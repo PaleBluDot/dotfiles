@@ -1,0 +1,20 @@
+{
+	"files.exclude": {
+		"**/.wakatime": false,
+		"**/.vscode-server-insiders": false,
+		"**/.oh-my-zsh": false,
+		"**/.npm": false,
+		"**/.nvm": false,
+		"**/.local": false,
+		"**/.landscape": false,
+		"**/.cache": false,
+		"**/.wakatime*": false,
+		"**/.zcompdump*": false,
+		"**/.bash_*": false,
+		"**/.motd_*": false,
+		"**/.shell.*": false,
+		"**/.sudo_*": false,
+		"**/.zsh_*": false,
+		"**/github": false
+	}
+}

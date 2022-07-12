@@ -1,0 +1,10 @@
+netlify-cli
+lerna
+cspell
+cspell-cli
+@palebludot/prettier-config
+@palebludot/eslint-config
+@palebludot/stylelint-config
+@palebludot/cspell-names
+@palebludot/cspell-locations
+@palebludot/cspell-personal
