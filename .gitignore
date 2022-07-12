@@ -1,0 +1,24 @@
+# IGNORE EVERYTHING
+/*
+
+# EXCEPT TRACK THESE FILES
+!README.md
+!/.zshrc
+!/.p10k.zsh
+!/.npmrc
+!/.gitignore
+!/.gitconfig
+!/.bashrc
+!/.aliases
+!/npm-global.txt
+!scripts/
+.scripts/*
+
+# cspell config
+!.config/configstore/cspell.json
+.config/configstore/*
+
+# ...and my VS Code settings...
+!.vscode/
+.vscode/*
+!.vscode/settings.json
