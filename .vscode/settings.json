@@ -1,20 +1,20 @@
 {
 	"files.exclude": {
-		"**/.wakatime": false,
-		"**/.vscode-server-insiders": false,
-		"**/.oh-my-zsh": false,
-		"**/.npm": false,
+		"**/.wakatime": true,
+		"**/.vscode-server-insiders": true,
+		"**/.oh-my-zsh": true,
+		"**/.npm": true,
 		"**/.nvm": false,
-		"**/.local": false,
-		"**/.landscape": false,
-		"**/.cache": false,
-		"**/.wakatime*": false,
-		"**/.zcompdump*": false,
-		"**/.bash_*": false,
-		"**/.motd_*": false,
-		"**/.shell.*": false,
-		"**/.sudo_*": false,
-		"**/.zsh_*": false,
-		"**/github": false
+		"**/.local": true,
+		"**/.landscape": true,
+		"**/.cache": true,
+		"**/.wakatime*": true,
+		"**/.zcompdump*": true,
+		"**/.bash_*": true,
+		"**/.motd_*": true,
+		"**/.shell.*": true,
+		"**/.sudo_*": true,
+		"**/.zsh_*": true,
+		"**/github": true
 	}
 }
