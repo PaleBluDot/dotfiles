@@ -3,7 +3,7 @@ echo ""
 echo "--------------------------"
 echo " Loaded ~/.zhrc"
 echo " Edit aliases: edit"
-echo " To refresh run: fresh"
+echo " To refresh run: refresh"
 echo " View all aliases: alias"
 echo "--------------------------"
 echo ""
@@ -16,7 +16,8 @@ echo ""
 alias edit="code ~/.aliases"
 
 # Force terminal to recognize changes to .zshrc
-alias fresh="source ~/.zshrc"
+alias refresh="source ~/.zshrc"
+alias fresh="refresh"
 
 # Ask before removing files
 alias rm="rm -i"
@@ -78,6 +79,7 @@ alias addgroup='sudo usermod -aG $1 $2'
 # Remove a group
 alias delgroup='sudo usermod -G $1 $2'
 
+alias exscripts='chmod +x ~/scripts/*'
 
 
 # !------------------------------------
