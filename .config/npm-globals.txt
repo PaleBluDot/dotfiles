@@ -1,0 +1,13 @@
+@palebludot/cspell-locations@1.1.1
+@palebludot/cspell-names@1.1.0
+@palebludot/cspell-personal@1.2.0
+@palebludot/eslint-config@0.4.1
+@palebludot/prettier-config@1.0.4
+@palebludot/stylelint-config@1.0.7
+corepack@0.12.0
+cspell-cli@6.1.7
+cspell@6.2.3
+lerna@5.1.8
+netlify-cli@10.9.0
+npm@8.13.2
+
