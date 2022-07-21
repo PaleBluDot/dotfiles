@@ -16,6 +16,9 @@
 		"**/.shell.*": true,
 		"**/.sudo_*": true,
 		"**/.zsh_*": true,
-		"**/github": true
+		"**/.node_*": true,
+		"**/github": true,
+		"**/.config/netlify": true,
+		"**/.config/wslu": true
 	}
 }
