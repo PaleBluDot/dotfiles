@@ -1,6 +1,9 @@
 {
 	"files.exclude": {
 		"**/.wakatime": true,
+		"**/.1password": true,
+		"**/.mozilla": true,
+		"**/.pki": true,
 		"**/.vscode-server-insiders": true,
 		"**/.oh-my-zsh": true,
 		"**/.npm": true,
@@ -18,6 +21,14 @@
 		"**/.zsh_*": true,
 		"**/.node_*": true,
 		"**/github": true,
+		"**/.config/1Password": true,
+		"**/.config/BraveSoftware": true,
+		"**/.config/chromium": true,
+		"**/.config/google-chrome": true,
+		"**/.config/google-chrome-beta": true,
+		"**/.config/google-chrome-unstable": true,
+		"**/.config/microsoft-edge-dev": true,
+		"**/.config/vivaldi*": true,
 		"**/.config/netlify": true,
 		"**/.config/wslu": true
 	}
