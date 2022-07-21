@@ -14,15 +14,13 @@
 
 !/.config/npm-global.txt
 !/.config/
-/.config/gh
-/.config/netlify
-/.config/wslu
+/.config/**
 
 
 # cspell config
 !.config/configstore/cspell.json
-.config/configstore/*
-/config/*
+!.config/configstore/
+/config/**
 
 # ...and my VS Code settings...
 !.vscode/
