@@ -9,13 +9,20 @@
 !/.gitconfig
 !/.bashrc
 !/.aliases
-!/npm-global.txt
 !scripts/
 .scripts/*
+
+!/.config/npm-global.txt
+!/.config/
+/.config/gh
+/.config/netlify
+/.config/wslu
+
 
 # cspell config
 !.config/configstore/cspell.json
 .config/configstore/*
+/config/*
 
 # ...and my VS Code settings...
 !.vscode/
