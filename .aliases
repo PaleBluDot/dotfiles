@@ -1,12 +1,5 @@
 # Intro message shown on terminal
-echo ""
-echo "--------------------------"
-echo " Loaded ~/.zhrc"
-echo " Edit aliases: edit"
-echo " To refresh run: refresh"
-echo " View all aliases: alias"
-echo "--------------------------"
-echo ""
+welcome.sh
 
 # !------------------------------------
 # @@@ STANDARD
