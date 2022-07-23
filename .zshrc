@@ -99,6 +99,7 @@ source $ZSH/oh-my-zsh.sh
 # export ARCHFLAGS="-arch x86_64"
 
 export PATH=$PATH:~/scripts
+export PATH=$PATH:~/
 
 # Alias definitions.
 # Set personal aliases, overriding those provided by oh-my-zsh libs,
