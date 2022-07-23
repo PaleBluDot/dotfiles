@@ -13,9 +13,7 @@ git config --global user.name "Pavel Sanchez"
 git config --global user.email "23495830+PaleBluDot@users.noreply.github.com"
 
 ### SSH Key
-ssh-keygen -t ed25519 -C "accounts@psanchez.me" -f ~/.ssh/id_ed25519 -N ""
-eval "$(ssh-agent -s)"
-ssh-add ~/.ssh/id_ed25519
+gh-ssh-keygen.sh
 
 
 # Install
@@ -40,4 +38,9 @@ sudo apt install gh
 gh auth login -p SSH -w
 
 ## NPM Packages
-< npm-global.txt xargs npm install --location=global
+< ~/.config/npm-globals.txt xargs npm install --location=global
+
+## Dotfiles
+git clone --depth=1 git@github.com:PaleBluDot/dotfiles.git ~/
+
+source ~/.zshrc
