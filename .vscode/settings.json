@@ -2,6 +2,7 @@
 	"files.exclude": {
 		"**/.wakatime": true,
 		"**/.1password": true,
+		"**/.dbus": true,
 		"**/.mozilla": true,
 		"**/.pki": true,
 		"**/.vscode-server-insiders": true,
@@ -30,6 +31,7 @@
 		"**/.config/microsoft-edge-dev": true,
 		"**/.config/vivaldi*": true,
 		"**/.config/netlify": true,
+		"**/.config/ibus": true,
 		"**/.config/wslu": true
 	}
 }
