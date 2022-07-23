@@ -25,7 +25,7 @@ read -p "Enter github email : " email
 read -p "Enter SSH key name : " sshkey
 ssh-keygen -t ed25519 -C "$email" -f ~/.ssh/${sshkey} -N '' <<<$'\n'
 
-# eval `ssh-agent -s`
+eval `ssh-agent -s`
 ssh-add ~/.ssh/${sshkey}
 pub=`cat ~/.ssh/${sshkey}.pub`
 
