@@ -1,39 +1,70 @@
 #!/bin/bash
 
 RED='\033[0;31m'
-BLUE='\033[0;34m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+DARK_BLUE='\033[0;34m'
+PINK='\033[0;35m'
+BLUE='\033[0;36m'
 NC='\033[0m'
 
+COUNT=$1
+STRING_NAME=$2
+
+Missing() {
+	echo
+	echo "Supply number argument to continue."
+	echo -e "example: count.sh ${RED}10"
+
+	exit 1
+}
+
+Fallback() {
+	echo
+	echo -e "Using default ${YELLOW}task-${NC} string."
+	echo
+
+	for (( count=1; count<=$COUNT; count++ ))
+	do
+		echo "task-$count"
+	done
+
+	echo
+	echo "Tip: You can supply a string to appear before the count."
+	echo -e "example: count.sh 10 ${RED}task-${NC}"
+
+	Output
+
+	exit 0
+}
+
+Custom() {
+	echo
+	echo -e "Looping number ${YELLOW}${STRING_NAME}1-$COUNT!${NC}"
+	echo
+
+	for (( count=1; count<=$COUNT; count++ ))
+	do
+		echo "${STRING_NAME}$count"
+	done
+
+	Output
+
+	exit 0
+}
+
+Output() {
+	echo
+	echo "All numbers have been successfully output. "
+	echo
+}
+
+
+
 if [ -z "$1" ]; then
-	echo ""
-	echo "No number argument has been supplied. Please supply one to continue."
-	echo -e "example: ${RED}count.sh 10"
-	exit 1
+	Missing
+elif [ -z "$2" ]; then
+	Fallback
 else
-	count=$1
+	Custom
 fi
-
-if [ -z "$2" ]; then
-	echo ""
-	echo "No number argument has been supplied. Please supply one to continue."
-	echo -e "example: ${RED}count.sh 10 task"
-	exit 1
-else
-	name=$1
-fi
-
-echo ""
-echo -e "Looping number ${BLUE}1-$1!${NC}"
-echo ""
-
-
-for (( count=1; count<=$1; count++ ))
-do
-	echo "$2$count"
-done
-
-echo ""
-echo "All numbers have been successfully output. "
-echo ""
-
-exit 0
