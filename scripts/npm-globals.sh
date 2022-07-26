@@ -10,54 +10,46 @@ NAME="NPM Globals"
 DESCRIPTION="This script pull all global NPM installed packages and writes it to a local text file. Local file is used on a build script on new installs."
 
 Help() {
-   # Display Help
-   echo
-	 echo "${NAME}: v$VERSION"
-   echo "${DESCRIPTION}"
-   echo
-   echo "Syntax: npm-globals.sh [-h|v]"
-   echo "options:"
-   echo "h     Print this Help."
-   echo "v     Print software version and exit."
-
-	 exit 0
+	# Display Help
+	echo
+	echo "${NAME}: v$VERSION"
+	echo "${DESCRIPTION}"
+	echo
+	echo "Syntax: npm-globals.sh [-h|v]"
+	echo "options:"
+	echo "h     Print this Help."
+	echo "v     Print software version and exit."
 }
 
 Default() {
 	echo
-	echo "Writting to default location ~/.config/npm-globals.txt"
-	npm ls --global > ~/.config/npm-globals.txt
-	sed -i '1d' ~/.config/npm-globals.txt
-	sed -i -e 's/[├── ]//g' ~/.config/npm-globals.txt
-	sed -i -e 's/[└ ]//g' ~/.config/npm-globals.txt
-
-	echo "Writting completed ~/.config/npm-globals.txt"
-	echo
-
+	echo "Writing to default location ~/.config/npm-globals.txt"
 	echo "Add location argument."
 	echo -e "example: npm-globals.sh ${RED}~/.config/npm-globals.txt${NC}"
+	echo
 
-	exit 0
+	npm ls --global | grep "" | tr -d "├── " | tail -n +2 | tee ~/.config/npm-globals.txt
+
+	echo
+	echo "Writing completed ~/.config/npm-globals.txt"
+	echo
 }
 
 Custom() {
 	echo
-	echo "Writting file to ${LOCATION}"
+	echo "Writing file to ${LOCATION}"
+	echo
 
-	npm ls --global > ${LOCATION}
-	sed -i '1d' ${LOCATION}
-	sed -i -e 's/[├── ]//g' ${LOCATION}
-	sed -i -e 's/[└ ]//g' ${LOCATION}
+	npm ls --global | grep "" | tr -d "├── " | tail -n +2 | tee ./${LOCATION}
 
+	echo
 	echo "Write completed ${LOCATION}"
-
-	exit 0
+	echo
 }
 
 Version() {
 	echo
 	echo "${NAME}: v${VERSION}"
-	exit 0
 }
 
 if [ -z "$1" ]; then
