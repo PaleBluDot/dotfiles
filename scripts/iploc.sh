@@ -24,7 +24,23 @@ if [[ $status == "success" ]]; then
 
 	city=$(echo $data | jq '.city' -r)
 	regionName=$(echo $data | jq '.regionName' -r)
-	country=$( echo $data | jq '.country' -r)
-	echo $city, $regionName in $country.
+	country=$(echo $data | jq '.country' -r)
+	timezone=$(echo $data | jq '.timezone' -r)
+	isp=$(echo $data | jq '.isp' -r)
+	org=$(echo $data | jq '.org' -r)
+	ip=$(echo $data | jq '.query' -r)
+	lat=$(echo $data | jq '.lat' -r)
+	lon=$(echo $data | jq '.lon' -r)
+	maps=$(echo "https://www.google.com/maps/place/@${lat},${lon},17z/")
+
+	echo
+	echo -e "IP:\t\t${ip}"
+	echo -e "Org:\t\t${isp}"
+	echo -e "ISP:\t\t${org}"
+	echo -e "City:\t\t${city}"
+	echo -e "Region:\t\t${regionName}"
+	echo -e "Country:\t${country}"
+	echo -e "Timezone:\t${timezone}"
+	echo -e "Map:\t\t${maps}"
 fi
 
