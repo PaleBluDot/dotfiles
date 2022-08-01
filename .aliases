@@ -74,6 +74,8 @@ alias delgroup='sudo usermod -G $1 $2'
 
 alias exscripts='chmod +x ~/scripts/*'
 
+alias sshcopy="ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 22 $1"
+
 
 # !------------------------------------
 # @@@ GIT
