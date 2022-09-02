@@ -2,63 +2,22 @@
 welcome.sh
 
 # !------------------------------------
-# @@@ STANDARD
+# @@@ LINUX
 # !------------------------------------
-
-# Edit aliases
-alias edit="code ~/.aliases"
-
 # Force terminal to recognize changes to .zshrc
 alias refresh="source ~/.zshrc"
 alias fresh="refresh"
 
-# Ask before removing files
-alias rm="rm -i"
-
-# Switch to sudo user
-alias sudo="sudo -i"
-
-# Open VSCode Insiders
-alias code="code-insiders"
-
-# Use teach user data
-alias teach="code-insiders --extensions-dir ~/code_profiles/teach/exts --user-data-dir ~/code_profiles/teach/data"
-
-# Search history. Example usage: `histg git` to recent commands that use git
-alias histg="history | grep"
-
-# Get your current IP
-alias myip="curl http://ipecho.net/plain; echo"
-
 # Clear terminal
 alias c="clear"
 
-# Reboot
-alias reboot="sudo reboot"
+alias ll="ls -la"
 
-# Rotate Screen
-alias r0="echo 0 | sudo tee /sys/class/graphics/fbcon/rotate"
-alias r1="echo 1 | sudo tee /sys/class/graphics/fbcon/rotate"
-alias r2="echo 2 | sudo tee /sys/class/graphics/fbcon/rotate"
-alias r3="echo 3 | sudo tee /sys/class/graphics/fbcon/rotate"
+# Ask before removing files
+alias rm="rm -i"
 
-# Update
-alias update='sudo apt update'
-
-# Configure Static IP
-alias netcfg='sudo nano /etc/netplan/50-cloud-init.yaml'
-
-# Configure Hostname
-alias cloudcfg='sudo nano /etc/cloud/cloud.cfg'
-
-# Install Package
-alias install='sudo apt install $1'
-
-# Remove Package
-alias rmdpkg='sudo apt-get --purge remove $1'
-
-# See Groups
-alias group='cat /etc/group'
+# Update and Upgrade
+alias uu='sudo apt update && sudo apt upgrade -y'
 
 # Create a user
 alias adduser='sudo adduser $1'
@@ -72,9 +31,68 @@ alias addgroup='sudo usermod -aG $1 $2'
 # Remove a group
 alias delgroup='sudo usermod -G $1 $2'
 
+# Search history. Example usage: `histg git` to recent commands that use git
+alias histg="history | grep"
+
+# Remove Package
+alias rmdpkg='sudo apt-get --purge remove $1'
+
+# Make all files in ~/scripts executable
 alias exscripts='chmod +x ~/scripts/*'
 
+# Copy SSH Key to remote server
 alias sshcopy="ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 22 $1"
+
+
+
+# !------------------------------------
+# @@@ CHANGE DIRECTORIES
+# !------------------------------------
+alias home="cd ~/"
+alias github="cd ~/github"
+alias aclu-emails="cd ~/github/PaleBluDot/aclu-emails"
+alias cspell-dictionaries="cd ~/github/PaleBluDot/cspell-dictionaries"
+alias lint-config="cd ~/github/PaleBluDot/lint-config"
+alias psd="cd ~/github/PaleBluDot/website"
+alias publications="cd ~/github/American-Technion-Society/publications"
+alias ats-emails="cd ~/github/American-Technion-Society/email-templates"
+alias ats="cd ~/github/American-Technion-Society/purple"
+alias tasteink="cd ~/github/taste-ink/tasteink.studio"
+alias sshd="cd /etc/ssh"
+
+function mkprj {
+	echo "Selected org:"
+	select org in $(exec ls ~/github)
+
+	do
+		echo "You selected $org"
+		echo "Name of the project?"
+		read project
+		mkdir ~/github/$org/$project
+		cd ~/github/$org/$project
+		git init
+		code-insiders .
+		echo "Project created in ~/github/$org/$project"
+		break;
+	done
+}
+
+
+# !------------------------------------
+# @@@ FILE EDITS
+# !------------------------------------
+# Edit aliases
+alias edit="code ~/.aliases"
+
+# Configure Static IP
+alias netcfg='sudo nano /etc/netplan/50-cloud-init.yaml'
+
+# Configure Hostname
+alias cloudcfg='sudo nano /etc/cloud/cloud.cfg'
+
+# See Groups
+alias group='cat /etc/group'
+
 
 
 # !------------------------------------
@@ -98,13 +116,6 @@ alias save="gaa && gcm \"chore: save point\""
 alias incom="gaa && gcm \"initial commit\""
 alias cached="git rm -r --cached"
 
-
-function husky {
-	echo "\n⏳ Creating…\n"
-	npx husky add .husky/"$1" "$2" # Local delete.
-	echo "\n✅ Husky script has been created.\n"
-}
-
 function delete {
 	# Branch name present?
 	if [[ -z "$1" ]]; then
@@ -119,6 +130,8 @@ function delete {
 	fi
 }
 
+
+
 # !------------------------------------
 # @@@ NPM
 # !------------------------------------
@@ -129,6 +142,33 @@ alias build="npm run build"
 alias dev="npm run dev"
 alias start="npm run start"
 alias commit="npm run commit"
+
+# Create a Husky script
+function husky {
+	echo "\n⏳ Creating…\n"
+	npx husky add .husky/"$1" "$2" # Local delete.
+	echo "\n✅ Husky script has been created.\n"
+}
+
+
+
+# !------------------------------------
+# @@@ GET INFO
+# !------------------------------------
+# Get your current IP
+alias myip="curl http://ipecho.net/plain; echo"
+
+
+
+# !------------------------------------
+# @@@ OS SPECIFIC
+# !------------------------------------
+# Open VSCode Insiders
+alias code="code-insiders"
+
+# Use teach user data
+alias teach="code-insiders --extensions-dir ~/code_profiles/teach/exts --user-data-dir ~/code_profiles/teach/data"
+
 
 
 # !------------------------------------
