@@ -98,7 +98,6 @@ source $ZSH/oh-my-zsh.sh
 # Compilation flags
 # export ARCHFLAGS="-arch x86_64"
 
-export PATH=$PATH:~/scripts
 export PATH=$PATH:~/
 
 # Alias definitions.
@@ -117,7 +116,3 @@ export NVM_DIR="$HOME/.nvm"
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
-
-eval "$(op completion zsh)"; compdef _op op
-
-eval "$(starship init zsh)"
