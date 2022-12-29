@@ -9,8 +9,7 @@
 !/.gitconfig
 !/.bashrc
 !/.aliases
-!scripts/
-.scripts/*
+!bin/
 
 !/.config/npm-global.txt
 !/.config/
