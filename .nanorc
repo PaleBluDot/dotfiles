@@ -1,0 +1,6 @@
+set linenumbers
+set autoindent
+set cut
+set matchbrackets
+set tabsize 2
+set softwrap
