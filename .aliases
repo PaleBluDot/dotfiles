@@ -36,7 +36,7 @@ alias histg="history | grep"
 alias rmdpkg='sudo apt-get --purge remove $1'
 
 # Make all files in ~/scripts executable
-alias exscripts='chmod +x ~/scripts/*'
+alias xbin='chmod +x ~/bin/*'
 
 # Copy SSH Key to remote server
 alias sshcopy="ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 22 $1"
