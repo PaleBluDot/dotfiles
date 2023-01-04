@@ -5,6 +5,8 @@
 ## 2. task 2
 ########################
 
+source colors.sh
+
 dotfiles=$HOME/.config/dotfiles
 
 if [[ ! -d $dotfiles ]]
