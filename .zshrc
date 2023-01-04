@@ -24,7 +24,7 @@ source welcome.sh
 if [[ -n $SSH_CONNECTION ]]; then
   export EDITOR='nano'
 else
-  export EDITOR='vscode'
+  export EDITOR='code'
 fi
 
 if [ -f ~/.aliases ]; then
