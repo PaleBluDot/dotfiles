@@ -4,6 +4,7 @@
 # Force terminal to recognize changes to .zshrc
 alias refresh="source ~/.zshrc"
 alias fresh="refresh"
+alias bashrc="source ~/.bashrc"
 
 # Clear terminal
 alias c="clear"
