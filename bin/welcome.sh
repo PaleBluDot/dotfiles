@@ -8,26 +8,29 @@ PINK='\033[0;35m'
 BLUE='\033[0;36m'
 NC='\033[0m'
 
+echo -e "${BLUE}-------------------------------------------------------${NC}"
+echo -e " ${RED}__      __       .__                               ";
+echo -e "/  \    /  \ ____ |  |   ____  ____   _____   ____  ";
+echo -e "\   \/\/   // __ \|  | _/ ___\/  _ \ /     \_/ __ \ ";
+echo -e " \        /\  ___/|  |_\  \__(  <_> )  Y Y  \  ___/ ";
+echo -e "  \__/\  /  \___  >____/\___  >____/|__|_|  /\___  >";
+echo -e "       \/       \/          \/            \/     \/ ${NC}";
+
+echo -e "${BLUE}-------------------------------------------------------${NC}"
+
+echo -e " ${YELLOW}${USER}${NC} is on ${YELLOW}${HOSTNAME}${NC}"
 echo
-echo -e "${BLUE}--------------------------${NC}"
-echo -e " ${YELLOW}Welcome ${USER}${NC}"
-echo
-echo -e " Loaded ${BLUE}~/.zhrc${NC}"
+if [[ -n "$ZSH_VERSION" ]]
+then
+	echo -e " Loaded ${BLUE}~/.zhrc${NC}"
+else
+	echo -e " Loaded ${BLUE}~/.bashrc${NC}"
+fi
 echo -e " Edit aliases: ${BLUE}edit${NC}"
 echo -e " To refresh run: ${BLUE}fresh${NC}"
 echo -e " View all aliases: ${BLUE}alias${NC}"
-echo -e "${BLUE}--------------------------${NC}"
+
+echo -e "${BLUE}-------------------------------------------------------${NC}"
 echo
 
-# echo
-# echo -e "Writing ${YELLOW}npm ls --globals${NC} to file..."
-# npm ls --global | grep "" | tr -d "├── " | tail -n +2 > ~/.config/npm-globals.txt
-# echo -e "Writing completed to ${YELLOW}~/.config/npm-globals.txt${NC}."
-# echo
-
-# Doing a git pull to bring in
-# any fresh changes.
-REPO=$(git config --get remote.origin.url)
-echo -e "Updating ${YELLOW}${REPO}${NC}..."
-git pull
-echo
+source gitPull.sh
