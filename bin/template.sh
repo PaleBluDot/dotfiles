@@ -41,6 +41,7 @@ zsh_setup() {
 	# my personal .zshrc
 	rm -rf $HOME/.zshrc
 	ln -fs $dotfiles/.zshrc ~/.zshrc
+	source ~/.zshrc
 }
 
 node_setup() {
