@@ -1,19 +1,31 @@
 #!/bin/bash
 
 ##########################################
-# Script Name:		config.sh
+# Script Name:		dotfiles.sh
 # Author:					pavel sanchez
 # Email:					support@tasteink.me
-# Description:		copy personal config files
+# Description:		insatlling dotfiles
 # args:						- none
 ##########################################
 
-dotfiles() {
-	dotfiles=$HOME/.config/dotfiles
+##########################################
+######	VARIABLES
+##########################################
 
-	if [[ ! -d $dotfiles ]]
+NAME="$(basename $0)"
+
+export DOTFILES="$HOME/.config/dotfiles"
+
+##########################################
+######	FUNCTIONS
+##########################################
+
+dotfiles() {
+	echo -e "${YELLOW}[-] Downloading Dotfiles [-]${NC}"
+
+	if [[ ! -d $DOTFILES ]]
 	then
-		git clone https://github.com/PaleBluDot/dotfiles.git $dotfiles
+		git clone https://github.com/PaleBluDot/dotfiles.git $DOTFILES
 	fi
 
 	if [[ ! -d $HOME/.ssh/ ]]
@@ -21,27 +33,45 @@ dotfiles() {
 		mkdir $HOME/.ssh
 	fi
 
-	ln -fs $dotfiles/.config/authorized ~/.ssh/authorized_keys
-	ln -fs $dotfiles/.config/npm-globals.txt ~/.config/npm-globals.txt
+	ln -fs $DOTFILES/.config/npm-globals.txt ~/.config/npm-globals.txt
+	ln -fs $DOTFILES/.config/configstore/cspell.json ~/.config/cspell.json
+	ln -fs $DOTFILES/.vscode/ ~/.vscode
+	ln -fs $DOTFILES/bin/ ~/bin
 
+	ln -fs $DOTFILES/.aliases ~/.aliases
+	ln -fs $DOTFILES/.bashrc ~/.bashrc
+	ln -fs $DOTFILES/.gitconfig ~/.gitconfig
+	ln -fs $DOTFILES/.nanorc ~/.nanorc
+	ln -fs $DOTFILES/.npmrc ~/.npmrc
 
-	ln -fs $dotfiles/.config/configstore/ ~/.config/configstore
-	ln -fs $dotfiles/.vscode/ ~/.vscode
-	ln -fs $dotfiles/bin/ ~/bin
+	echo -e "${YELLOW}[-] Linking Dotfiles [-]${NC}"
+cat << EOF
+.aliases ---> 		~/.aliases
+.bashrc ---> 		~/.bashrc
+.gitconfig ---> 	~/.gitconfig
+.nanorc ---> 		~/.nanorc
+.npmrc ---> 		~/.npmrc
+.vscode/ ---> 		~/.vscode
+bin/ ---> 		~/bin
+cspell.json ---> 	~/.config/cspell.json
+npm-globals.txt ---> 	~/.config/npm-globals.txt
+EOF
 
+	chmod +x ~/bin/*
 
-	ln -fs $dotfiles/.aliases ~/.aliases
-	ln -fs $dotfiles/.bashrc ~/.bashrc
-	ln -fs $dotfiles/.gitconfig ~/.gitconfig
-	ln -fs $dotfiles/.nanorc ~/.nanorc
-	ln -fs $dotfiles/.npmrc ~/.npmrc
-	ln -fs $dotfiles/.p10k.zsh ~/.p10k.zsh
-	ln -fs $dotfiles/.zshrc ~/.zshrc
 	echo "all config files linked"
 	echo
 }
 
-dotfiles
+main() {
+	dotfiles
+}
+
+
+##########################################
+###### EXECUTE
+##########################################
+main
 
 echo
-echo -e "Completed ${YELLOW}${NAME^}${NC} on ${CYAN}$(date +%c)${NC}"
+echo -e "Completed ${YELLOW}${NAME}${NC} on ${CYAN}$(date +%c)${NC}"

@@ -12,7 +12,8 @@ echo -e "       \/       \/          \/            \/     \/ ${NC}";
 
 echo -e "${BLUE}-------------------------------------------------------${NC}"
 
-echo -e " ${YELLOW}${USER}${NC} is on ${YELLOW}${HOSTNAME}${NC}"
+echo
+echo -e " ${YELLOW}${USER}${NC} is on ${YELLOW}$(hostname)${NC}"
 echo
 if [[ -n "$ZSH_VERSION" ]]
 then
@@ -23,8 +24,6 @@ fi
 echo -e " Edit aliases: ${BLUE}edit${NC}"
 echo -e " To refresh run: ${BLUE}fresh${NC}"
 echo -e " View all aliases: ${BLUE}alias${NC}"
-
-echo -e "${BLUE}-------------------------------------------------------${NC}"
 echo
 
 source gitPull.sh
