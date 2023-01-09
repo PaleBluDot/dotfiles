@@ -41,7 +41,28 @@ alias xbin='chmod +x ~/bin/*'
 # Copy SSH Key to remote server
 alias sshcopy="ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 22 $1"
 
+alias gd="gobust"
 
+# Find DIR that are common hack points
+gobust() {
+	URL=$1
+	MODE=$2
+	WORDLIST=~/.config/gobuster-wordlist.txt
+
+	if [ -z $URL ]
+	then
+		echo "Error: no URL provided"
+	fi
+
+	if [ $MODE = "dns" ] 2&> /dev/null
+	then
+		# echo "Using mode: $MODE"
+		gobuster -u $URL -w "$WORDLIST" -m $MODE
+	else
+		# echo "Using mode: dir"
+		gobuster -u "https://$URL" -w "$WORDLIST"
+	fi
+}
 
 # !------------------------------------
 # @@@ CHANGE DIRECTORIES
