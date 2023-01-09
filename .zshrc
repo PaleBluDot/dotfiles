@@ -15,8 +15,14 @@ zstyle ':omz:update' frequency 7
 
 plugins=(
   git
+  git-auto-fetch
+  dotenv
   zsh-syntax-highlighting
   zsh-autosuggestions
+  colored-man-pages
+  composer
+  copypath
+
 )
 
 source $ZSH/oh-my-zsh.sh
