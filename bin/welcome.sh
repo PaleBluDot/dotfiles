@@ -25,5 +25,3 @@ echo -e " Edit aliases: ${BLUE}edit${NC}"
 echo -e " To refresh run: ${BLUE}fresh${NC}"
 echo -e " View all aliases: ${BLUE}alias${NC}"
 echo
-
-source gitPull.sh
