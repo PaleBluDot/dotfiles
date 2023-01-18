@@ -9,7 +9,9 @@
 		"lorem-ipsum",
 		"networking-terms",
 		"node",
+		"npm",
 		"php",
+		"powershell",
 		"typescript",
 		"companies",
 		"locations",
@@ -18,9 +20,9 @@
 		"es-es"
 	],
 	"import": [
-		"/home/pbd/.nvm/versions/node/v16.16.0/lib/node_modules/@palebludot/cspell-locations/cspell-ext.json",
-		"/home/pbd/.nvm/versions/node/v16.16.0/lib/node_modules/@palebludot/cspell-names/cspell-ext.json",
-		"/home/pbd/.nvm/versions/node/v16.16.0/lib/node_modules/@palebludot/cspell-personal/cspell-ext.json",
-		"/home/pbd/.nvm/versions/node/v16.16.0/lib/node_modules/@cspell/dict-es-es/cspell-ext.json"
+		"/usr/lib/node_modules/@palebludot/cspell-locations/cspell-ext.json",
+		"/usr/lib/node_modules/@palebludot/cspell-names/cspell-ext.json",
+		"/usr/lib/node_modules/@palebludot/cspell-personal/cspell-ext.json",
+		"/usr/lib/node_modules/@cspell/dict-es-es/cspell-ext.json"
 	]
 }
