@@ -2,14 +2,18 @@
 # @@@ LINUX
 # !------------------------------------
 # Force terminal to recognize changes to .zshrc
-alias refresh="source ~/.zshrc"
+if [[ -n "$ZSH_VERSION" ]]
+then
+	alias refresh="source ~/.zshrc"
+else
+	alias refresh="source ~/.bashrc"
+fi
 alias fresh="refresh"
-alias bashrc="source ~/.bashrc"
 
 # Clear terminal
 alias c="clear"
 
-alias ll="ls -la"
+alias ll="ls -lha"
 
 # Ask before removing files
 alias rm="rm -i"
@@ -42,6 +46,8 @@ alias xbin='chmod +x ~/bin/*'
 alias sshcopy="ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 22 $1"
 
 alias gd="gobust"
+
+alias alre="sed -i 's/~\/.bash_aliases/~\/.aliases/g' ~/.bashrc"
 
 # Find DIR that are common hack points
 gobust() {
@@ -88,7 +94,7 @@ function mkprj {
 		echo "You selected $org"
 		echo "Name of the project?"
 		read project
-		mkdir ~/github/$org/$project
+		mkdir -p ~/github/$org/$project
 		cd ~/github/$org/$project
 		git init
 		code-insiders .
@@ -174,11 +180,12 @@ function husky {
 
 
 # !------------------------------------
-# @@@ GET INFO
+# @@@ NETWORKING
 # !------------------------------------
 # Get your current IP
 alias myip="curl http://ipecho.net/plain; echo"
 alias localip="ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'"
+alias ping="ping -c 3"
 
 
 # !------------------------------------
