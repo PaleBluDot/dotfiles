@@ -108,12 +108,7 @@ function mkprj {
 # @@@ FILE EDITS
 # !------------------------------------
 # Edit aliases
-if [[ "$EDITOR" == "code" ]]
-then
-	echo -e "alias edit="code ~/.aliases""
-else
-	echo -e "alias edit="nano ~/.aliases""
-fi
+alias edit="$EDITOR ~/.aliases"
 
 # Configure Static IP
 alias netcfg='sudo nano /etc/netplan/50-cloud-init.yaml'
