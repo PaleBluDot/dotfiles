@@ -51,8 +51,8 @@ alias alre="sed -i 's/~\/.bash_aliases/~\/.aliases/g' ~/.bashrc"
 
 # Find DIR that are common hack points
 gobust() {
-	URL=$1
-	MODE=$2
+	MODE=$1
+	URL=$2
 	WORDLIST=~/.config/gobuster-wordlist.txt
 
 	if [ -z $URL ]
@@ -63,10 +63,10 @@ gobust() {
 	if [ $MODE = "dns" ] 2&> /dev/null
 	then
 		# echo "Using mode: $MODE"
-		gobuster -u $URL -w "$WORDLIST" -m $MODE
+		gobuster $MODE -d $URL -w "$WORDLIST"
 	else
 		# echo "Using mode: dir"
-		gobuster -u "https://$URL" -w "$WORDLIST"
+		gobuster -d "https://$URL" -w "$WORDLIST"
 	fi
 }
 
@@ -196,6 +196,8 @@ alias code="code-insiders"
 
 # Use teach user data
 alias teach="code-insiders --extensions-dir ~/code_profiles/teach/exts --user-data-dir ~/code_profiles/teach/data"
+
+alias brew-installs="brew list > .config/brew.txt"
 
 
 
