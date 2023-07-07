@@ -11,7 +11,7 @@ if ! [ -x "$(command -v jq)" ]; then
 fi
 
 if [[ $# -ne 1 ]]; then
-	echo 'Provide I.P as command line parameter. Usage:  ' $0 ' 15.45.0.1 '
+	echo 'Provide IP as command line parameter. Usage:  ' $0 ' 15.45.0.1 '
 	exit 1
 fi
 
