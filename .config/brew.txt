@@ -10,6 +10,7 @@ ca-certificates
 composer
 curl
 docker
+docker-completion
 fontconfig
 freetds
 freetype
@@ -58,8 +59,10 @@ php
 powerlevel10k
 python@3.11
 readline
+rename
 rtmpdump
 screenresolution
+sharewifi
 speedtest-cli
 sqlite
 tidy-html5
@@ -70,3 +73,5 @@ wp-cli
 xz
 yarn
 zstd
+espanso
+raycast
