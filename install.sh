@@ -120,12 +120,34 @@ dotfiles() {
 		".profile"
 	)
 
+	INSTALL=$(yq eval '.links.*' symlinks.yml)
+	SOURCE=$(yq eval '.links | keys' symlinks.yml)
+
+	ln -fs $DOTFILES/config/git/.gitconfig ~/.gitconfig
+	ln -fs $DOTFILES/config/zsh/.zshrc ~/.zshrc
+	ln -fs $DOTFILES/config/zsh/.aliases ~/.aliases
+	ln -fs $DOTFILES/config/bash/.bashrc ~/.bashrc
+
+	for file in ${INSTALL[@]}; do
+		if [[ ! -L "$file" ]]; then
+			echo -e "$file 	=> ${GREEN}[INSTALLING]${NC}"
+			sleep 0.5
+		else
+			echo -e "$file 	=> ${LIGHTRED}[SKIPPED]${NC}"
+			sleep 0.2
+		fi
+	done
+
+	echo
+	echo "break"
+	echo
+
 	for file in ${linkfiles[@]}; do
 		install=~/$file
 
 		if [[ ! -L $install ]]; then
 			echo -e "~/$file 	=> ${GREEN}[INSTALLING]${NC}"
-			ln -fs "${DOTFILES}/"$file $install
+			# ln -fs "${DOTFILES}/"$file $install
 			sleep 0.5
 		else
 			echo -e "~/$file 	=> ${LIGHTRED}[SKIPPED]${NC}"
