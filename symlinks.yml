@@ -1,8 +1,8 @@
 links:
-  ${DOTFILES}/config/bash/.profile: ~/.profile
-  ${DOTFILES}/config/git/.gitconfig: ~/.gitconfig
-  ${DOTFILES}/config/npm/.npmrc: ~/.npmrc
-  ${DOTFILES}/config/terminal/.nanorc: ~/.nanorc
-  ${DOTFILES}/config/zsh/.zshrc: ~/.zshrc
-  ${DOTFILES}/config/zsh/.aliases: ~/.aliases
-  ${DOTFILES}/config/zsh/.p10k.zsh: ~/.p10k.zsh
+  /config/bash/.profile: "~/.profile"
+  /config/git/.gitconfig: "~/.gitconfig"
+  /config/npm/.npmrc: "~/.npmrc"
+  /config/terminal/.nanorc: "~/.nanorc"
+  /config/zsh/.zshrc: "~/.zshrc"
+  /config/zsh/.aliases: "~/.aliases"
+  /config/zsh/.p10k.zsh: "~/.p10k.zsh"
