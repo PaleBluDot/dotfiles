@@ -72,7 +72,7 @@ dotfiles() {
 		msg_info "Repo already exists at $DOTFILES"
 	fi
 
-	if [[ ! -d "~/.ssh/ "]]
+	if [[ ! -d ~/.ssh/ ]]
 	then
 		mkdir ~/.ssh
 	fi
