@@ -72,9 +72,9 @@ dotfiles() {
 		msg_info "Repo already exists at $DOTFILES"
 	fi
 
-	if [[ ! -d ~/.ssh/ ]]
+	if [[ ! -d $HOME/.ssh/ ]]
 	then
-		mkdir ~/.ssh
+		mkdir $HOME/.ssh
 	fi
 
 	header "Linking Dotfiles"
