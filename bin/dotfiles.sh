@@ -33,6 +33,7 @@ NC='\033[0m'
 set -a
 export DOTFILES="$HOME/.config/dotfiles"
 set +a
+
 ##########################################
 ######	FUNCTIONS
 ##########################################
@@ -89,7 +90,6 @@ dotfiles() {
 		".gitconfig"
 		".nanorc"
 		".profile"
-		"bin/"
 	)
 
 	for file in ${linkfiles[@]}; do
@@ -106,7 +106,11 @@ dotfiles() {
 		fi
 	done
 
-	chmod +x $HOME/bin/* 2> /dev/null
+	msg_info "${DOTFILES}/bin/* 	=> INSTALLING"
+	ln -fs "${DOTFILES}/bin/*" "$HOME"
+	chmod +x "$HOME/bin/*"
+	sleep 0.5
+	msg_ok "$HOME/bin/* 	=> INSTALLED"
 
 	echo
 	msg_ok "All files linked"

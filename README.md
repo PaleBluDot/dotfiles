@@ -1,5 +1,6 @@
 # Dotfiles
 
+Install with this script
 ```bash
-curl -s -L https://raw.githubusercontent.com/PaleBluDot/dotfiles/main/bin/hostname.sh | sudo bash -s starter
+curl -s -L https://raw.githubusercontent.com/PaleBluDot/dotfiles/dev/bin/dotfiles.sh | bash -s
 ```
