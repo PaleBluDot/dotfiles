@@ -14,57 +14,108 @@
 
 NAME="$(basename $0)"
 
-export DOTFILES="$HOME/.config/dotfiles"
+export DOTFILES="~/.config/dotfiles"
+
+if [ "$VERBOSE" = "yes" ]; then set -x; STD=""; else STD="silent"; fi
+
+silent() { "$@" > /dev/null 2>&1; }
 
 ##########################################
 ######	FUNCTIONS
 ##########################################
+function header() {
+  local msg="$1"
+	echo
+  echo -e "${YELLOW}[-] ${msg} [-]${NC}"
+}
+
+function subHeader() {
+  local msg="$1"
+	echo
+  echo -e "${CYAN}${msg}${NC}"
+}
+
+function msg_info() {
+  local msg="$1"
+  echo -e "${CYAN} ${INFO} ${msg}${NC}"
+}
+
+function msg_ok() {
+  local msg="$1"
+  echo -e "${GREEN} ${CM} ${msg} ${NC}"
+}
+
+function msg_error() {
+  local msg="$1"
+  echo -e "${LIGHTRED} ${CROSS} ${msg} ${NC}"
+}
 
 dotfiles() {
-	echo -e "${YELLOW}[-] Downloading Dotfiles [-]${NC}"
+	header "Downloading Dotfiles"
 
 	if [[ ! -d $DOTFILES ]]
 	then
 		git clone https://github.com/PaleBluDot/dotfiles.git $DOTFILES
+	else
+		msg_info "Repo already exists at $DOTFILES\n"
 	fi
 
-	if [[ ! -d $HOME/.ssh/ ]]
+	if [[ ! -d ~/.ssh/ ]]
 	then
-		mkdir $HOME/.ssh
+		mkdir ~/.ssh
 	fi
 
-	ln -fs $DOTFILES/.config/npm-globals.txt ~/.config/npm-globals.txt
-	ln -fs $DOTFILES/.config/configstore/cspell.json ~/.config/cspell.json
-	ln -fs $DOTFILES/.vscode/ ~/.vscode
-	ln -fs $DOTFILES/bin/ ~/bin
+	header "Linking Dotfiles"
+	msg_info "Checking if files are exist..."
+	sleep 0.2
+	echo
 
-	ln -fs $DOTFILES/.aliases ~/.aliases
-	ln -fs $DOTFILES/.bashrc ~/.bashrc
-	ln -fs $DOTFILES/.gitconfig ~/.gitconfig
-	ln -fs $DOTFILES/.nanorc ~/.nanorc
-	ln -fs $DOTFILES/.npmrc ~/.npmrc
+	linkfiles=(
+		".aliases"
+		".bashrc"
+		".gitconfig"
+		".nanorc"
+		".profile"
+		"bin/"
+	)
 
-	echo -e "${YELLOW}[-] Linking Dotfiles [-]${NC}"
-cat << EOF
-.aliases ---> 		~/.aliases
-.bashrc ---> 		~/.bashrc
-.gitconfig ---> 	~/.gitconfig
-.nanorc ---> 		~/.nanorc
-.npmrc ---> 		~/.npmrc
-.vscode/ ---> 		~/.vscode
-bin/ ---> 		~/bin
-cspell.json ---> 	~/.config/cspell.json
-npm-globals.txt ---> 	~/.config/npm-globals.txt
-EOF
+	for file in ${linkfiles[@]}; do
+		install=~/$file
+
+		if [[ ! -L $install ]]; then
+			msg_info "$file 	=> INSTALLING"
+			ln -fs "${DOTFILES}/"$file $install
+			sleep 0.3
+			msg_ok "$file 	=> INSTALLED"
+		else
+			msg_error "$file 	=> SKIPPED"
+			sleep 0.1
+		fi
+	done
 
 	chmod +x ~/bin/*
 
-	echo "all config files linked"
+	echo
+	msg_ok "All files linked"
+}
+
+details() {
+	header "Details"
+	echo -e "Ended: ${CYAN}$(date +%c)${NC} "
+	echo -e "Duration: ${CYAN}$runtime second(s)${NC}"
+	echo
+	msg_ok "Dotfiles installation complete"
 	echo
 }
 
 main() {
+	start=`date +%s`
+	echo
 	dotfiles
+	details
+	echo
+	end=`date +%s`
+	runtime=$((end-start))
 }
 
 
@@ -72,6 +123,3 @@ main() {
 ###### EXECUTE
 ##########################################
 main
-
-echo
-echo -e "Completed ${YELLOW}${NAME}${NC} on ${CYAN}$(date +%c)${NC}"

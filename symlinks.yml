@@ -1,8 +1,34 @@
 links:
-  /config/bash/.profile: "~/.profile"
-  /config/git/.gitconfig: "~/.gitconfig"
-  /config/npm/.npmrc: "~/.npmrc"
-  /config/terminal/.nanorc: "~/.nanorc"
-  /config/zsh/.zshrc: "~/.zshrc"
-  /config/zsh/.aliases: "~/.aliases"
-  /config/zsh/.p10k.zsh: "~/.p10k.zsh"
+  aliases:
+    install: .aliases
+    source: config/zsh/.aliases
+  bashrc:
+    install: .bashrc
+    source: config/bash/.bashrc
+  # gitconfig:
+  #   install: .gitconfig
+  #   source: config/git/.gitconfig
+  # nanorc:
+  #   install: .nanorc
+  #   source: config/terminal/.nanorc
+  # neo:
+  #   install: .config/neofetch/config.conf
+  #   source: config/terminal/neofetch.conf
+  # npmrc:
+  #   install: .npmrc
+  #   source: config/npm/.npmrc
+  # npmGlobals:
+  #   install: .config/.npm-globals.txt
+  #   source: config/npm/.npm-globals.txt
+  # p10k:
+  #   install: .p10k.zsh~
+  #   source: config/zsh/.p10k.zsh
+  # profile:
+  #   install: .profile
+  #   source: config/bash/.profile
+  # ssh:
+  #   install: .ssh/authorized
+  #   source: config/terminal/authorized
+  # zshrc:
+  #   install: .zshrc
+  #   source: config/zsh/.zshrc

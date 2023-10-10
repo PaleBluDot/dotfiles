@@ -39,7 +39,7 @@ silent() { "$@" > /dev/null 2>&1; }
 ##########################################
 ######	FUNCTIONS
 ##########################################
-function error_handler() {
+error_handler() {
   local exit_code="$?"
   local line_number="$1"
   local command="$2"
@@ -47,46 +47,71 @@ function error_handler() {
   echo -e "\n$error_message\n"
 }
 
-function header() {
+header() {
   local msg="$1"
 	echo
   echo -e "${YELLOW}[-] ${msg} [-]${NC}"
 }
 
-function subHeader() {
+subHeader() {
   local msg="$1"
-	echo
   echo -e "${CYAN}${msg}${NC}"
 }
 
-function msg_info() {
+msg_info() {
   local msg="$1"
   echo -e "${CYAN} ${INFO} ${msg}${NC}"
 }
 
-function msg_ok() {
+msg_ok() {
   local msg="$1"
   echo -e "${GREEN} ${CM} ${msg} ${NC}"
 }
 
-function msg_error() {
+msg_error() {
   local msg="$1"
   echo -e "${LIGHTRED} ${CROSS} ${msg} ${NC}"
 }
 
-usage() {
-	header "${NAME^} v$VERSION Help"
-	echo -e "A file for building scripts."
+# Checks if a given package is installed
+command_exists () {
+  command -v "$1" 1> /dev/null
+}
 
-	echo -e "\nSyntax: ${YELLOW}${NAME^}${NC} ${LIGHTRED}-[i|h]${NC}"
+# On error, displays death banner, and terminates app with exit code 1
+terminate () {
+  make_banner "Installation failed. Terminating..." ${RED_B}
+  exit 1
+}
+
+# Checks if command / package (in $1) exists and then shows
+# either shows a warning or error, depending if package required ($2)
+system_verify () {
+  if ! command_exists $1; then
+    if $2; then
+      echo -e "🚫 ${RED_B}Error:${PLAIN_B} $1 is not installed${RESET}"
+      terminate
+    else
+      echo -e "⚠️  ${YELLOW_B}Warning:${PLAIN_B} $1 is not installed${RESET}"
+    fi
+  fi
+}
+
+usage() {
+	header "Dotfiles Install Help"
+	echo -e "Install script for dotfiles repository!"
+	subHeader "version: ${VERSION}"
+
+	echo -e "\nSyntax: ${YELLOW}${NAME}${NC} ${LIGHTRED}-[i|h]${NC}\n"
 
 	subHeader "Options:"
 	echo -e "-i    			install dotfiles"
 	echo -e "-h    			print software help."
+	echo
 
 	subHeader "Examples:"
-	echo -e "${NAME^} -i		install dotfiles"
-	echo -e "${NAME^} -h		print help"
+	echo -e "${NAME} -i		install dotfiles"
+	echo -e "${NAME} -h		print help"
 	echo
 
 	exit 1
@@ -109,55 +134,37 @@ dotfiles() {
 	sleep 0.2
 	echo
 
-	linkfiles=(
-		".aliases"
-		".bashrc"
-		".gitconfig"
-		".nanorc"
-		".npmrc"
-		".zshrc"
-		".p10k.zsh"
-		".profile"
-	)
+	if ! command_exists "yq"; then
+		msg_error "Command missing..."
+	fi
 
-	INSTALL=$(yq eval '.links.*' symlinks.yml)
-	SOURCE=$(yq eval '.links | keys' symlinks.yml)
+	SYMLINKS=$(yq eval '.links.*.install' symlinks.yml)
+	INSTALL_LOC=$(yq eval '.links.*.install' symlinks.yml)
+	SOURCE_LOC=$(yq eval '.links.*.source' symlinks.yml)
 
-	ln -fs $DOTFILES/config/git/.gitconfig ~/.gitconfig
-	ln -fs $DOTFILES/config/zsh/.zshrc ~/.zshrc
-	ln -fs $DOTFILES/config/zsh/.aliases ~/.aliases
-	ln -fs $DOTFILES/config/bash/.bashrc ~/.bashrc
-
-	for file in ${INSTALL[@]}; do
-		if [[ ! -L "$file" ]]; then
-			echo -e "$file 	=> ${GREEN}[INSTALLING]${NC}"
-			sleep 0.5
-		else
-			echo -e "$file 	=> ${LIGHTRED}[SKIPPED]${NC}"
-			sleep 0.2
-		fi
-	done
-
-	echo
-	echo "break"
-	echo
-
-	for file in ${linkfiles[@]}; do
-		install=~/$file
+	for file in ${SYMLINKS[@]}; do
+		source="$DOTFILES/$SOURCE_LOC"
+		install="$HOME/test/$file"
 
 		if [[ ! -L $install ]]; then
-			echo -e "~/$file 	=> ${GREEN}[INSTALLING]${NC}"
-			# ln -fs "${DOTFILES}/"$file $install
-			sleep 0.5
+			msg_info "$file	=> $(msg_ok "INSTALLING")"
+			sleep 0.2
+			echo
+			echo "source: $source"
+			echo "install: $install"
+			echo "symlink: $source $install"
+			echo
+			ln -fs $source $install
+			msg_ok "Completed: $install"
 		else
-			echo -e "~/$file 	=> ${LIGHTRED}[SKIPPED]${NC}"
+			msg_info "$file 	=> $(msg_error "SKIPPED")"
 			sleep 0.2
 		fi
 	done
 
-	echo
 	msg_ok "All files linked"
 }
+
 
 details() {
 	header "Details"
@@ -186,7 +193,7 @@ main() {
 ###### EXECUTE
 ##########################################
 if [ $# -eq 0 ]; then
-	>&2 usage
+	>&2 main
 	exit 1
 fi
 
