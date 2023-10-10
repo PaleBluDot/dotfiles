@@ -105,7 +105,7 @@ dotfiles() {
 		fi
 	done
 
-	chmod +x $HOME/bin/*
+	chmod +x $HOME/bin/* 2> /dev/null
 
 	echo
 	msg_ok "All files linked"
