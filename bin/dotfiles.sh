@@ -96,7 +96,7 @@ dotfiles() {
 
 		if [[ ! -L $install ]]; then
 			msg_info "$file 	=> INSTALLING"
-			# ln -fs "${DOTFILES}/"$file $install
+			ln -fs "${DOTFILES}/"$file $install
 			sleep 0.3
 			msg_ok "$file 	=> INSTALLED"
 		else
