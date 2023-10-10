@@ -69,7 +69,10 @@ dotfiles() {
 
 	if [[ ! -d $DOTFILES ]]
 	then
+		msg_info "$DOTFILES repo Doesn't exists"
 		git clone https://github.com/PaleBluDot/dotfiles.git $DOTFILES
+		sleep 0.5
+		msg_ok " Repo installed at $DOTFILES"
 	else
 		msg_info "Repo already exists at $DOTFILES"
 	fi
