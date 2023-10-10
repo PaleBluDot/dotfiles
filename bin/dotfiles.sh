@@ -107,7 +107,7 @@ dotfiles() {
 	done
 
 	msg_info "${DOTFILES}/bin/* 	=> INSTALLING"
-	ln -fs "${DOTFILES}/bin/*" $HOME
+	ln -fs $DOTFILES/bin/* $HOME
 	chmod +x $HOME/bin/*
 	sleep 0.5
 	msg_ok "$HOME/bin/* 	=> INSTALLED"
