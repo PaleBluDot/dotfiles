@@ -14,7 +14,23 @@
 
 NAME="$(basename $0)"
 
-export DOTFILES="~/.config/dotfiles"
+RETRY_NUM=2
+RETRY_EVERY=3
+INFO="${GN}${CL}"
+CM="${GN}${CL}"
+CROSS="${RD}${CL}"
+BFR="\\r\\033[K"
+HOLD="-"
+
+YELLOW='\033[1;33m'
+CYAN='\033[1;36m'
+GREEN='\033[1;32m'
+LIGHTRED='\033[0;31m'
+LIGHTGREEN='\033[0;32m'
+LIGHTYELLOW='\033[0;33m'
+NC='\033[0m'
+
+export DOTFILES="$HOME/.config/dotfiles"
 
 ##########################################
 ######	FUNCTIONS
@@ -53,10 +69,10 @@ dotfiles() {
 	then
 		git clone https://github.com/PaleBluDot/dotfiles.git $DOTFILES
 	else
-		msg_info "Repo already exists at $DOTFILES\n"
+		msg_info "Repo already exists at $DOTFILES"
 	fi
 
-	if [[ ! -d ~/.ssh/ ]]
+	if [[ ! -d "~/.ssh/ "]]
 	then
 		mkdir ~/.ssh
 	fi
@@ -72,15 +88,14 @@ dotfiles() {
 		".gitconfig"
 		".nanorc"
 		".profile"
-		"bin/"
 	)
 
 	for file in ${linkfiles[@]}; do
-		install=~/$file
+		install=$HOME/$file
 
 		if [[ ! -L $install ]]; then
 			msg_info "$file 	=> INSTALLING"
-			ln -fs "${DOTFILES}/"$file $install
+			# ln -fs "${DOTFILES}/"$file $install
 			sleep 0.3
 			msg_ok "$file 	=> INSTALLED"
 		else
