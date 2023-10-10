@@ -30,8 +30,9 @@ LIGHTGREEN='\033[0;32m'
 LIGHTYELLOW='\033[0;33m'
 NC='\033[0m'
 
+set -a
 export DOTFILES="$HOME/.config/dotfiles"
-
+set +a
 ##########################################
 ######	FUNCTIONS
 ##########################################
