@@ -88,6 +88,7 @@ dotfiles() {
 		".gitconfig"
 		".nanorc"
 		".profile"
+		"bin/"
 	)
 
 	for file in ${linkfiles[@]}; do
@@ -104,13 +105,14 @@ dotfiles() {
 		fi
 	done
 
-	chmod +x ~/bin/*
+	chmod +x $HOME/bin/*
 
 	echo
 	msg_ok "All files linked"
 }
 
 details() {
+	runtime=$((end-start))
 	header "Details"
 	echo -e "Ended: ${CYAN}$(date +%c)${NC} "
 	echo -e "Duration: ${CYAN}$runtime second(s)${NC}"
@@ -123,10 +125,9 @@ main() {
 	start=`date +%s`
 	echo
 	dotfiles
-	details
 	echo
 	end=`date +%s`
-	runtime=$((end-start))
+	details
 }
 
 
