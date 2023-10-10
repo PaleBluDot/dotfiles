@@ -106,8 +106,8 @@ dotfiles() {
 		fi
 	done
 
-	msg_info "${DOTFILES}/bin/* 	=> INSTALLING"
-	ln -fs "${DOTFILES}/bin/*" $HOME/bin
+	msg_info "${DOTFILES}/bin/ 	=> INSTALLING"
+	ln -fs "${DOTFILES}/bin/" $HOME/bin
 	# chmod +x $HOME/bin/*
 	sleep 0.5
 	msg_ok "$HOME/bin/* 	=> INSTALLED"
