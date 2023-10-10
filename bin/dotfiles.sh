@@ -16,10 +16,6 @@ NAME="$(basename $0)"
 
 export DOTFILES="~/.config/dotfiles"
 
-if [ "$VERBOSE" = "yes" ]; then set -x; STD=""; else STD="silent"; fi
-
-silent() { "$@" > /dev/null 2>&1; }
-
 ##########################################
 ######	FUNCTIONS
 ##########################################
