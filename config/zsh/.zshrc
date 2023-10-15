@@ -4,9 +4,8 @@ fi
 
 export PATH=$HOME/bin:/usr/local/bin:$PATH
 export ZSH="$HOME/.oh-my-zsh"
-export PATH=$PATH:~/bin
-export GITHUB_DIR=$HOME/github
-export DOTFILES=$GITHUB_DIR/PaleBluDot/dotfiles
+export GITHUB=$HOME/github
+export DOTFILES=$HOME/.config/dotfiles
 
 ZSH_THEME="powerlevel10k/powerlevel10k"
 HIST_STAMPS="yyyy-mm-dd"
@@ -36,7 +35,7 @@ else
 fi
 
 if [ -f ~/.aliases ]; then
-    . ~/.aliases
+  source ~/.aliases
 fi
 
 export NVM_DIR="$HOME/.nvm"
