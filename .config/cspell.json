@@ -20,9 +20,9 @@
 		"es-es"
 	],
 	"import": [
-		"/usr/lib/node_modules/@palebludot/cspell-locations/cspell-ext.json",
-		"/usr/lib/node_modules/@palebludot/cspell-names/cspell-ext.json",
-		"/usr/lib/node_modules/@palebludot/cspell-personal/cspell-ext.json",
-		"/usr/lib/node_modules/@cspell/dict-es-es/cspell-ext.json"
+		"/opt/homebrew/lib/node_modules/@palebludot/cspell-locations/cspell-ext.json",
+		"/opt/homebrew/lib/node_modules/@palebludot/cspell-names/cspell-ext.json",
+		"/opt/homebrew/lib/node_modules/@palebludot/cspell-personal/cspell-ext.json",
+		"/opt/homebrew/lib/node_modules/@cspell/dict-es-es/cspell-ext.json"
 	]
 }

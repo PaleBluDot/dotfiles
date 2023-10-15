@@ -1,9 +1,15 @@
 #!/bin/bash
 
+# Raycast Script Command Template
+#
+# Duplicate this file and remove ".template." from the filename to get started.
+# See full documentation here: https://github.com/raycast/script-commands
+#
+# Required parameters:
 # @raycast.schemaVersion 1
-# @raycast.title Open Port
+# @raycast.title myScript
 # @raycast.mode fullOutput
-# @raycast.packageName Networking
+# @raycast.packageName Raycast Scripts
 #
 # Optional parameters:
 # @raycast.icon 🤖
@@ -15,4 +21,4 @@
 # @raycast.author Pavel Sanchez
 # @raycast.authorURL https://github.com/palebludot/dotfiles
 
-sudo netstat -tulpn | grep LISTEN
+echo "Hello from My First Script"

@@ -7,6 +7,7 @@ else
     name=$1
 fi
 
+cd ~/Github
 echo "Cloning repo from $1..."
 
 gh repo list $1 --limit 100 | while read -r repo _; do
