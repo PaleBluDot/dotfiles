@@ -108,9 +108,9 @@ pushover() {
   https://api.pushover.net/1/messages.json
 }
 
-dotfiles() {
+dotfiles-update() {
 	if [[ -z "${DOTFILES}" ]]; then
-		echo "Does not Exits. Creating `$DOTFILES`"
+		echo "Does not Exits. Creating dotfiles."
 		export DOTFILES="$HOME/.config/dotfiles"
 	fi
 
