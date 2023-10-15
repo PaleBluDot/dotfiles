@@ -117,6 +117,7 @@ dotfiles-update() {
 	cd $DOTFILES
 	git checkout main
 	git pull
+	fresh 1> /dev/null
 	cd $HOME
 }
 
