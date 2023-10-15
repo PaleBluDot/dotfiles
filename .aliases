@@ -51,8 +51,8 @@ alias alre="sed -i 's/~\/.bash_aliases/~\/.aliases/g' ~/.bashrc"
 
 # Find DIR that are common hack points
 gobust() {
-	URL=$1
-	MODE=$2
+	MODE=$1
+	URL=$2
 	WORDLIST=~/.config/gobuster-wordlist.txt
 
 	if [ -z $URL ]
@@ -63,10 +63,10 @@ gobust() {
 	if [ $MODE = "dns" ] 2&> /dev/null
 	then
 		# echo "Using mode: $MODE"
-		gobuster -u $URL -w "$WORDLIST" -m $MODE
+		gobuster $MODE -d $URL -w "$WORDLIST"
 	else
 		# echo "Using mode: dir"
-		gobuster -u "https://$URL" -w "$WORDLIST"
+		gobuster -d "https://$URL" -w "$WORDLIST"
 	fi
 }
 
@@ -123,16 +123,16 @@ dotfiles() {
 # @@@ CHANGE DIRECTORIES
 # !------------------------------------
 alias home="cd ~/"
-alias github="cd ~/github"
-alias aclu-emails="cd ~/github/PaleBluDot/aclu-emails"
-alias cspell-dictionaries="cd ~/github/PaleBluDot/cspell-dictionaries"
-alias lint-config="cd ~/github/PaleBluDot/lint-config"
-alias psd="cd ~/github/PaleBluDot/website"
-alias config="cd ~/github/PaleBluDot/dotfiles"
-alias publications="cd ~/github/American-Technion-Society/publications"
-alias ats-emails="cd ~/github/American-Technion-Society/email-templates"
-alias ats="cd ~/github/American-Technion-Society/purple"
-alias tasteink="cd ~/github/taste-ink/tasteink.studio"
+alias github="cd ~/Github"
+alias aclu-emails="cd ~/Github/PaleBluDot/aclu-emails"
+alias cspell-dictionaries="cd ~/Github/PaleBluDot/cspell-dictionaries"
+alias lint-config="cd ~/Github/PaleBluDot/lint-config"
+alias psd="cd ~/Github/PaleBluDot/website"
+alias dotfiles="cd ~/Github/PaleBluDot/dotfiles"
+alias publications="cd ~/Github/American-Technion-Society/publications"
+alias ats-emails="cd ~/Github/American-Technion-Society/email-templates"
+alias ats="cd ~/Github/American-Technion-Society/purple"
+alias tasteink="cd ~/Github/taste-ink/tasteink.studio"
 alias sshd="cd /etc/ssh"
 
 function mkprj {
@@ -158,6 +158,8 @@ function mkprj {
 # !------------------------------------
 # Edit aliases
 alias edit="$EDITOR ~/.aliases"
+
+alias base="$EDITOR ~/Library/CloudStorage/OneDrive-Personal/Documents/Espanso/match/base.yml"
 
 # Configure Static IP
 alias netcfg='sudo nano /etc/netplan/50-cloud-init.yaml'
@@ -236,6 +238,28 @@ alias myip="curl http://ipecho.net/plain; echo"
 alias localip="ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'"
 alias ping="ping -c 3"
 
+loip() {
+	local name="$(ifconfig | grep "flags=" | awk '{print $1}')"
+	local ip=$(ifconfig | grep "inet ")
+
+	# ifconfig | grep "inet " | grep -Fv 127.0.0.1 | awk '{print $2}'
+
+	# echo $name
+	# echo $ip
+
+	if [[ ! -z "$ip" ]]; then
+			echo "$name"
+	fi
+}
+
+getent() {
+  [ "$1" = "hosts" ] && shift
+  for x
+  do
+    echo $(dscacheutil -q host -a name $x | awk '/^ip_address/{print $NF}')
+  done
+}
+
 
 # !------------------------------------
 # @@@ OS SPECIFIC
@@ -245,6 +269,8 @@ alias code="code-insiders"
 
 # Use teach user data
 alias teach="code-insiders --extensions-dir ~/code_profiles/teach/exts --user-data-dir ~/code_profiles/teach/data"
+
+alias brew-installs="brew list > .config/brew.txt"
 
 
 
