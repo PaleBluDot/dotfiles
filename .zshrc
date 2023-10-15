@@ -6,7 +6,7 @@ export PATH=$HOME/bin:/usr/local/bin:$PATH
 export ZSH="$HOME/.oh-my-zsh"
 export PATH=$PATH:~/bin
 export GITHUB_DIR=$HOME/github
-export DOTFILES=$GITHUB_DIR/PaleBluDot/dotfiles
+export DOTFILES=$HOME/.config/dotfiles
 
 ZSH_THEME="powerlevel10k/powerlevel10k"
 HIST_STAMPS="yyyy-mm-dd"
