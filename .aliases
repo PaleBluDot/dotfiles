@@ -70,6 +70,55 @@ gobust() {
 	fi
 }
 
+pushover() {
+	APP_TOKEN="azgrm981bxopyyxd74b7qbrisxxfjx"
+	USER_TOKEN="g4yhnf9391i3wgpgkvi7scruipy2g7"
+	MESSAGE=$1
+	TITLE=$2
+	PRIORITY=$3
+	URL=$4
+	USER=$(whoami)
+	HOSTNAME=$(uname -n)
+
+	if [ $# -eq 0 ]; then
+		echo "Usage: pushover <message> [title] <priority> [url]"
+		exit 1
+	fi
+
+	if [ $# -lt 2 ]; then
+		TITLE="$USER@$HOSTNAME"
+		PRIORITY="0"
+		URL="https://example.com/"
+	fi
+
+	if [ $# -lt 3 ]; then
+		PRIORITY="0"
+		URL="https://example.com/"
+	fi
+
+	curl -s \
+  --form-string "token=$APP_TOKEN" \
+  --form-string "user=$USER_TOKEN" \
+  --form-string "html=1" \
+  --form-string "priority=$PRIORITY" \
+  --form-string "retry=60" \
+  --form-string "expire=3600" \
+  --form-string "title=$TITLE" \
+  --form-string "message=<b>$HOSTNAME:</b> $MESSAGE! <i>From user: $USER</i> <a href=\"$URL\"><b>View</b></a>" \
+  https://api.pushover.net/1/messages.json
+}
+
+dotfiles() {
+	if [[ -z "${DOTFILES}" ]]; then
+		echo "Does not Exits. Creating `$DOTFILES`"
+		export DOTFILES="$HOME/.config/dotfiles"
+	fi
+
+	cd $DOTFILES
+	git checkout main
+	git pull
+}
+
 # !------------------------------------
 # @@@ CHANGE DIRECTORIES
 # !------------------------------------
