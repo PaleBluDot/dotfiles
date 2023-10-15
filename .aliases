@@ -114,10 +114,12 @@ dotfiles-update() {
 		export DOTFILES="$HOME/.config/dotfiles"
 	fi
 
+	clear
 	cd $DOTFILES
 	git checkout main
 	git pull
-	fresh 1> /dev/null
+	clear
+	fresh
 	cd $HOME
 }
 
