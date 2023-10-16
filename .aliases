@@ -124,11 +124,13 @@ dotfiles-update() {
 }
 
 checkGit() {
-	if [ $(git status --porcelain | wc -l) -eq "0" ]; then
-		echo "  🟢 Git repo is clean."
+	COUNT=$(git status --porcelain | wc -l)
+
+	if [ $COUNT -eq "0" ]; then
+		echo "  🟢${LIGHTGREEN}$COUNT changes!${NC} Git repo is clean."
 	else
-		echo "  🔴 Git repo dirty. Quit."
-		exit 1
+		echo "  🔴${LIGHTRED}$COUNT changes!${NC} Git repo dirty."
+		return
 	fi
 }
 
