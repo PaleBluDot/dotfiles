@@ -7,13 +7,16 @@
 # Description:		script for testing.
 # args:						- none
 ##########################################
-shopt -s expand_aliases
+# Copyright (c) 2021-2023 tteck
+# Author: tteck (tteckster)
+# License: MIT
+# https://github.com/tteck/Proxmox/raw/main/LICENSE
+##########################################
 
 if [ "$VERBOSE" = "yes" ]; then set -x; STD=""; else STD="silent"; fi
 
 silent() { "$@" > /dev/null 2>&1; }
 
-NAME="$(basename $0)"
 YW=$(echo "\033[33m")
 RD=$(echo "\033[01;31m")
 BL=$(echo "\033[36m")
@@ -22,8 +25,8 @@ CL=$(echo "\033[m")
 
 RETRY_NUM=2
 RETRY_EVERY=3
-CM="${GN}✔️${CL}"
-CROSS="${RD}❌${CL}"
+CM="${GN}✓${CL}"
+CROSS="${RD}✗${CL}"
 BFR="\\r\\033[K"
 HOLD="-"
 
@@ -36,7 +39,6 @@ function error_handler() {
   local command="$2"
   local error_message="${RD}[ERROR]${CL} in line ${RD}$line_number${CL}: exit code ${RD}$exit_code${CL}: while executing command ${YW}$command${CL}"
   echo -e "\n$error_message\n"
-  notify "$error_message"
 }
 
 function msg_info() {
@@ -54,44 +56,11 @@ function msg_error() {
   echo -e "${BFR} ${CROSS} ${RD}${msg}${CL}"
 }
 
-function msg_complete() {
-  local msg="$1"
-  echo -e "${BFR} ${CM} ${GN}${msg}${CL}"
-  notify "✅ $NAME: ${msg}" 2>&1 /dev/null
-}
-
-function notify() {
-  local APP_TOKEN="azgrm981bxopyyxd74b7qbrisxxfjx"
-	local USER_TOKEN="g4yhnf9391i3wgpgkvi7scruipy2g7"
-	local MESSAGE=$1
-	local PRIORITY=0
-	local PATH=$(pwd)
-	local USER=$(/usr/bin/whoami)
-	local HOSTNAME=$(/usr/bin/uname -n)
-  local TITLE=$USER@$HOSTNAME
-
-	if [ $# -eq 0 ]; then
-		echo "Usage: pushover <message>"
-		exit 1
-	fi
-
-  /usr/bin/curl -s \
-  --form-string "token=$APP_TOKEN" \
-  --form-string "user=$USER_TOKEN" \
-  --form-string "html=1" \
-  --form-string "priority=$PRIORITY" \
-  --form-string "retry=60" \
-  --form-string "expire=3600" \
-  --form-string "title=$TITLE" \
-  --form-string "message=<b>$MESSAGE</b> $PATH" \
-  https://api.pushover.net/1/messages.json
-}
-
 msg_info "Starting setup script"
-sleep 0.5
-msg_ok "Set up Container OS"
+sleep 2
+# msg_ok "Set up Container OS"
 
-# set +e
+set +e
 trap - ERR
 
 if ping -c 1 -W 1 1.1.1.1 &> /dev/null;
@@ -121,23 +90,24 @@ set -e
 trap 'error_handler $LINENO "$BASH_COMMAND"' ERR
 
 msg_info "Updating Container OS"
-sleep 0.5
+brew update
+brew upgrade
 msg_ok "Updated Container OS"
-
-msg_info "Checking Dependencies"
-if ! hash curl 2>/dev/null; then
-  echo -e "\\n\\033[31m$(basename "$0") needs curl installed.\\033[0m\n"
-  exit 1
-fi
-msg_ok "Checked Dependencies"
 
 
 msg_info "Installing Dependencies"
 sleep 1
 msg_ok "Installed Dependencies"
 
-msg_info "Sending Notification"
-msg_complete "Script set up complete!"
-sleep 2
 
+msg_info "Installing UniFi Network Application (Patience)"
+sleep 1
+msg_ok "Installed UniFi Network Application"
+
+
+# msg_info "SSH Only"
+# if [[ "${SSH_ROOT}" == "yes" ]];
+# then
+# 	sed -i "s/#PermitRootLogin prohibit-password/PermitRootLogin yes/g" /etc/ssh/sshd_config; systemctl restart sshd;
+# fi
 msg_ok "Set Up Complete"
