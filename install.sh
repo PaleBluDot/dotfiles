@@ -144,18 +144,16 @@ dotfiles() {
 
 	for file in ${SYMLINKS[@]}; do
 		source="$DOTFILES/$SOURCE_LOC"
-		install="$HOME/test/$file"
+		install="$HOME/$INSTALL_LOC"
 
 		if [[ ! -L $install ]]; then
 			msg_info "$file	=> $(msg_ok "INSTALLING")"
-			sleep 0.2
 			echo
-			echo "source: $source"
-			echo "install: $install"
-			echo "symlink: $source $install"
+			echo -e "symlink:\n$source $install"
 			echo
 			ln -fs $source $install
-			msg_ok "Completed: $install"
+			sleep 0.2
+			msg_ok "Completed:\n$install"
 		else
 			msg_info "$file 	=> $(msg_error "SKIPPED")"
 			sleep 0.2

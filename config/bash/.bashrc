@@ -116,5 +116,5 @@ if ! shopt -oq posix; then
   fi
 fi
 
-# Intro message shown on terminal
+export PATH=$HOME/bin:/usr/local/bin:$PATH
 source welcome.sh

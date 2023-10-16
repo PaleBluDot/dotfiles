@@ -21,7 +21,7 @@ links:
   #   install: .config/.npm-globals.txt
   #   source: config/npm/.npm-globals.txt
   # p10k:
-  #   install: .p10k.zsh~
+  #   install: .p10k.zsh
   #   source: config/zsh/.p10k.zsh
   # profile:
   #   install: .profile
@@ -29,6 +29,6 @@ links:
   # ssh:
   #   install: .ssh/authorized
   #   source: config/terminal/authorized
-  # zshrc:
-  #   install: .zshrc
-  #   source: config/zsh/.zshrc
+  zshrc:
+    install: .zshrc
+    source: config/zsh/.zshrc
