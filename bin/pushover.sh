@@ -252,7 +252,6 @@ do
       ;;
     -T|--title)
 			title="${2:-}"
-			echo "title is blank"
 			shift
       ;;
     -d|--device)
