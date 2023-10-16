@@ -1,0 +1,90 @@
+# Espanso Match File
+
+name: utils
+package_author: Pavel Sanchez <info@tasteink.me>
+parent: base
+matches:
+  - trigger: ";html-link"
+    replace: "<a href='{{clipboard}}' />$|$</a>"
+    vars:
+      - name: "clipboard"
+        type: "clipboard"
+
+# Outputs public IP address
+  - trigger: ";ip"
+    replace: "{{output}}"
+    vars:
+      - name: output
+        type: shell
+        params:
+          cmd: "curl 'https://api.ipify.org'"
+
+# Outputs SSH Pub Key
+  - trigger: ";ssh"
+    replace: "{{output}}"
+    vars:
+      - name: output
+        type: shell
+        params:
+          cmd: "cat ~/.ssh/macbook.pub"
+
+# Outputs Current Time
+  - trigger: ";time"
+    replace: "It's {{mytime}}"
+    vars:
+      - name: mytime
+        type: date
+        params:
+          format: "%I:%M %P"
+
+# Outputs Today's Date (Day of Week, Month Day, Year)
+  - trigger: ";today"
+    replace: "{{today}}"
+    vars:
+      - name: today
+        type: date
+        params:
+          format: "%A, %B %d, %Y"
+          locale: "en-US"
+
+# Outputs the current weather for your location
+  - trigger: ";weather"
+    replace: "{{output}}"
+    vars:
+      - name: output
+        type: shell
+        params:
+          cmd: "curl 'http://wttr.in/?format=3'"
+
+# Outputs the month and year (e.g. January 2020)
+  - trigger: ";month"
+    replace: "{{date}}"
+    vars:
+    - name: date
+      type: date
+      params:
+        format: "%B %Y"
+
+# Auto close brackets, quotes and formatting modifiers, and put cursor in center
+  - trigger: ';('
+    replace: '($|$)'
+  - trigger: ';['
+    replace: '[$|$]'
+  - trigger: ';{'
+    replace: '{$|$}'
+  - trigger: ';<'
+    replace: '<$|$>'
+  - trigger: ';`'
+    replace: '`$|$`'
+  - trigger: ";\'"
+    replace: "\'$|$\'"
+  - trigger: ';"'
+    replace: '"$|$"'
+  - trigger: ';_'
+    replace: '_$|$_'
+  - trigger: ';*'
+    replace: '*$|$*'
+  - trigger: ';-'
+    replace: '-$|$-'
+
+# For a complete introduction, visit the official docs at: https://espanso.org/docs/

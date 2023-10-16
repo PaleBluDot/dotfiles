@@ -1,0 +1,16 @@
+# Espanso Match File
+
+name: ATS
+package_author: Pavel Sanchez <info@tasteink.me>
+parent: base
+matches:
+  - trigger: ";atsip"
+    replace: "35.227.136.104"
+
+  - trigger: ";atsstaged"
+    replace: "https://atsstaged.wpengine.com/wp-admin"
+
+  - trigger: ";atsp"
+    replace: "275b06b4"
+
+# For a complete introduction, visit the official docs at: https://espanso.org/docs/
