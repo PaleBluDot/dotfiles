@@ -127,9 +127,9 @@ checkGit() {
 	COUNT=$(git status --porcelain | wc -l)
 
 	if [ $COUNT -eq "0" ]; then
-		echo "  🟢${LIGHTGREEN}$COUNT changes!${NC} Git repo is clean."
+		echo "  🟢 ${LIGHTGREEN}$COUNT changes!${NC} Git repo is clean."
 	else
-		echo "  🔴${LIGHTRED}$COUNT changes!${NC} Git repo dirty."
+		echo "  🔴 ${LIGHTRED}$COUNT changes!${NC} Git repo dirty."
 		return
 	fi
 }
