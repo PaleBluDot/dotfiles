@@ -1,16 +1,12 @@
 #!/bin/bash
 
 ##########################################
-# Script Name:		trial.sh
-# Author:					pavel sanchez
-# Email:					support@tasteink.me
-# Description:		script for testing.
-# args:						- none
-##########################################
-# Copyright (c) 2021-2023 tteck
-# Author: tteck (tteckster)
-# License: MIT
-# https://github.com/tteck/Proxmox/raw/main/LICENSE
+# Script Name:    trial.sh
+# Author:         pavel sanchez
+# Email:          support@tasteink.me
+# Description:    script for testing.
+# args:
+#  - none
 ##########################################
 
 if [ "$VERBOSE" = "yes" ]; then set -x; STD=""; else STD="silent"; fi
@@ -90,8 +86,7 @@ set -e
 trap 'error_handler $LINENO "$BASH_COMMAND"' ERR
 
 msg_info "Updating Container OS"
-brew update
-brew upgrade
+sleep 2
 msg_ok "Updated Container OS"
 
 
@@ -99,15 +94,4 @@ msg_info "Installing Dependencies"
 sleep 1
 msg_ok "Installed Dependencies"
 
-
-msg_info "Installing UniFi Network Application (Patience)"
-sleep 1
-msg_ok "Installed UniFi Network Application"
-
-
-# msg_info "SSH Only"
-# if [[ "${SSH_ROOT}" == "yes" ]];
-# then
-# 	sed -i "s/#PermitRootLogin prohibit-password/PermitRootLogin yes/g" /etc/ssh/sshd_config; systemctl restart sshd;
-# fi
 msg_ok "Set Up Complete"
