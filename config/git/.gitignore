@@ -1,0 +1,8 @@
+.env
+.pushover.cfg
+node_modules
+.DS_Store
+*.pdf
+*.mpg
+*.mp3
+*.aac
