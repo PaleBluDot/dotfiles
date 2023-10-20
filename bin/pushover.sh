@@ -8,7 +8,22 @@
 # Description:		Script for Pushover notification
 # License: 				MIT
 # Copyright:		  (c) 2023 Pavel Sanchez
+# Copyright:		  (c) 2023 Pavel Sanchez
 # args:
+#  -t, --token
+#  -u, --user
+#  -m, --message
+#  -T, --title
+#  -p, --priority
+#  -s, --sound
+#  -a, --attachment
+#  -U, --url
+#  --url_title
+#  -r, --retry
+#  -e, --expire
+#  -d, --device
+#  -H, --html
+#  -M, --monospace
 #  -t, --token
 #  -u, --user
 #  -m, --message
@@ -305,6 +320,7 @@ trap 'error_handler $LINENO "$BASH_COMMAND"' ERR
 ##########################################
 ###### EXECUTE
 ##########################################
+start=`date +%s`
 start=`date +%s`
 msg_info "Starting setup script"
 
