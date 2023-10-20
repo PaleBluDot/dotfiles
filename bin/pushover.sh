@@ -7,9 +7,22 @@
 # Email:					support@tasteink.me
 # Description:		Script for Pushover notification
 # License: 				MIT
-# Copyright:			(c) 2023 Pavel Sanchez
+# Copyright:		  (c) 2023 Pavel Sanchez
 # args:
-#  - none
+#  -t, --token
+#  -u, --user
+#  -m, --message
+#  -T, --title
+#  -p, --priority
+#  -s, --sound
+#  -a, --attachment
+#  -U, --url
+#  --url_title
+#  -r, --retry
+#  -e, --expire
+#  -d, --device
+#  -H, --html
+#  -M, --monospace
 ######################################################
 
 if [ "$VERBOSE" = "yes" ]; then set -x; STD=""; else STD="silent"; fi
@@ -20,9 +33,9 @@ trap 'error_handler $LINENO "$BASH_COMMAND"' ERR
 readonly NAME="$(basename $0)"
 readonly VERSION="v0.0.1"
 readonly API_URL="https://api.pushover.net/1/messages.json"
-readonly CONFIG_FILE="pushover.cfg"
+readonly CONFIG_FILE=".pushover.cfg"
 readonly DEFAULT_CONFIG="/etc/pushover/${CONFIG_FILE}"
-readonly USER_OVERRIDE=$DOTFILES/config/terminal/${CONFIG_FILE}
+readonly USER_OVERRIDE="$HOME/${CONFIG_FILE}"
 readonly EXPIRE_DEFAULT=180
 readonly RETRY_DEFAULT=30
 HIDE_REPLY=true
@@ -40,6 +53,7 @@ CROSS="❌"
 BFR="\\r\\033[K"
 HOLD="-"
 
+curl --version > /dev/null 2>&1 || { echo "This script requires curl; aborting."; echo; exit 1; }
 
 ##########################################
 ######	FUNCTIONS
@@ -285,16 +299,13 @@ do
   shift
 done
 
-curl --version > /dev/null 2>&1 || { echo "This script requires curl; aborting."; echo; exit 1; }
-
-
-
 set -e
 trap 'error_handler $LINENO "$BASH_COMMAND"' ERR
 
 ##########################################
 ###### EXECUTE
 ##########################################
+start=`date +%s`
 msg_info "Starting setup script"
 
 msg_info "Checking Dependencies"
@@ -310,4 +321,7 @@ msg_info "Sending Message"
 main
 msg_ok "Message Sent"
 
-msg_ok "Set Up Complete"
+end=`date +%s`
+runtime=$((end-start))
+
+msg_ok "Set Up Complete. Runtime: ${runtime}"
