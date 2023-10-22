@@ -8,7 +8,9 @@ then
 else
 	alias refresh="source ~/.bashrc"
 fi
+
 alias fresh="refresh"
+alias aliasUpdate="fresh 2>&1 && c"
 
 # Clear terminal
 alias c="clear"
@@ -45,63 +47,12 @@ alias xbin='chmod +x ~/bin/*'
 # Copy SSH Key to remote server
 alias sshcopy="ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 22 $1"
 
+# Short for calling goBuster
 alias gd="gobust"
 
+# Rename ~/.bash_aliases to ~/.aliases
 alias alre="sed -i 's/~\/.bash_aliases/~\/.aliases/g' ~/.bashrc"
 
-# Find DIR that are common hack points
-gobust() {
-	MODE=$1
-	URL=$2
-	WORDLIST=~/.config/gobuster-wordlist.txt
-
-	if [ -z $URL ]
-	then
-		echo "Error: no URL provided"
-	fi
-
-	if [ $MODE = "dns" ] 2&> /dev/null
-	then
-		# echo "Using mode: $MODE"
-		gobuster $MODE -d $URL -w "$WORDLIST"
-	else
-		# echo "Using mode: dir"
-		gobuster -d "https://$URL" -w "$WORDLIST"
-	fi
-}
-
-
-dotfiles-update() {
-	if [[ -z "${DOTFILES}" ]]; then
-		echo "Does not Exits. Creating dotfiles."
-		export DOTFILES="$HOME/.config/dotfiles"
-	fi
-
-	clear
-	cd $DOTFILES
-	git checkout main
-	git pull
-	clear
-	fresh
-	cd $HOME
-}
-
-checkGit() {
-	COUNT=$(git status --porcelain | wc -l)
-
-	if [ $COUNT -eq "0" ]; then
-<<<<<<< Updated upstream
-		echo "  🟢 ${LIGHTGREEN}$COUNT changes!${NC} Git repo is clean."
-	else
-		echo "  🔴 ${LIGHTRED}$COUNT changes!${NC} Git repo dirty."
-=======
-		echo "  🟢${LIGHTGREEN}$COUNT changes!${NC} Git repo is clean."
-	else
-		echo "  🔴${LIGHTRED}$COUNT changes!${NC} Git repo dirty."
->>>>>>> Stashed changes
-		return
-	fi
-}
 
 # !------------------------------------
 # @@@ CHANGE DIRECTORIES
@@ -119,22 +70,6 @@ alias ats="cd ~/Github/American-Technion-Society/purple"
 alias tasteink="cd ~/Github/taste-ink/tasteink.studio"
 alias sshd="cd /etc/ssh"
 
-function mkprj {
-	echo "Selected org:"
-	select org in $(exec ls ~/github)
-
-	do
-		echo "You selected $org"
-		echo "Name of the project?"
-		read project
-		mkdir -p ~/github/$org/$project
-		cd ~/github/$org/$project
-		git init
-		code-insiders .
-		echo "Project created in ~/github/$org/$project"
-		break;
-	done
-}
 
 
 # !------------------------------------
@@ -177,21 +112,6 @@ alias save="gaa && gcm \"chore: save point\""
 alias incom="gaa && gcm \"initial commit\""
 alias cached="git rm -r --cached"
 
-function delete {
-	# Branch name present?
-	if [[ -z "$1" ]]; then
-			echo "\n ~T Oops… you forgot to provide the branch name"
-			echo " ~I E.g. gbdel branch_name\n"
-	else
-			# Start deleteing.
-			echo "\n⏳ Deleting…\n"
-			git branch -D "$1" # Local delete.
-			git push origin --delete "$1" # Remote delete.
-			echo "\n✅ Git branch $1 was deleted from local and remote.\n"
-	fi
-}
-
-
 
 # !------------------------------------
 # @@@ NPM
@@ -205,44 +125,14 @@ alias start="npm run start"
 alias commit="npm run commit"
 alias clean-node="rm -rf ./node_modules && rm -rf package-lock.json"
 
-# Create a Husky script
-function husky {
-	echo "\n⏳ Creating…\n"
-	npx husky add .husky/"$1" "$2" # Local delete.
-	echo "\n✅ Husky script has been created.\n"
-}
-
-
 
 # !------------------------------------
 # @@@ NETWORKING
 # !------------------------------------
 # Get your current IP
 alias myip="curl http://ipecho.net/plain; echo"
-alias localip="ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'"
+# alias localip="ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'"
 alias ping="ping -c 3"
-
-loip() {
-	local name="$(ifconfig | grep "flags=" | awk '{print $1}')"
-	local ip=$(ifconfig | grep "inet ")
-
-	# ifconfig | grep "inet " | grep -Fv 127.0.0.1 | awk '{print $2}'
-
-	# echo $name
-	# echo $ip
-
-	if [[ ! -z "$ip" ]]; then
-			echo "$name"
-	fi
-}
-
-getent() {
-  [ "$1" = "hosts" ] && shift
-  for x
-  do
-    echo $(dscacheutil -q host -a name $x | awk '/^ip_address/{print $NF}')
-  done
-}
 
 
 # !------------------------------------
@@ -255,7 +145,6 @@ alias code="code-insiders"
 alias teach="code-insiders --extensions-dir ~/code_profiles/teach/exts --user-data-dir ~/code_profiles/teach/data"
 
 alias brew-installs="brew list > .config/brew.txt"
-
 
 
 # !------------------------------------
