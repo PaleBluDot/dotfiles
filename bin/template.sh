@@ -5,7 +5,8 @@
 # Version:				v0.0.1
 # Author:					Pavel Sanchez (PaleBluDot)
 # Email:					support@tasteink.me
-# Description:		Script for Pushover notification
+# Description:		Script description should goes
+#                 here. Spans multiple lines.
 # License: 				MIT
 # Copyright:		  (c) 2023 Pavel Sanchez
 ######################################################
