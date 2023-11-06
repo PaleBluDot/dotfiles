@@ -70,6 +70,7 @@ alias ats="cd ~/Github/American-Technion-Society/purple"
 alias tasteink="cd ~/Github/taste-ink/tasteink.studio"
 alias sshd="cd /etc/ssh"
 
+alias findAlias="alias | grep \"$1\""
 
 
 # !------------------------------------
