@@ -41,7 +41,7 @@ source $ZSH/oh-my-zsh.sh
 [[ ! -f $DOTFILES/config/zsh/.aliases ]] || source $DOTFILES/config/zsh/.aliases
 [[ ! -f $DOTFILES/config/zsh/.functions ]] || source $DOTFILES/config/zsh/.functions
 [[ ! -f $DOTFILES/config/zsh/.p10k.zsh ]] || source $DOTFILES/config/zsh/.p10k.zsh
-[[ ! -x "$(command -v welcome.sh)" ]] || source welcome.sh
+[[ ! -x "$(command -v welcome.sh)" ]] || source welcome.sh && neofetch
 
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"

@@ -123,3 +123,4 @@ fi
 
 # Intro message shown on terminal
 source welcome.sh
+neofetch
