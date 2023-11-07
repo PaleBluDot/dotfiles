@@ -32,17 +32,23 @@ function husky() {
 # Get the local IP of your machine.
 # This is using ifconfig
 function loIP() {
-	local name="$(ifconfig | grep "flags=" | awk '{print $1}')"
-	local ip=$(ifconfig | grep "inet ")
+	ip=
 
-	# ifconfig | grep "inet " | grep -Fv 127.0.0.1 | awk '{print $2}'
-
-	# echo $name
-	# echo $ip
-
-	if [[ ! -z "$ip" ]]; then
-			echo "$ip"
+	if command -v ip &> /dev/null
+	then
+		echo "Using <ip>"
+		ip=$(ip add | grep "broadcast" | awk '{print $2}')
+		echo "$ip"
+		return
 	fi
+
+	echo "Using <ifconfig>"
+	ip=$(ifconfig | grep "broadcast" | awk '{print $2}')
+	echo "$ip"
+
+	# if [[ ! -z "$ip" ]]; then
+	# 		echo "$ip"
+	# fi
 }
 
 # Gets website IP address.
