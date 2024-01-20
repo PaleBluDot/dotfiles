@@ -65,7 +65,7 @@ function getWebsiteIP() {
 function gobust() {
 	MODE=$1
 	URL=$2
-	WORDLIST=~/.config/gobuster-wordlist.txt
+	WORDLIST=~/.config/gobuster.txt
 
 	if [ -z $URL ]
 	then

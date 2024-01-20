@@ -48,7 +48,7 @@ alias xbin='chmod +x ~/bin/*'
 alias sshcopy="ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 22 $1"
 
 # Short for calling goBuster
-alias gd="gobust"
+alias gd="gobuster -w ~/.config/gobuster.txt"
 
 # Rename ~/.bash_aliases to ~/.aliases
 alias alre="sed -i 's/~\/.bash_aliases/~\/.aliases/g' ~/.bashrc"
