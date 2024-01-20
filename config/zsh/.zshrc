@@ -16,6 +16,9 @@ export ZSH="$HOME/.oh-my-zsh"
 export PATH=$HOME/bin:$PATH
 export GITHUB_DIR=$HOME/github
 export DOTFILES=$HOME/.config/dotfiles
+export GOROOT=/usr/local/go
+export GOPATH=$HOME/go
+export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 
 # ZSH Configurations
 ZSH_THEME="powerlevel10k/powerlevel10k"

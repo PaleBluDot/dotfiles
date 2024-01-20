@@ -1,12 +1,2 @@
-bat
-fontconfig
-gobuster
-make
-mosh
-neofetch
-net-tools
-traceroute
-tree
-whois
-zip
-pastel
+exa
+vim

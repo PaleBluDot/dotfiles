@@ -1,0 +1,2 @@
+config.yml:.config/gh/config.yml
+hosts.yml:.config/gh/hosts.yml

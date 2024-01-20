@@ -1,0 +1,43 @@
+Host pfsense
+	HostName {{ op://lab/pfsense/hostname }}
+
+Host unifi
+	HostName {{ op://lab/unifi/hostname }}
+
+Host unifi.ap
+	HostName {{ op://lab/unifi.ap/hostname }}
+	IdentityFile ~/.ssh/id_rsa_jupiter
+
+Host unifi.switch
+	HostName {{ op://lab/unifi.switch/hostname }}
+	IdentityFile ~/.ssh/id_rsa_jupiter
+
+Host vsphere.home.psd
+	HostName {{ op://lab/vsphere.home.psd/hostname }}
+	User {{ op://lab/vsphere.home.psd/username }}
+
+Host atsorg
+  HostName {{ op://lab/atsorg/hostname }}
+  User {{ op://lab/atsorg/username }}
+  IdentitiesOnly yes
+
+Host atsstaged
+  HostName {{ op://lab/atsstaged/hostname }}
+  User {{ op://lab/atsstaged/username }}
+  IdentitiesOnly yes
+
+Host web-vm
+	HostName {{ op://lab/web-vm/hostname }}
+
+Host starter
+	HostName {{ op://lab/starter/hostname }}
+	User {{ op://lab/starter/username }}
+
+Host fortrabbit
+	HostName {{ op://lab/fortrabbit/hostname }}
+	User {{ op://lab/fortrabbit/username }}
+	IdentityFile ~/.ssh/fortrabbit
+
+Host *
+	User pavel
+	IdentityFile ~/.ssh/jupiter
