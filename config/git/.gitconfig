@@ -1,6 +1,7 @@
 [user]
 	name = Pavel Sanchez
 	email = 23495830+PaleBluDot@users.noreply.github.com
+	signingkey = /home/pbd/.ssh/jupiter.pub
 [init]
 	defaultBranch = main
 [filter "lfs"]
@@ -8,3 +9,5 @@
 	smudge = git-lfs smudge -- %f
 	process = git-lfs filter-process
 	required = true
+[gpg]
+	format = ssh
