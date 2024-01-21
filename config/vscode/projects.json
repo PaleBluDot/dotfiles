@@ -1,0 +1,100 @@
+[
+	{
+		"name": "aclu-email-builder",
+		"rootPath": "vscode-remote://wsl+Ubuntu/home/pbd/github/aclu-national/email-builder",
+		"paths": [],
+		"tags": [],
+		"enabled": true
+	},
+	{
+		"name": "aclu-emails",
+		"rootPath": "vscode-remote://wsl+Ubuntu/home/pbd/github/PaleBluDot/aclu-emails",
+		"paths": [],
+		"tags": [],
+		"enabled": true
+	},
+	{
+		"name": "cspell-dictionaries",
+		"rootPath": "vscode-remote://wsl+Ubuntu/home/pbd/github/PaleBluDot/cspell-dictionaries",
+		"paths": [],
+		"tags": [],
+		"enabled": true
+	},
+	{
+		"name": "dotfiles",
+		"rootPath": "vscode-remote://wsl+ubuntu/home/pbd/.config/dotfiles",
+		"paths": [],
+		"tags": [],
+		"enabled": true
+	},
+	{
+		"name": "echo",
+		"rootPath": "vscode-remote://wsl+Ubuntu/home/pbd/github/PaleBluDot/echo",
+		"paths": [],
+		"tags": [],
+		"enabled": true
+	},
+	{
+		"name": "espanso",
+		"rootPath": "c:\\Users\\pasan\\OneDrive\\Documents\\Espanso",
+		"paths": [],
+		"tags": [],
+		"enabled": true
+	},
+	{
+		"name": "flowLauncher",
+		"rootPath": "c:\\Users\\pasan\\AppData\\Roaming\\FlowLauncher",
+		"paths": [],
+		"tags": [],
+		"enabled": true
+	},
+	{
+		"name": "github-training",
+		"rootPath": "vscode-remote://wsl+Ubuntu/home/pbd/github/PaleBluDot/github-training",
+		"paths": [],
+		"tags": [],
+		"enabled": true
+	},
+	{
+		"name": "obsidian",
+		"rootPath": "c:\\Users\\pasan\\OneDrive\\Documents\\Obsidian Vaults",
+		"paths": [],
+		"tags": [],
+		"enabled": true
+	},
+	{
+		"name": "pavelsanchez.com",
+		"rootPath": "vscode-remote://wsl+Ubuntu/home/pbd/github/PaleBluDot/pavelsanchez.com",
+		"paths": [],
+		"tags": [],
+		"enabled": true
+	},
+	{
+		"name": "purple",
+		"rootPath": "vscode-remote://wsl+Ubuntu/home/pbd/github/American-Technion-Society/purple",
+		"paths": [],
+		"tags": [],
+		"enabled": true
+	},
+	{
+		"name": "purple-local",
+		"rootPath": "c:\\Users\\pasan\\Local Sites\\atsorg-test\\app\\public\\wp-content\\themes\\purple",
+		"paths": [],
+		"tags": [],
+		"enabled": true
+	},
+	{
+		"name": "ubuntu home",
+		"rootPath": "vscode-remote://wsl+Ubuntu/home/pbd",
+		"paths": [],
+		"tags": [],
+		"enabled": true
+	},
+	{
+		"name": "windows Home",
+		"rootPath": "c:\\Users\\pasan",
+		"paths": [],
+		"tags": [],
+		"enabled": true
+	}
+]

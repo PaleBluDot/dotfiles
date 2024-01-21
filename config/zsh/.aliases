@@ -63,7 +63,7 @@ alias aclu-emails="cd ~/Github/PaleBluDot/aclu-emails"
 alias cspell-dictionaries="cd ~/Github/PaleBluDot/cspell-dictionaries"
 alias lint-config="cd ~/Github/PaleBluDot/lint-config"
 alias psd="cd ~/Github/PaleBluDot/website"
-alias dotfiles="cd ~/Github/PaleBluDot/dotfiles"
+alias dotfiles="cd $DOTFILES"
 alias publications="cd ~/Github/American-Technion-Society/publications"
 alias ats-emails="cd ~/Github/American-Technion-Society/email-templates"
 alias ats="cd ~/Github/American-Technion-Society/purple"
@@ -77,7 +77,7 @@ alias findAlias="alias | grep \"$1\""
 # @@@ FILE EDITS
 # !------------------------------------
 # Edit aliases
-alias edit="$EDITOR ~/.aliases"
+alias edit="$EDITOR ~/.config/dotfiles/config/zsh/.aliases"
 
 alias base="$EDITOR ~/Library/CloudStorage/OneDrive-Personal/Documents/Espanso/match/base.yml"
 
