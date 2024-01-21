@@ -1,0 +1,1 @@
+gobuster.txt:.config/gobuster.txt

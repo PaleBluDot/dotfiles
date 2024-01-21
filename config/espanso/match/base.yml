@@ -1,0 +1,27 @@
+# Espanso Match File
+
+matches:
+# Outputs a Choice list of Emails
+  - triggers: [";email", ";eml"]
+    replace: "{{output}}"
+    vars:
+      - name: output
+        type: choice
+        params:
+          values:
+            - label: "Personal"
+              id: "hello@psanchez.me"
+            - label: "Work"
+              id: "psanchez@aclu.org"
+            - label: "CAN Support"
+              id: "cansupport@aclu.org"
+            - label: "CAN Test"
+              id: "cantest@aclu.org"
+            - label: "ACLU Test"
+              id: "aclucan.test@gmail.com"
+            - label: "Litmus"
+              id: "cantest@litmusemail.com"
+
+
+
+

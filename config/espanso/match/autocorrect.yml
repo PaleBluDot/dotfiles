@@ -1,0 +1,131 @@
+# Espanso Match File
+
+name: autocorrect
+package_author: Pavel Sanchez <info@tasteink.me>
+parent: base
+matches:
+  - trigger: emial
+    replace: email
+    propagate_case: true
+    word: true
+
+  - trigger: thansk
+    replace: thanks
+    propagate_case: true
+    word: true
+
+  - trigger: acount
+    replace: account
+    propagate_case: true
+    word: true
+
+  - trigger: adress
+    replace: address
+    propagate_case: true
+    word: true
+
+  - trigger: anivesary
+    replace: anniversary
+    propagate_case: true
+    word: true
+
+  - trigger: anual
+    replace: annual
+    propagate_case: true
+    word: true
+
+
+  - trigger: beleive
+    replace: believe
+    propagate_case: true
+    word: true
+
+  - trigger: belive
+    replace: believe
+    propagate_case: true
+    word: true
+
+  - trigger: seperate
+    replace: separate
+    propagate_case: true
+    word: true
+
+  - trigger: btw
+    replace: "by the way"
+    word: true
+    propagate_case: false
+
+  - trigger: dont
+    replace: "don't"
+    propagate_case: true
+    word: true
+
+  - trigger: aint
+    replace: "ain't"
+    propagate_case: true
+    word: true
+
+  - trigger: isnt
+    replace: "isn't"
+    propagate_case: true
+    word: true
+
+  - trigger: arent
+    replace: "aren't"
+    propagate_case: true
+    word: true
+
+  - trigger: doesnt
+    replace: "doesn't"
+    propagate_case: true
+    word: true
+
+  - trigger: wouldnt
+    replace: "wouldn't"
+    propagate_case: true
+    word: true
+
+  - trigger: shouldnt
+    replace: "shouldn't"
+    propagate_case: true
+    word: true
+
+  - trigger: couldnt
+    replace: "couldn't"
+    propagate_case: true
+    word: true
+
+  - trigger: cant
+    replace: "can't"
+    propagate_case: true
+    word: true
+
+  - trigger: didnt
+    replace: "didn't"
+    propagate_case: true
+    word: true
+
+  - trigger: hadnt
+    replace: "hadn't"
+    propagate_case: true
+    word: true
+
+  - trigger: wasnt
+    replace: "wasn't"
+    propagate_case: true
+    word: true
+
+  - trigger: werent
+    replace: "weren't"
+    propagate_case: true
+    word: true
+
+  - trigger: yall
+    replace: "y'all"
+    propagate_case: true
+    word: true
+
+  - trigger: wont
+    replace: "won't"
+    propagate_case: true
+    word: true

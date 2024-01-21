@@ -1,0 +1,43 @@
+Host pfsense
+	HostName 11.0.17.1
+
+Host unifi
+	HostName 157.230.60.240
+
+Host unifi.ap
+	HostName 11.0.17.3
+	IdentityFile ~/.ssh/id_rsa_jupiter
+
+Host unifi.switch
+	HostName 11.0.17.2
+	IdentityFile ~/.ssh/id_rsa_jupiter
+
+Host vsphere.home.psd
+	HostName 11.0.17.205
+	User root
+
+Host atsorg
+  HostName atsorg.ssh.wpengine.net
+  User atsorg
+  IdentitiesOnly yes
+
+Host atsstaged
+  HostName atsstaged.ssh.wpengine.net
+  User atsstaged
+  IdentitiesOnly yes
+
+Host web-vm
+	HostName 11.0.17.210
+
+Host starter
+	HostName 11.0.17.30
+	User pavel
+
+Host fortrabbit
+	HostName deploy.us1.frbit.com
+	User intranet-ats
+	IdentityFile ~/.ssh/fortrabbit
+
+Host *
+	User pavel
+	IdentityFile ~/.ssh/jupiter

@@ -1,0 +1,278 @@
+# Looks inside the ~/github folder
+# to find the user and orgs and let
+# you select where to create the folder
+# and moves you into it and open $EDITOR.
+##! Need to add git init and gh creation.
+function mkprj() {
+	echo "Selected org:"
+	select org in $(exec ls ~/github)
+
+	do
+		echo "You selected $org"
+		echo "Name of the project?"
+		read project
+		mkdir -p ~/github/$org/$project
+		cd ~/github/$org/$project
+		git init
+		code-insiders .
+		echo "Project created in ~/github/$org/$project"
+		break;
+	done
+}
+
+# Create a Husky script to automate
+# git-hooks, like pre-commit.
+##! Need to add a check if already exist.
+function husky() {
+	echo "\n⏳ Creating…\n"
+	npx husky add .husky/"$1" "$2" # Local delete.
+	echo "\n✅ Husky script has been created.\n"
+}
+
+# Get the local IP of your machine.
+# This is using ifconfig
+function loIP() {
+	ip=
+
+	if command -v ip &> /dev/null
+	then
+		echo "Using <ip>"
+		ip=$(ip add | grep "broadcast" | awk '{print $2}')
+		echo "$ip"
+		return
+	fi
+
+	echo "Using <ifconfig>"
+	ip=$(ifconfig | grep "broadcast" | awk '{print $2}')
+	echo "$ip"
+
+	# if [[ ! -z "$ip" ]]; then
+	# 		echo "$ip"
+	# fi
+}
+
+# Gets website IP address.
+function getWebsiteIP() {
+  [ "$1" = "hosts" ] && shift
+  for x
+  do
+    # echo $(dscacheutil -q host -a name $x | awk '/^ip_address/{print $NF}')
+    dscacheutil -q host -a name $x
+  done
+}
+
+# Find DIR that are common hack points
+function gobust() {
+	MODE=$1
+	URL=$2
+	WORDLIST=~/.config/gobuster.txt
+
+	if [ -z $URL ]
+	then
+		echo "Error: no URL provided"
+	fi
+
+	if [ $MODE = "dns" ] 2&> /dev/null
+	then
+		# echo "Using mode: $MODE"
+		gobuster $MODE -d $URL -w "$WORDLIST"
+	else
+		# echo "Using mode: dir"
+		gobuster -d "https://$URL" -w "$WORDLIST"
+	fi
+}
+
+# Sends a message to the pushover
+# platform. Intending on using to send
+# errors script messages.
+function pushover() {
+	APP_TOKEN="azgrm981bxopyyxd74b7qbrisxxfjx"
+	USER_TOKEN="g4yhnf9391i3wgpgkvi7scruipy2g7"
+	MESSAGE=$1
+	TITLE=$2
+	PRIORITY=$3
+	URL=$4
+	USER=$(whoami)
+	HOSTNAME=$(uname -n)
+
+	if [ $# -eq 0 ]; then
+		echo "Usage: pushover <message> [title] <priority> [url]"
+		exit 1
+	fi
+
+	if [ $# -lt 2 ]; then
+		TITLE="$USER@$HOSTNAME"
+		PRIORITY="0"
+		URL="https://example.com/"
+	fi
+
+	if [ $# -lt 3 ]; then
+		PRIORITY="0"
+		URL="https://example.com/"
+	fi
+
+	curl -s \
+  --form-string "token=$APP_TOKEN" \
+  --form-string "user=$USER_TOKEN" \
+  --form-string "html=1" \
+  --form-string "priority=$PRIORITY" \
+  --form-string "retry=60" \
+  --form-string "expire=3600" \
+  --form-string "title=$TITLE" \
+  --form-string "message=<b>$HOSTNAME:</b> $MESSAGE! <i>From user: $USER</i> <a href=\"$URL\"><b>View</b></a>" \
+  https://api.pushover.net/1/messages.json
+}
+
+# Updates Dotfiles to the latests changes.
+function dotfiles-update() {
+	if [[ -z "${DOTFILES}" ]]; then
+		echo "Does not Exits. Creating dotfiles."
+		export DOTFILES="$HOME/.config/dotfiles"
+	fi
+
+	clear
+	cd $DOTFILES
+	git checkout main
+	git pull
+	clear
+	fresh
+	cd $HOME
+}
+
+# Checks if there are any changes
+# to be committed and pushed.
+function checkGit() {
+	COUNT=$(git status --porcelain | wc -l)
+
+	if [ $COUNT -eq "0" ]; then
+		echo "  🟢${LIGHTGREEN}$COUNT changes!${NC} Git repo is clean."
+	else
+		echo "  🔴${LIGHTRED}$COUNT changes!${NC} Git repo dirty."
+		return
+	fi
+}
+
+# Checks if HTTP Status is 200
+# if not, then it outputs errors message.
+function getHTTPCode() {
+	local url=$1
+	status_code=$(curl --write-out "%{http_code}\n" --silent --output /dev/null "$url");
+
+  if [[ "$status_code" -ne 200 ]] ; then
+    echo "Status Code: $status_code"
+  else
+		echo "Status Code: $status_code"
+    exit 0
+  fi
+}
+
+# Takes a file and outputs CSpell
+# flags. These flags will flag a
+# error if the word is misspelled.
+function add_flags() {
+	local FILE=$1
+	local FLAG=\!
+	local OUTPUTFILE=${GITHUB_DIR}/PaleBluDot/aclu-emails/.config/dictionaries/flags.txt
+
+	cat $FILE | while read LINE; do \
+		CAPITALIZED=`echo "${LINE}" | tr '[a-z]' '[A-Z]'`
+		LOWERCASE=`echo "${LINE}" | tr '[A-Z]' '[a-z]'`
+
+		echo ${FLAG}${LINE};\
+		echo ${FLAG}${LOWERCASE};\
+		echo ${FLAG}${CAPITALIZED};\
+	done | \
+	> $OUTPUTFILE
+}
+
+
+# Delete local and remote branch.
+##! Need to add a check to see if
+##! branch is removed on remote.
+function delete {
+	# Branch name present?
+	if [[ -z "$1" ]]; then
+			echo "\n ~T Oops… you forgot to provide the branch name"
+			echo " ~I E.g. gbdel branch_name\n"
+	else
+			# Start deleteing.
+			echo "\n⏳ Deleting…\n"
+			git branch -D "$1" # Local delete.
+			git push origin --delete "$1" # Remote delete.
+			echo "\n✅ Git branch $1 was deleted from local and remote.\n"
+	fi
+}
+
+# Get the type of system you are on.
+##! Need to update this for windows response
+##! MINGW64_NT and MINGW32_NT.
+function getSystem () {
+  if [[ "$(uname)" == "Darwin" ]]; then
+    echo "This is a Mac machine";
+  elif [[ "$(uname)" == "Darwin" ]]; then
+    echo "This is a Linux machine"
+  else
+    echo "This is a Windows machine"
+  fi
+}
+
+# Formats the date command to add
+# commonly used formats.
+##! Add more formats and roll this
+##! out to its own script.
+function dateF() {
+  separator=
+  format=
+
+  case $1 in
+    yyyymmdd )
+      case $2 in
+        -s | --separator )
+          separator=$3
+          echo "📅 $(date +%Y${separator}%m${separator}%d)"
+          ;;
+        * )
+          echo "📅 $(date +%Y${separator}%m${separator}%d)"
+          ;;
+      esac
+      ;;
+    mmddyyyy )
+      case $2 in
+        -s | --separator )
+          separator=$3
+          echo "📅 $(date +%m${separator}%d${separator}%Y)"
+          ;;
+        * )
+          echo "📅 $(date +%m${separator}%d${separator}%Y)"
+          ;;
+      esac
+      ;;
+    mmddyy )
+      case $2 in
+        -s | --separator )
+          separator=$3
+          echo "📅 $(date +%m${separator}%d${separator}%y)"
+          ;;
+        * )
+          echo "📅 $(date +%m${separator}%d${separator}%y)"
+          ;;
+      esac
+      ;;
+    * )
+			echo -e "Usage: dateF <commands> [--option]"
+      echo
+      echo -e "Commands:"
+      echo -e "  yyyymmdd            Shows fullYear month day"
+      echo -e "  mmddyyyy            Shows month day fullYear"
+      echo -e "  mmddyy              Shows month day shortYear"
+      echo
+      echo -e "Options:"
+      echo -e "  -s | --separator    Adds a separator"
+      echo
+      echo -e "Example:"
+      echo -e "  dateF mmddyyyy #10222023"
+      echo -e "  dateF mmddyy --separator \"-\" #10-22-23"
+      echo
+			;;
+  esac
+}

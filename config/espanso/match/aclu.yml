@@ -1,0 +1,89 @@
+# Espanso Match File
+
+name: ACLU
+package_author: Pavel Sanchez <info@tasteink.me>
+parent: base
+matches:
+  - trigger: aff
+    replace: affiliate
+    propagate_case: true
+    word: true
+
+  - trigger: ";date"
+    replace: "{{mydate}}"
+    vars:
+      - name: mydate
+        type: date
+        params:
+          format: "%Y%m%d"
+          locale: "en-US"
+
+  - trigger: ";logo"
+    image_path: "$CONFIG/images/aclu-sig-logo.png"
+
+  - trigger: ";sup"
+    replace: "Suppressions:\nCAN Default Suppression\n"
+
+  - trigger: ";sig"
+    label: "Basic signature"
+    replace: "Thanks,\nPavel Sanchez"
+
+  - trigger: ";sig"
+    label: "Full signature"
+    replace: |
+      Best,
+      Pavel Sanchez
+
+      Pavel Sanchez
+      Pronouns: He, him, his
+      Associate Director, Affiliates Digital Campaigns
+      American Civil Liberties Union
+      125 Broad St., New York, NY 10004
+      212.284.7371 | psanchez@aclu.org
+      www.aclu.org
+      {{output}}
+    vars:
+      - name: output
+        type: match
+        params:
+          trigger: ";logo"
+
+  - trigger: ";color"
+    replace: "{{output}}"
+    vars:
+      - name: output
+        type: choice
+        params:
+          values:
+            - label: "ACLU Blue"
+              id: "#0055aa"
+            - label: "ACLU Red"
+              id: "#ef404e"
+            - label: "ACLU Light Azure"
+              id: "#a3dbe3"
+            - label: "ACLU Light Green"
+              id: "#a7d7b5"
+            - label: "ACLU Light Orange"
+              id: "#fcaa17"
+            - label: "ACLU Light Pink"
+              id: "#fabeaf"
+            - label: "ACLU Light Yellow"
+              id: "#ffe06a"
+
+  - trigger: ";issues"
+    replace: "\nCapital Punishment\nCivil Liberties\nCriminal Law Reform\nDisability Rights\nFree Speech\nHIV and AIDS\nHuman Rights\nImmigrants' Rights\nJuvenile Justice\nLGBT Rights\nMass Incarceration\nNational Security\nNon-Issue Campaign\nPrisoners' Rights\nPrivacy & Technology\nRacial Justice\nReligious Liberty\nReproductive Freedom\nVoting Rights\nWomen's Rights"
+
+  - trigger: ";so"
+    replace: "Sorry, {{clipboard}} Ticket(s) are sold out!"
+    vars:
+      - name: "clipboard"
+        type: "clipboard"
+
+  - trigger: ";zoom"
+    replace: "https://aclu.zoom.us/my/pavel"
+
+  - trigger: ";uaf"
+    replace: "Hello [NAME],\n\nYou can sign up to gain access to Springboard by submitting this webform: https://dbsupport.aclu.org/hc/en-us/requests/new?ticket_form_id=985388.\n\nThanks,\nPavel"
+
+
+# For a complete introduction, visit the official docs at: https://espanso.org/docs/

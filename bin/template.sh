@@ -1,14 +1,15 @@
 #!/bin/bash
 
-##########################################
-# Script Name:		test.sh
-# Author:					pavel sanchez
+######################################################
+# Script Name:		template.sh
+# Version:				v0.0.1
+# Author:					Pavel Sanchez (PaleBluDot)
 # Email:					support@tasteink.me
-# Description:		script for testing.
-# args:						- none
-##########################################
-
-source colors.sh
+# Description:		Script description should goes
+#                 here. Spans multiple lines.
+# License: 				MIT
+# Copyright:		  (c) 2023 Pavel Sanchez
+######################################################
 
 NAME="$(basename $0)"
 
