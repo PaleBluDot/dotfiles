@@ -293,20 +293,10 @@ install_dotfiles() {
       ;;
   esac
 
-
-
-  # Specify the file path
-  CONFIG_FILE="${HOME}/.config/configstore/cspell.json"
-
-  echo "DOTFILES_DIR: $DOTFILES_DIR"
-  echo "CSPELL_DIR: $CSPELL_DIR"
-  echo "CONFIG_FILE: $CONFIG_FILE"
-
-  # Find and replace the CSPELL_DIR variable
-  sed -i.bak -e "s|\"\${CSPELL}\"|\"${CSPELL_DIR}\"|g" "$CONFIG_FILE"
-
-
-  echo "CSPELL value replaced successfully."
+  # DEBUG
+  # echo "DOTFILES_DIR: $DOTFILES_DIR"
+  # echo "CSPELL_DIR: $CSPELL_DIR"
+  # echo "CONFIG_FILE: $CONFIG_FILE"
 }
 
 # Function to uninstall dotfiles
