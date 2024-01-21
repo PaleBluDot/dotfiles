@@ -24,7 +24,7 @@ start_time=$(date +%s.%N)
 ######################
 
 # Export dotfiles directory as an environment variable
-export DOTFILES_DIR="$HOME/.config/dotfiles"
+export DOTFILES_DIR=$HOME/.config/dotfiles
 
 ######################
 ##@ MACOS
@@ -33,40 +33,92 @@ export DOTFILES_DIR="$HOME/.config/dotfiles"
 # Function to install packages for macOS
 install_macos() {
   local macos_dir="config/os-only/macos/"
+  local install_packages=true
 
-  # Display packages to be installed
-  echo "Packages to be installed for macOS:"
-  if [ -f "$macos_dir/required-packages.txt" ]; then
-    cat "$macos_dir/required-packages.txt"
-
-    # Check if packages are already installed
-    echo -e "\nChecking installed packages and versions:"
-    while IFS= read -r package; do
-      if brew list --versions "$package" &>/dev/null; then
-        installed_version=$(brew list --versions "$package" | awk '{print $NF}')
-        echo "$package: Installed (Version: $installed_version)"
-      else
-        echo "$package: Not Installed"
-      fi
-    done < "$macos_dir/required-packages.txt"
-
-    # Wait for 3 seconds
-    sleep 3
-
-    # Install packages using Homebrew
-    echo "Installing packages for macOS..."
-    brew bundle --file="$macos_dir/Brewfile"
-  else
-    echo "Error: required-packages.txt not found in $macos_dir"
+  # Check if Brewfile exists
+  if [ ! -f "$macos_dir/Brewfile" ]; then
+    echo "Error: Brewfile not found in $macos_dir"
     exit 1
+  fi
+
+  # Check if -d flag is present
+  if [[ $* == *"-d"* ]]; then
+    echo "Packages to be installed for macOS:"
+    cat "$macos_dir/Brewfile"
+    install_packages=false
+  fi
+
+  if [ "$install_packages" == true ]; then
+    # Update Homebrew
+    brew update > /dev/null
+
+    # Install packages for macOS
+    echo "Installing packages for macOS..."
+    while IFS= read -r line; do
+      if [[ $line == brew* ]]; then
+        package=$(echo "$line" | awk -F'"' '{print $2}')
+        brew install "$package" > /dev/null 2>&1
+
+        # Wait for the version information to become available
+        while true; do
+          installed_version=$(brew list --versions "$package" 2>/dev/null || echo "Not Installed")
+          [ "$installed_version" != "Not Installed" ] && break
+        done
+
+        if [ "$installed_version" != "Not Installed" ]; then
+          echo "$package: Installed (Version: $installed_version)"
+        else
+          echo "$package: Installing..."
+        fi
+      fi
+    done < "$macos_dir/Brewfile"
   fi
 }
 
 # Function to uninstall packages for macOS
 uninstall_macos() {
-  # Uninstall packages for macOS (adjust as needed)
-  echo "Uninstalling packages for macOS..."
-  # Example: brew uninstall packageName
+  local macos_dir="config/os-only/macos/"
+  local uninstall_packages=true
+
+  # Check if Brewfile exists
+  if [ ! -f "$macos_dir/Brewfile" ]; then
+    echo "Error: Brewfile not found in $macos_dir"
+    exit 1
+  fi
+
+  # Check if -d flag is present
+  if [[ $* == *"-d"* ]]; then
+    echo "Packages to be uninstalled for macOS:"
+    cat "$macos_dir/Brewfile"
+    uninstall_packages=false
+  fi
+
+  if [ "$uninstall_packages" == true ]; then
+    # Update Homebrew
+    brew update > /dev/null
+
+    # Uninstall packages for macOS
+    echo "Uninstalling packages for macOS..."
+    while IFS= read -r line; do
+      if [[ $line == brew* ]]; then
+        package=$(echo "$line" | awk -F'"' '{print $2}')
+        brew uninstall "$package" > /dev/null 2>&1
+
+        # Wait for the version information to become unavailable
+        while true; do
+          installed_version=$(brew list --versions "$package" 2>/dev/null || echo "Not Installed")
+          [ "$installed_version" == "Not Installed" ] && break
+          sleep 1
+        done
+
+        if [ "$installed_version" == "Not Installed" ]; then
+          echo "$package: Uninstalled"
+        else
+          echo "$package: Uninstalling..."
+        fi
+      fi
+    done < "$macos_dir/Brewfile"
+  fi
 }
 
 ######################
@@ -192,10 +244,10 @@ install_dotfiles() {
       # Check if the target directory exists, create it if not
       local full_target_dir="${HOME}/${target_dir}"
 
-      if [ ! -d "$full_target_dir" ]; then
-        mkdir -p "$full_target_dir"
-        echo "Created directory: $full_target_dir"
-      fi
+      # if [ ! -d "$full_target_dir" ]; then
+      #   mkdir -p "$full_target_dir"
+      #   echo "Created directory: $full_target_dir"
+      # fi
 
       echo "Creating symlinks for $target_dir directory..."
 
@@ -204,12 +256,10 @@ install_dotfiles() {
         source="${HOME}/.config/dotfiles/$dir$source"
         target="${HOME}/${target}"
 
-        # Replace $(uname -s) with the actual system name
-        source=$(echo "$source" | sed "s/\$(uname -s)/$system_name/")
-
         if [ -e "$target" ]; then
           if [ -L "$target" ]; then
-            echo "Symlink already exists: $target -> $(readlink -f $target)"
+            echo "Symlinks already exists."
+            # echo "Symlink already exists: $target -> $(readlink -f $target)"
           else
             echo "File or directory already exists: $target"
           fi
@@ -225,10 +275,39 @@ install_dotfiles() {
   done
 
   echo -e "\nDotfiles installation completed successfully."
+
+  # Set CSPELL_DIR based on the OS
+  case "$(uname)" in
+    Darwin)
+      CSPELL_DIR="/opt/homebrew/lib"
+      ;;
+    Linux)
+      CSPELL_DIR="/usr/lib"
+      ;;
+    MINGW32*|MSYS*|MINGW64*)
+      CSPELL_DIR="C:\\Program Files\\nodejs\\"
+      ;;
+    *)
+      echo "Unsupported operating system."
+      exit 1
+      ;;
+  esac
+
+
+
+  # Specify the file path
+  CONFIG_FILE="${HOME}/.config/configstore/cspell.json"
+
+  echo "DOTFILES_DIR: $DOTFILES_DIR"
+  echo "CSPELL_DIR: $CSPELL_DIR"
+  echo "CONFIG_FILE: $CONFIG_FILE"
+
+  # Find and replace the CSPELL_DIR variable
+  sed -i.bak -e "s|\"\${CSPELL}\"|\"${CSPELL_DIR}\"|g" "$CONFIG_FILE"
+
+
+  echo "CSPELL value replaced successfully."
 }
-
-
-
 
 # Function to uninstall dotfiles
 uninstall_dotfiles() {
@@ -290,12 +369,15 @@ install_packages() {
 
   case "$os_type" in
     Darwin)
+      CSPELL_DIR="/opt/homebrew/lib"
       install_macos
       ;;
     Linux)
+      CSPELL_DIR="/usr/lib"
       install_linux
       ;;
     MINGW32*|MSYS*|MINGW64*)
+      CSPELL_DIR="C:\\Program Files\\nodejs\\"
       install_windows
       ;;
     *)
@@ -325,6 +407,7 @@ uninstall_packages() {
       ;;
   esac
 }
+
 
 ######################
 ##@ COMMANDS
@@ -429,6 +512,7 @@ end_time=$(date +%s.%N)
 
 # Calculate and print the execution time
 execution_time=$(echo "$end_time - $start_time" | bc)
+
 echo
 echo "Script execution time: $execution_time seconds"
 
