@@ -1,0 +1,28 @@
+{
+	"languageId": "*",
+	"dictionaries": [
+		"bash",
+		"css",
+		"fonts",
+		"html-symbol-entities",
+		"html",
+		"lorem-ipsum",
+		"networking-terms",
+		"node",
+		"npm",
+		"php",
+		"powershell",
+		"typescript",
+		"companies",
+		"locations",
+		"names",
+		"personal",
+		"es-es"
+	],
+	"import": [
+		"C:\\Program Files\\nodejs\\node_modules\\@palebludot\\cspell-locations\\cspell-ext.json",
+		"C:\\Program Files\\nodejs\\node_modules\\@palebludot\\cspell-names\\cspell-ext.json",
+		"C:\\Program Files\\nodejs\\node_modules\\@palebludot\\cspell-personal\\cspell-ext.json",
+		"C:\\Program Files\\nodejs\\node_modules\\@cspell/dict-es-es\\cspell-ext.json"
+	]
+}

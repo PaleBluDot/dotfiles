@@ -1,0 +1,1 @@
+linux/cspell.json:.config/configstore/cspell.json

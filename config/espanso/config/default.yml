@@ -1,0 +1,14 @@
+# Espanso Configuration File
+
+# For a complete introduction, visit the official docs at: https://espanso.org/docs/
+
+# ----- OPTIONS --------
+# toggle_key: OFF
+# auto_restart: false
+# backend: Clipboard
+# clipboard_threshold: 100
+search_shortcut: off
+search_trigger: off
+show_icon: false
+show_notifications: false
+
