@@ -1,1 +1,1 @@
-starburst.yml:.config/.warp/starburst.yml
+starburst.yml:.warp/starburst.yml

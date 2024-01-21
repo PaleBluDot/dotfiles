@@ -1,1 +1,1 @@
-neofetch.conf:neofetch/neofetch.conf
+neofetch.conf:.config/neofetch/config.conf
