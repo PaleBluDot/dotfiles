@@ -1,12 +1,12 @@
-name: Release
+name: Test Release
 
 on:
   push:
     branches:
-      - main
+      - dev
   pull_request:
     branches:
-      - main
+      - dev
 
 jobs:
   Release:
@@ -46,9 +46,10 @@ jobs:
         id: semantic
         with:
           semantic_version: 18
+          dry_run: true
           branches: |
             [
-              'main'
+              'dev'
             ]
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
