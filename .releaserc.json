@@ -3,7 +3,12 @@
 	"plugins": [
 		"@semantic-release/commit-analyzer",
 		"@semantic-release/release-notes-generator",
-		"@semantic-release/changelog",
+		[
+			"@semantic-release/changelog",
+			{
+				"changelogTitle": "# Dotfiles Changelog\n\nThese are automatically created by [semantic-release](https://github.com/semantic-release/semantic-release) based on their [commit message conventions](https://semantic-release.gitbook.io/semantic-release#commit-message-format)\n\n"
+			}
+		],
 		"@semantic-release/npm",
 		[
 			"@semantic-release/git",
