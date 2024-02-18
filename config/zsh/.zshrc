@@ -12,13 +12,16 @@ else
 fi
 
 # Export ENV variables
-export ZSH="$HOME/.oh-my-zsh"
+export ZSH="$HOME/.config/oh-my-zsh"
 export PATH=$HOME/bin:$PATH
 export GITHUB_DIR=$HOME/github
 export DOTFILES=$HOME/.config/dotfiles
 export GOROOT=/usr/local/go
 export GOPATH=$HOME/go
 export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
+export ZSH_COMPDUMP=$ZSH/cache/.zcompdump-$HOST
+export LESSHISTFILE=-
+export NODE_REPL_HISTORY=""
 
 # ZSH Configurations
 ZSH_THEME="powerlevel10k/powerlevel10k"
@@ -36,7 +39,6 @@ plugins=(
   colored-man-pages
   composer
   copypath
-
 )
 
 # Source files needed for ZSH
