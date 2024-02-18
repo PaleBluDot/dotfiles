@@ -24,7 +24,7 @@ start_time=$(date +%s.%N)
 ######################
 
 # Export dotfiles directory as an environment variable
-export DOTFILES_DIR=$HOME/.config/dotfiles
+export DOT_DIR=$HOME/.config/dotfiles
 
 ######################
 ##@ MACOS
@@ -294,7 +294,7 @@ install_dotfiles() {
   esac
 
   # DEBUG
-  # echo "DOTFILES_DIR: $DOTFILES_DIR"
+  # echo "DOT_DIR: $DOT_DIR"
   # echo "CSPELL_DIR: $CSPELL_DIR"
   # echo "CONFIG_FILE: $CONFIG_FILE"
 }
