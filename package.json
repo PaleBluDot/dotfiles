@@ -9,7 +9,7 @@
 	"scripts": {
 		"commit": "git cz",
 		"release": "npx semantic-release",
-		"dry-run": "npx semantic-release -d"
+		"dry-release": "npx semantic-release -d"
 	},
 	"devDependencies": {
 		"@semantic-release/changelog": "^6.0.3",
