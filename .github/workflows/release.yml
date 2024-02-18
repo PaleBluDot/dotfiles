@@ -27,7 +27,7 @@ jobs:
       - name: ⚙️ Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: 20
 
       - name: 📥 Install deps
         run: npm install
@@ -45,7 +45,7 @@ jobs:
         uses: cycjimmy/semantic-release-action@v3
         id: semantic
         with:
-          semantic_version: 18
+          semantic_version: 20
           branches: |
             [
               'main'
