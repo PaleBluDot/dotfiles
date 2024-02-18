@@ -458,19 +458,20 @@ update() {
 
 # Function to display extensive usage
 usage() {
-  echo "Usage: $0 {install|uninstall|update|help} [options]"
+  echo "Usage: $0 {command} [options]"
+  echo
   echo "Commands:"
   echo "  install   Install dotfiles and/or packages."
   echo "  uninstall Uninstall dotfiles and/or packages."
   echo "  update    Update dotfiles and/or packages."
   echo "  help      Display this help message."
-
-  echo -e "\nOptions:"
+  echo
+  echo -e "Options:"
   echo "  -d        Install/uninstall/update dotfiles."
   echo "  -p        Install/uninstall/update packages."
   echo "  -h        Display usage information."
-
-  echo -e "\nExamples:"
+  echo
+  echo -e "Examples:"
   echo "  $0 install -d -p   # Install both dotfiles and packages."
   echo "  $0 uninstall -d    # Uninstall dotfiles."
   echo "  $0 update -p       # Update packages."
