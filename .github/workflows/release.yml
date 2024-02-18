@@ -27,7 +27,7 @@ jobs:
       - name: ⚙️ Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: ${{ matrix.node }}
+          node-version: ${{ matrix.node[2] }}
 
       - name: 📥 Install deps
         run: npm install
