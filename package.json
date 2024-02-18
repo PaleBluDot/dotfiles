@@ -7,7 +7,9 @@
 	"license": "MIT",
 	"private": true,
 	"scripts": {
-		"commit": "git cz"
+		"commit": "git cz",
+		"release": "npx semantic-release",
+		"dry-run": "npx semantic-release -d"
 	},
 	"devDependencies": {
 		"@semantic-release/changelog": "^6.0.3",

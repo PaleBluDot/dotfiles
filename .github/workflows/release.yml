@@ -14,8 +14,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        node: [18]
-        os: [ubuntu-latest]
+        node: [20]
+        os: ["ubuntu-latest"]
 
     steps:
       - name: 🛒 Checkout
@@ -42,14 +42,7 @@ jobs:
         run: npm run test --if-present
 
       - name: 🚀 Release
-        uses: cycjimmy/semantic-release-action@v3
-        id: semantic
-        with:
-          semantic_version: 18
-          branches: |
-            [
-              'main'
-            ]
+        run: npm run release
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}

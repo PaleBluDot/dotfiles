@@ -1,4 +1,4 @@
-name: Test Release
+name: Dry Release
 
 on:
   push:
@@ -9,13 +9,13 @@ on:
       - dev
 
 jobs:
-  Release:
-    name: 🚀 Release 🚀
+  Dry-Release:
+    name: 🚀 Dry Release 🚀
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        node: [18]
-        os: [ubuntu-latest]
+        node: [20]
+        os: ["ubuntu-latest"]
 
     steps:
       - name: 🛒 Checkout
@@ -41,16 +41,8 @@ jobs:
       - name: 🚨 test
         run: npm run test --if-present
 
-      - name: 🚀 Release
-        uses: cycjimmy/semantic-release-action@v3
-        id: semantic
-        with:
-          semantic_version: 18
-          dry_run: true
-          branches: |
-            [
-              'dev'
-            ]
+      - name: 🚀 Dry Release
+        run: npm run dry-release
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
