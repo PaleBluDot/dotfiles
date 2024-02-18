@@ -14,7 +14,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        node: [18, 20]
+        node: [20]
         os: ["ubuntu-latest"]
 
     steps:
@@ -42,7 +42,7 @@ jobs:
         run: npm run test --if-present
 
       - name: 🚀 Release
-        run: npm run semantic-release
+        run: npm run release
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
