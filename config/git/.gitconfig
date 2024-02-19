@@ -1,7 +1,7 @@
 [user]
 	name = Pavel Sanchez
 	email = 23495830+PaleBluDot@users.noreply.github.com
-	signingkey = E646E3C81D06AAF8
+	signingkey = F60BB56DBC017F59
 [init]
 	defaultBranch = main
 [filter "lfs"]
