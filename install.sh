@@ -479,24 +479,29 @@ usage() {
 }
 
 # Check command arguments
-case "$1" in
-  install)
-    install "$2"
-    ;;
-  uninstall)
-    uninstall "$2"
-    ;;
-  update)
-    update "$2"
-    ;;
-  help)
-    usage
-    ;;
-  *)
-    usage
-    exit 1
-    ;;
-esac
+if [ "$#" -eq 0 ]; then
+  # No arguments provided, default to 'install'
+  install
+else
+  case "$1" in
+    install)
+      install "$2"
+      ;;
+    uninstall)
+      uninstall "$2"
+      ;;
+    update)
+      update "$2"
+      ;;
+    help)
+      usage
+      ;;
+    *)
+      usage
+      exit 1
+      ;;
+  esac
+fi
 
 # Record the end time
 end_time=$(date +%s.%N)
