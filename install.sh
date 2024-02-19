@@ -20,6 +20,24 @@ fi
 start_time=$(date +%s.%N)
 
 ######################
+##@ BANNER
+######################
+clear
+echo
+
+cat << "EOF"
+     _       _    __ _ _
+    | |     | |  / _(_) |
+  __| | ___ | |_| |_ _| | ___  ___
+ / _` |/ _ \| __|  _| | |/ _ \/ __|
+| (_| | (_) | |_| | | | |  __/\__ \
+ \__,_|\___/ \__|_| |_|_|\___||___/
+EOF
+
+echo
+sleep .5
+
+######################
 ##@ VARIABLES
 ######################
 
@@ -407,6 +425,10 @@ uninstall_packages() {
 install() {
   local options="$1"
 
+  # Ask the user what they want to do
+  echo "Do you want to (1) install packages or (2) symlink files?"
+  read -p "Enter pkg or sym: " choice
+
   # Check if -d flag is present
   local install_dotfiles=true
   if [[ $options == *"d"* ]]; then
@@ -424,6 +446,21 @@ install() {
     install_dotfiles
     install_packages
   fi
+
+  # Process the user's choice
+  case "$choice" in
+    pkg)
+      echo "Installing packages..."
+      # Call your function or commands to install packages here
+      ;;
+    sym)
+      echo "Symlinking files..."
+      # Call your function or commands to symlink files here
+      ;;
+    *)
+      echo "Invalid choice"
+      ;;
+  esac
 }
 
 # Function to uninstall dotfiles and/or packages based on options
@@ -478,10 +515,11 @@ usage() {
   echo "  $0 help            # Display this help message."
 }
 
+
 # Check command arguments
 if [ "$#" -eq 0 ]; then
   # No arguments provided, default to 'install'
-  install
+  usage
 else
   case "$1" in
     install)
