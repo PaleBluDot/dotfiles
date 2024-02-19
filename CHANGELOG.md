@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [1.2.0](https://github.com/PaleBluDot/dotfiles/compare/v1.1.0...v1.2.0) (2024-02-19)
+
+
+### Features
+
+* **script:** add banner ([c9e9c13](https://github.com/PaleBluDot/dotfiles/commit/c9e9c132887bc91a500d9ebb0bf09a216da44cb0))
+
 # [1.1.0](https://github.com/PaleBluDot/dotfiles/compare/v1.0.4...v1.1.0) (2024-02-19)
 
 
