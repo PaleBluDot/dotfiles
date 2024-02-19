@@ -2,11 +2,11 @@ name: Dry Release
 
 on:
   push:
-    branches:
-      - dev
+    branches-ignore:
+      - main
   pull_request:
-    branches:
-      - dev
+    branches-ignore:
+      - main
 
 jobs:
   Dry-Release:
