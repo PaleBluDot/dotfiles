@@ -11,7 +11,6 @@
 	required = true
 [gpg]
 	format = openpgp
-	program = /usr/bin/gpg
 [credential "https://github.com"]
 	helper =
 	helper = !/usr/bin/gh auth git-credential
