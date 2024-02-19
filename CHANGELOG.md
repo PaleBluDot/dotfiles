@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [1.1.0](https://github.com/PaleBluDot/dotfiles/compare/v1.0.4...v1.1.0) (2024-02-19)
+
+
+### Features
+
+* **config:** new packages ([f573004](https://github.com/PaleBluDot/dotfiles/commit/f573004c4e15e5c1cedffb00c1c1d7875488d722))
+
 ## [1.0.4](https://github.com/PaleBluDot/dotfiles/compare/v1.0.3...v1.0.4) (2024-02-19)
 
 
