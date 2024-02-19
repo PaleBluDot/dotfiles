@@ -7,7 +7,6 @@ gobuster
 make
 mosh
 neofetch
-pastel
 ranger
 traceroute
 tree
