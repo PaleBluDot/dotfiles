@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [1.0.4](https://github.com/PaleBluDot/dotfiles/compare/v1.0.3...v1.0.4) (2024-02-19)
+
+
+### Bug Fixes
+
+* **script:** default install if not command is provided ([80ad3df](https://github.com/PaleBluDot/dotfiles/commit/80ad3dfee85a31a8f82be6f3d3c1dd5cbcafe1e5))
+
 ## [1.0.3](https://github.com/PaleBluDot/dotfiles/compare/v1.0.2...v1.0.3) (2024-02-18)
 
 
