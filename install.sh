@@ -26,16 +26,16 @@ clear
 echo
 
 cat << "EOF"
-     _       _    __ _ _
-    | |     | |  / _(_) |
-  __| | ___ | |_| |_ _| | ___  ___
- / _` |/ _ \| __|  _| | |/ _ \/ __|
-| (_| | (_) | |_| | | | |  __/\__ \
- \__,_|\___/ \__|_| |_|_|\___||___/
+          _       _    __ _ _
+         | |     | |  / _(_) |
+       __| | ___ | |_| |_ _| | ___  ___
+      / _` |/ _ \| __|  _| | |/ _ \/ __|
+     | (_| | (_) | |_| | | | |  __/\__ \
+      \__,_|\___/ \__|_| |_|_|\___||___/
 EOF
 
 echo
-sleep .5
+sleep 1
 
 ######################
 ##@ VARIABLES
@@ -292,7 +292,8 @@ install_dotfiles() {
     fi
   done
 
-  echo -e "\nDotfiles installation completed successfully."
+  ln -fs $DOT_DIR/bin  $HOME/bin
+  echo "Symlink created: $DOT_DIR/bin -> $HOME/bin"
 
   # Set CSPELL_DIR based on the OS
   case "$(uname)" in
@@ -315,6 +316,8 @@ install_dotfiles() {
   # echo "DOT_DIR: $DOT_DIR"
   # echo "CSPELL_DIR: $CSPELL_DIR"
   # echo "CONFIG_FILE: $CONFIG_FILE"
+
+  echo -e "\nDotfiles installation completed successfully."
 }
 
 # Function to uninstall dotfiles
@@ -346,11 +349,14 @@ uninstall_dotfiles() {
       done
       echo
     else
-      echo "Warning: $symlink_file not found. Uninstallation skipped for this directory."
+      echo "Warning: $symlink_file not found. Uninstall skipped for this directory."
     fi
   done
 
-  echo "Dotfiles uninstallation completed successfully."
+  rm -f $HOME/bin
+  echo "Symlink removed: $HOME/bin -> $DOT_DIR/bin"
+
+  echo "Dotfiles uninstall completed successfully."
 }
 
 
@@ -519,7 +525,7 @@ usage() {
 # Check command arguments
 if [ "$#" -eq 0 ]; then
   # No arguments provided, default to 'install'
-  usage
+  install
 else
   case "$1" in
     install)
