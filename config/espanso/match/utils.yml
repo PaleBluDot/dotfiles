@@ -87,4 +87,12 @@ matches:
   - trigger: ';-'
     replace: '-$|$-'
 
+# Outputs the month and year (e.g. January 2020)
+  - trigger: ";figlet"
+    replace: "echo {{text}} | figlet -f fraktur -w 90 -c"
+    vars:
+    - name: text
+      type: echo
+
 # For a complete introduction, visit the official docs at: https://espanso.org/docs/
+
