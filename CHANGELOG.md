@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [1.4.0](https://github.com/PaleBluDot/dotfiles/compare/v1.3.0...v1.4.0) (2024-02-20)
+
+
+### Features
+
+* **alias:** figlet text expansion ([07adff6](https://github.com/PaleBluDot/dotfiles/commit/07adff69831bcd503666f5f2d3c10d2645cb91af))
+
 # [1.3.0](https://github.com/PaleBluDot/dotfiles/compare/v1.2.0...v1.3.0) (2024-02-20)
 
 
