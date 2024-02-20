@@ -1,2 +1,1 @@
 settings.json:.vscode/settings.json
-projects.json:AppData/Roaming/Code\ -\ Insiders/User/globalStorage/alefragnani.project-manager/projects.json
