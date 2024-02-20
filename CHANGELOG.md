@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [1.3.0](https://github.com/PaleBluDot/dotfiles/compare/v1.2.0...v1.3.0) (2024-02-20)
+
+
+### Features
+
+* **script:** add bin directory ([8158338](https://github.com/PaleBluDot/dotfiles/commit/815833855ea32a867cca4428de9f297c41ad9078))
+
 # [1.2.0](https://github.com/PaleBluDot/dotfiles/compare/v1.1.0...v1.2.0) (2024-02-19)
 
 
