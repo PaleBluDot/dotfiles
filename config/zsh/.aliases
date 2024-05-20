@@ -53,21 +53,34 @@ alias gd="gobuster -w ~/.config/gobuster.txt"
 # Rename ~/.bash_aliases to ~/.aliases
 alias alre="sed -i 's/~\/.bash_aliases/~\/.aliases/g' ~/.bashrc"
 
+# wget without history
+alias wget='wget --no-hsts'
+
 
 # !------------------------------------
 # @@@ CHANGE DIRECTORIES
 # !------------------------------------
+# PaleBluDot
+alias dotfiles="cd $DOT_DIR"
 alias home="cd ~/"
-alias github="cd ~/Github"
-alias aclu-emails="cd ~/Github/PaleBluDot/aclu-emails"
+alias github="cd $GITHUB_DIR"
 alias cspell-dictionaries="cd ~/Github/PaleBluDot/cspell-dictionaries"
 alias lint-config="cd ~/Github/PaleBluDot/lint-config"
 alias psd="cd ~/Github/PaleBluDot/website"
-alias dotfiles="cd $DOTFILES"
-alias publications="cd ~/Github/American-Technion-Society/publications"
-alias ats-emails="cd ~/Github/American-Technion-Society/email-templates"
-alias ats="cd ~/Github/American-Technion-Society/purple"
+alias aclu-emails="cd ~/Github/PaleBluDot/aclu-emails"
+alias playground="cd /Users/psanchez/Library/CloudStorage/OneDrive-Personal/Dev/demos/jsExplorer"
+
+# taste-ink
 alias tasteink="cd ~/Github/taste-ink/tasteink.studio"
+
+# american-technion-society
+alias ats="cd ~/Github/American-Technion-Society/purple"
+alias publications="cd ~/Github/American-Technion-Society/publications"
+
+# aclu-national
+alias builder="cd ~/Github/ACLU-National/email-builder"
+
+
 alias sshd="cd /etc/ssh"
 
 alias findAlias="alias | grep \"$1\""
@@ -89,6 +102,13 @@ alias cloudcfg='sudo nano /etc/cloud/cloud.cfg'
 
 # See Groups
 alias group='cat /etc/group'
+
+
+
+# !------------------------------------
+# @@@ Manipulations
+# !------------------------------------
+alias comlist='cat test.html | tr "\n" "," > comma-list.txt'
 
 
 

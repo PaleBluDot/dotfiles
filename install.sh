@@ -20,11 +20,38 @@ fi
 start_time=$(date +%s.%N)
 
 ######################
+##@ BANNER
+######################
+clear
+echo
+
+cat << "EOF"
+      ..                        s                 .          ..               .x+=:.
+    dF                         :8       oec :    @88>  x .d88"               z`    ^%
+   '88bu.             u.      .88      @88888    %8P    5888R                   .   <k
+   '*88888bu    ...ue888b    :888ooo   8"*88%     .     '888R        .u       .@8Ned8"
+     ^"*8888N   888R Y888r -*8888888   8b.      .@88u    888R     ud8888.   .@^%8888"
+    beWE "888L  888R I888>   8888     u888888> ''888E`   888R   :888'8888. x88:  `)8b.
+    888E  888E  888R I888>   8888      8888R     888E    888R   d888 '88%" 8888N=*8888
+    888E  888E  888R I888>   8888      8888P     888E    888R   8888.+"     %8"    R88
+    888E  888F u8888cJ888   .8888Lu=   *888>     888E    888R   8888L        @8Wou 9%
+   .888N..888   "*888*P"    ^%888*     4888      888&   .888B . '8888c. .+ .888888P`
+    `"888*""      'Y"         'Y"      '888      R888"  ^*888%   "88888%   `   ^"F
+       ""                               88R       ""      "%       "YP'
+                                        88>
+                                        48
+                                        '8
+EOF
+
+echo
+sleep 1
+
+######################
 ##@ VARIABLES
 ######################
 
 # Export dotfiles directory as an environment variable
-export DOTFILES_DIR=$HOME/.config/dotfiles
+export DOT_DIR=$HOME/.config/dotfiles
 
 ######################
 ##@ MACOS
@@ -274,7 +301,8 @@ install_dotfiles() {
     fi
   done
 
-  echo -e "\nDotfiles installation completed successfully."
+  ln -fs $DOT_DIR/bin  $HOME/bin
+  echo "Symlink created: $DOT_DIR/bin -> $HOME/bin"
 
   # Set CSPELL_DIR based on the OS
   case "$(uname)" in
@@ -294,9 +322,11 @@ install_dotfiles() {
   esac
 
   # DEBUG
-  # echo "DOTFILES_DIR: $DOTFILES_DIR"
+  # echo "DOT_DIR: $DOT_DIR"
   # echo "CSPELL_DIR: $CSPELL_DIR"
   # echo "CONFIG_FILE: $CONFIG_FILE"
+
+  echo -e "\nDotfiles installation completed successfully."
 }
 
 # Function to uninstall dotfiles
@@ -328,11 +358,14 @@ uninstall_dotfiles() {
       done
       echo
     else
-      echo "Warning: $symlink_file not found. Uninstallation skipped for this directory."
+      echo "Warning: $symlink_file not found. Uninstall skipped for this directory."
     fi
   done
 
-  echo "Dotfiles uninstallation completed successfully."
+  rm -f $HOME/bin
+  echo "Symlink removed: $HOME/bin -> $DOT_DIR/bin"
+
+  echo "Dotfiles uninstall completed successfully."
 }
 
 
@@ -407,6 +440,10 @@ uninstall_packages() {
 install() {
   local options="$1"
 
+  # Ask the user what they want to do
+  echo "Do you want to (1) install packages or (2) symlink files?"
+  read -p "Enter pkg or sym: " choice
+
   # Check if -d flag is present
   local install_dotfiles=true
   if [[ $options == *"d"* ]]; then
@@ -424,6 +461,21 @@ install() {
     install_dotfiles
     install_packages
   fi
+
+  # Process the user's choice
+  case "$choice" in
+    pkg)
+      echo "Installing packages..."
+      # Call your function or commands to install packages here
+      ;;
+    sym)
+      echo "Symlinking files..."
+      # Call your function or commands to symlink files here
+      ;;
+    *)
+      echo "Invalid choice"
+      ;;
+  esac
 }
 
 # Function to uninstall dotfiles and/or packages based on options
@@ -478,25 +530,31 @@ usage() {
   echo "  $0 help            # Display this help message."
 }
 
+
 # Check command arguments
-case "$1" in
-  install)
-    install "$2"
-    ;;
-  uninstall)
-    uninstall "$2"
-    ;;
-  update)
-    update "$2"
-    ;;
-  help)
-    usage
-    ;;
-  *)
-    usage
-    exit 1
-    ;;
-esac
+if [ "$#" -eq 0 ]; then
+  # No arguments provided, default to 'install'
+  install
+else
+  case "$1" in
+    install)
+      install "$2"
+      ;;
+    uninstall)
+      uninstall "$2"
+      ;;
+    update)
+      update "$2"
+      ;;
+    help)
+      usage
+      ;;
+    *)
+      usage
+      exit 1
+      ;;
+  esac
+fi
 
 # Record the end time
 end_time=$(date +%s.%N)

@@ -23,23 +23,37 @@ CONTACT=support@tasteink.me
 USER=$(whoami)
 clear
 echo
-echo -e "  ${YELLOW}_  _  ____  __     ___  __   _  _  ____${NC}"
-echo -e " ${YELLOW}/ )( \(  __)(  )   / __)/  \ ( \/ )(  __)${NC}"
-echo -e " ${YELLOW}\ /\ / ) _) / (_/\( (__(  O )/ \/ \ ) _)${NC}"
-echo -e " ${YELLOW}(_/\_)(____)\____/ \___)\__/ \_)(_/(____)${NC} ${LIGHTRED}${USER}${NC}"
-echo
-echo -e "${LIGHTCYAN}---------------------------------------------------${NC}"
-echo
-echo -e "  Connections monitored and tracked!"
-if [[ -n "$ZSH_VERSION" ]]; then
-  echo -e "  Loaded ${LIGHTGREEN}~/.zhrc${NC}"
-else
-  echo -e "  Loaded ${LIGHTGREEN}~/.bashrc${NC}"
-fi
-echo -e "  Contact ${CYAN}${CONTACT}${NC}"
-echo -e "  Edit aliases: ${CYAN}edit${NC}"
-echo -e "  View all aliases: ${CYAN}alias${NC}"
-echo -e "  Date: $(dateF yyyymmdd -s -)"
-echo
 
+# cat << "EOF"
+#                .
+#   .uef^"      @88>
+# :d88E         %8P
+# `888E          .
+#  888E .z8k   .@88u
+#  888E~?888L ''888E`
+#  888E  888E   888E
+#  888E  888E   888E
+#  888E  888E   888E
+#  888E  888E   888&
+# m888N= 888>   R888"
+#  `Y"   888     ""
+#       J88"
+#       @%
+#     :"
+# EOF
 
+figlet -f fraktur -S -w 90 hi!
+
+# echo -e "${LIGHTCYAN} ---------------------------------------------------${NC}"
+# echo
+# echo -e "  Connections monitored and tracked!"
+# if [[ -n "$ZSH_VERSION" ]]; then
+#   echo -e "  Loaded ${LIGHTGREEN}~/.zhrc${NC}"
+# else
+#   echo -e "  Loaded ${LIGHTGREEN}~/.bashrc${NC}"
+# fi
+# echo -e "  Contact ${CYAN}${CONTACT}${NC}"
+# echo -e "  Edit aliases: ${CYAN}edit${NC}"
+# echo -e "  View all aliases: ${CYAN}alias${NC}"
+# echo -e "  Date: $(dateF yyyymmdd -s -)"
+# echo

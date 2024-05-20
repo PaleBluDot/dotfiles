@@ -1,2 +1,15 @@
+bat
 exa
-vim
+figlet
+fontconfig
+gh
+gobuster
+make
+mosh
+neofetch
+ranger
+traceroute
+tree
+whois
+zip
+zsh

@@ -1,7 +1,7 @@
 [user]
 	name = Pavel Sanchez
 	email = 23495830+PaleBluDot@users.noreply.github.com
-	signingkey = /home/pbd/.ssh/jupiter.pub
+	signingkey = F60BB56DBC017F59
 [init]
 	defaultBranch = main
 [filter "lfs"]
@@ -10,10 +10,12 @@
 	process = git-lfs filter-process
 	required = true
 [gpg]
-	format = ssh
+	format = openpgp
 [credential "https://github.com"]
-	helper = 
+	helper =
 	helper = !/usr/bin/gh auth git-credential
 [credential "https://gist.github.com"]
-	helper = 
+	helper =
 	helper = !/usr/bin/gh auth git-credential
+[commit]
+	gpgsign = true
