@@ -26,18 +26,8 @@ Host atsstaged
   User {{ op://lab/atsstaged/username }}
   IdentitiesOnly yes
 
-Host web-vm
-	HostName {{ op://lab/web-vm/hostname }}
 
-Host starter
-	HostName {{ op://lab/starter/hostname }}
-	User {{ op://lab/starter/username }}
-
-Host fortrabbit
-	HostName {{ op://lab/fortrabbit/hostname }}
-	User {{ op://lab/fortrabbit/username }}
-	IdentityFile ~/.ssh/fortrabbit
 
 Host *
 	User pavel
-	IdentityFile ~/.ssh/jupiter
+	IdentityFile ~/.ssh/macbook
