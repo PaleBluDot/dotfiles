@@ -1,23 +1,23 @@
 const types = [
 	{
-		value: "ci",
-		name: "⚙️ ci: CI configuration files and scripts",
+		value: "feat",
+		name: "✨ feat: A new feature",
+	},
+		{
+		value: "fix",
+		name: "🐞 fix: A bug fix",
 	},
 	{
 		value: "chore",
-		name: "🔩 chore: Doesn't modify src files",
+		name: "🔩 chore: Doesn't modify config or bin files",
+	},
+	{
+		value: "ci",
+		name: "⚙️ ci: CI configuration",
 	},
 	{
 		value: "docs",
 		name: "📚 docs: Update to the documentation",
-	},
-	{
-		value: "feat",
-		name: "✨ feat: A new feature",
-	},
-	{
-		value: "fix",
-		name: "🐞 fix: A bug fix",
 	},
 	{
 		value: "refactor",
@@ -29,7 +29,7 @@ const types = [
 	},
 ];
 
-const scopes = ["alias", "config", "function", "lib", "script", "settings", "symlink", "workflow"].map((name) => ({
+const scopes = ["ai", "config", "library", "script", "settings", "workflow"].map((name) => ({
 	name,
 }));
 
