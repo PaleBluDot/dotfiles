@@ -1,7 +1,7 @@
 [user]
 	name = Pavel Sanchez
 	email = 23495830+PaleBluDot@users.noreply.github.com
-	signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN3kIu2EIG/rjdY6NaDD5P7HPDP935kKwO0BTuVbv/bh
+	signingkey = F60BB56DBC017F59
 [init]
 	defaultBranch = main
 [filter "lfs"]
@@ -10,8 +10,12 @@
 	process = git-lfs filter-process
 	required = true
 [gpg]
-	format = ssh
-[gpg "ssh"]
-	program = /Applications/1Password.app/Contents/MacOS/op-ssh-sign
+	format = openpgp
+[credential "https://github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
 [commit]
 	gpgsign = true

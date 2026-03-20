@@ -1,2 +1,0 @@
-authorized.txt:.ssh/authorized
-config.txt:.ssh/config

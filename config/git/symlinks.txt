@@ -1,2 +1,0 @@
-.gitconfig:.gitconfig
-.gitignore:.gitignore
