@@ -75,11 +75,6 @@ os-only:
   windows:
     windows/cspell.json: ~/AppData/Roaming/configstore/cspell.json
 
-spotify:
-  enabled: true
-  symlinks:
-    .shpotify.cfg: ~/.shpotify.cfg
-
 ssh:
   enabled: true
   symlinks:
@@ -104,11 +99,6 @@ vscode:
   enabled: true
   symlinks:
     .: ~/.vscode
-
-wakatime:
-  enabled: true
-  symlinks:
-    .wakatime.cfg: ~/.wakatime.cfg
 
 warp:
   enabled: true
