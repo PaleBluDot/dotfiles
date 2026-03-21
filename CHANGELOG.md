@@ -4,6 +4,20 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [1.5.0](https://github.com/PaleBluDot/dotfiles/compare/v1.4.0...v1.5.0) (2026-03-21)
+
+
+### Bug Fixes
+
+* **config:** clean up config symlinks    ([#13](https://github.com/PaleBluDot/dotfiles/issues/13)) ([c29cb83](https://github.com/PaleBluDot/dotfiles/commit/c29cb8329692eeeee5d989f2c66b1a13c769d122))
+* **config:** update dir locations ([8ff523b](https://github.com/PaleBluDot/dotfiles/commit/8ff523b3d89cc85f5eb03efe087eab5c9de97db3))
+* **config:** work for mac only ([bb1b729](https://github.com/PaleBluDot/dotfiles/commit/bb1b72935357f713f0478a7bce324bb1d57ba716))
+
+
+### Features
+
+* **script:** rename aclu email files ([b149540](https://github.com/PaleBluDot/dotfiles/commit/b1495400d4b4f6dada4bdcc3cf7290dde9929f70))
+
 # [1.4.0](https://github.com/PaleBluDot/dotfiles/compare/v1.3.0...v1.4.0) (2024-02-20)
 
 
