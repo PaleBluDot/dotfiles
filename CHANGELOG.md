@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [1.5.2](https://github.com/PaleBluDot/dotfiles/compare/v1.5.1...v1.5.2) (2026-03-21)
+
+
+### Bug Fixes
+
+* **script:** rename install.sh to dotfiles.sh ([f8efd1d](https://github.com/PaleBluDot/dotfiles/commit/f8efd1df770b2545cd298946a0fae23f921a85df))
+
 ## [1.5.1](https://github.com/PaleBluDot/dotfiles/compare/v1.5.0...v1.5.1) (2026-03-21)
 
 
