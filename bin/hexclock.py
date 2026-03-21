@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-from flask import Flask, render_template_string
+from flask import Flask, render_template
 from datetime import datetime
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates')
 
 GRID_ROWS = 16
 GRID_COLS = 6
@@ -34,114 +34,7 @@ def get_active_cells(hex_val):
 
 @app.route('/')
 def index():
-    html = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Hex Clock Grid</title>
-        <style>
-            body {
-                display:flex;
-                flex-direction:column;
-                justify-content:center;
-                align-items:center;
-                height:100vh;
-                background:#111;
-                margin:0;
-                font-family:sans-serif;
-            }
-            #time-container {
-                display:flex;
-                flex-direction:column;
-                align-items:center;
-                margin-bottom:20px;
-            }
-            #time-display {
-                font-size:32px;
-                font-weight:bold;
-                color:#fff;
-            }
-            #hex-display {
-                font-size:24px;
-                font-weight:bold;
-                margin-top:4px;
-            }
-            #grid {
-                display:grid;
-                grid-template-columns: repeat({{cols}}, 40px);
-                grid-template-rows: repeat({{rows}}, 40px);
-                grid-gap:4px;
-            }
-            .cell {
-                width:40px;
-                height:40px;
-                display:flex;
-                justify-content:center;
-                align-items:center;
-                font-weight:bold;
-                font-size:20px;
-                color:#fff;
-                border-radius:4px;
-                background:#222;
-                transition: background 0.2s;
-            }
-        </style>
-    </head>
-    <body>
-        <div id="time-container">
-            <div id="time-display">--:--:--</div>
-            <div id="hex-display">--:--:--</div>
-        </div>
-        <div id="grid"></div>
-        <script>
-            const rows = {{rows}};
-            const cols = {{cols}};
-            const grid = document.getElementById("grid");
-            const timeDisplay = document.getElementById("time-display");
-            const hexDisplay = document.getElementById("hex-display");
-            const hexGrid = {{hex_grid|safe}};
-
-            const cells = [];
-            for(let r=0;r<rows;r++){
-                for(let c=0;c<cols;c++){
-                    const cell = document.createElement("div");
-                    cell.className = "cell";
-                    cell.textContent = hexGrid[r][c];
-                    grid.appendChild(cell);
-                    cells.push({el: cell, row: r, col: c});
-                }
-            }
-
-            async function updateGrid(){
-                const res = await fetch('/time_hex');
-                const data = await res.json();
-                const hexColor = data.hex;
-                const activeCells = data.active;
-                const timeStr = data.time;
-                const hexFormatted = data.hex_formatted;
-
-                // dim all cells
-                cells.forEach(cellObj => cellObj.el.style.backgroundColor = "#222");
-
-                // light up active cells
-                activeCells.forEach(c => {
-                    const cellObj = cells.find(cell => cell.row === c[0] && cell.col === c[1]);
-                    if(cellObj) cellObj.el.style.backgroundColor = "#" + hexColor;
-                });
-
-                // update time and hex displays
-                timeDisplay.textContent = timeStr;
-                hexDisplay.textContent = hexFormatted;
-                hexDisplay.style.color = "#" + hexColor;  // set text color to match hex
-            }
-
-            updateGrid();
-            setInterval(updateGrid, 1000);
-        </script>
-    </body>
-    </html>
-    """
-    return render_template_string(html, rows=GRID_ROWS, cols=GRID_COLS, hex_grid=HEX_DIGITS)  # nosemgrep: python.flask.security.xss.audit.direct-use-of-jinja2
+    return render_template('hexclock.html', rows=GRID_ROWS, cols=GRID_COLS, hex_grid=HEX_DIGITS)
 
 @app.route('/time_hex')
 def time_hex():
