@@ -11,7 +11,7 @@ fi
 # Paths needed before .zshrc loads
 # -----------------------
 export ZSH="$HOME/.config/oh-my-zsh"
-export DOT_DIR="$HOME/.config/dotfiles"
+export DOTFILES="$HOME/.config/dotfiles"
 
 # LANGUAGE RUNTIMES
 # Go and NVM directories

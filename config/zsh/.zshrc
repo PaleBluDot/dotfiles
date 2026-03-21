@@ -88,8 +88,8 @@ thefuck() {
 # LOCAL CONFIG
 # Aliases, functions, theme, welcome message
 # -----------------------
-[[ ! -f $DOT_DIR/config/zsh/.aliases ]] || source $DOT_DIR/config/zsh/.aliases
-[[ ! -f $DOT_DIR/config/zsh/.functions ]] || source $DOT_DIR/config/zsh/.functions
-# [[ ! -f $DOT_DIR/config/zsh/.p10k.zsh ]] || source $DOT_DIR/config/zsh/.p10k.zsh  # uncomment to revert to p10k
+[[ ! -f $DOTFILES/config/zsh/.aliases ]] || source $DOTFILES/config/zsh/.aliases
+[[ ! -f $DOTFILES/config/zsh/.functions ]] || source $DOTFILES/config/zsh/.functions
+# [[ ! -f $DOTFILES/config/zsh/.p10k.zsh ]] || source $DOTFILES/config/zsh/.p10k.zsh  # uncomment to revert to p10k
 eval "$(starship init zsh)"
 [[ ! -x "$(command -v welcome.sh)" ]] || source welcome.sh && fastfetch --pipe false

@@ -63,7 +63,7 @@ alias wget='wget --no-hsts'
 # @@@ CHANGE DIRECTORIES
 # !------------------------------------
 # PaleBluDot
-alias dotfiles="cd $DOT_DIR"
+alias dotfiles="cd $DOTFILES"
 alias home="cd ~/"
 alias github="cd $GITHUB_DIR"
 alias cspell-dictionaries="cd ~/Github/PaleBluDot/cspell-dictionaries"
