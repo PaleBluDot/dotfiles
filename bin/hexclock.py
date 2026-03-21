@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import socket
 from flask import Flask, render_template_string
 from datetime import datetime
 
@@ -150,4 +151,5 @@ def time_hex():
     return {"hex": hex_val, "active": active_cells, "time": time_str, "hex_formatted": hex_formatted}
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    local_ip = socket.gethostbyname(socket.gethostname())
+    app.run(host=local_ip, port=5000)
