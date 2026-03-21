@@ -26,21 +26,21 @@ clear
 echo
 
 cat << "EOF"
-      ..                        s                 .          ..               .x+=:.
-    dF                         :8       oec :    @88>  x .d88"               z`    ^%
-   '88bu.             u.      .88      @88888    %8P    5888R                   .   <k
-   '*88888bu    ...ue888b    :888ooo   8"*88%     .     '888R        .u       .@8Ned8"
-     ^"*8888N   888R Y888r -*8888888   8b.      .@88u    888R     ud8888.   .@^%8888"
-    beWE "888L  888R I888>   8888     u888888> ''888E`   888R   :888'8888. x88:  `)8b.
-    888E  888E  888R I888>   8888      8888R     888E    888R   d888 '88%" 8888N=*8888
-    888E  888E  888R I888>   8888      8888P     888E    888R   8888.+"     %8"    R88
-    888E  888F u8888cJ888   .8888Lu=   *888>     888E    888R   8888L        @8Wou 9%
-   .888N..888   "*888*P"    ^%888*     4888      888&   .888B . '8888c. .+ .888888P`
-    `"888*""      'Y"         'Y"      '888      R888"  ^*888%   "88888%   `   ^"F
-       ""                               88R       ""      "%       "YP'
-                                        88>
-                                        48
-                                        '8
+   ..                        s                 .          ..               .x+=:.
+ dF                         :8       oec :    @88>  x .d88"               z`    ^%
+'88bu.             u.      .88      @88888    %8P    5888R                   .   <k
+'*88888bu    ...ue888b    :888ooo   8"*88%     .     '888R        .u       .@8Ned8"
+  ^"*8888N   888R Y888r -*8888888   8b.      .@88u    888R     ud8888.   .@^%8888"
+ beWE "888L  888R I888>   8888     u888888> ''888E`   888R   :888'8888. x88:  `)8b.
+ 888E  888E  888R I888>   8888      8888R     888E    888R   d888 '88%" 8888N=*8888
+ 888E  888E  888R I888>   8888      8888P     888E    888R   8888.+"     %8"    R88
+ 888E  888F u8888cJ888   .8888Lu=   *888>     888E    888R   8888L        @8Wou 9%
+.888N..888   "*888*P"    ^%888*     4888      888&   .888B . '8888c. .+ .888888P`
+ `"888*""      'Y"         'Y"      '888      R888"  ^*888%   "88888%   `   ^"F
+    ""                               88R       ""      "%       "YP'
+                                     88>
+                                     48
+                                     '8
 EOF
 
 echo
@@ -51,7 +51,7 @@ sleep 1
 ######################
 
 # Export dotfiles directory as an environment variable
-export DOT_DIR=$HOME/.config/dotfiles
+export DOTFILES=$HOME/.config/dotfiles
 
 ######################
 ##@ MACOS
@@ -257,113 +257,120 @@ uninstall_windows() {
 ##@ DOTFILES
 ######################
 
+# Resolve uname to the YAML OS key: darwin | linux | windows
+_current_os() {
+  case "$(uname)" in
+    Darwin)             echo "darwin"  ;;
+    Linux)              echo "linux"   ;;
+    MINGW*|MSYS*|CYGWIN*) echo "windows" ;;
+    *)                  echo "unknown" ;;
+  esac
+}
+
+# Emit tab-separated "tool src dest" lines for all enabled symlinks on the current OS.
+# dest is always a full ~/... path. Combines cross-platform (symlinks:) and
+# OS-specific (darwin:/linux:/windows:) entries.
+_parse_symlinks() {
+  local symlinks_file="$1"
+  export OS
+  OS=$(_current_os)
+  {
+    # Cross-platform entries
+    yq eval 'to_entries[] | select(.value.enabled == true) | . as $e |
+      .value.symlinks // {} | to_entries[] |
+      [$e.key, .key, .value] | join("\t")' "$symlinks_file"
+    # OS-specific entries
+    yq eval 'to_entries[] | select(.value.enabled == true) | . as $e |
+      .value[env(OS)] | select(. != null) | to_entries[] |
+      [$e.key, .key, .value] | join("\t")' "$symlinks_file"
+  }
+}
+
 # Function to install dotfiles
 install_dotfiles() {
-  local config_dir="config"
-  local system_name=$(uname -s)
+  local symlinks_file="config/symlinks.yml"
 
-  # Iterate through directories in config and install symlinks
-  for dir in $config_dir/*/; do
-    local symlink_file="$dir/symlinks.txt"
-    local target_dir="${dir#${config_dir}/}"
+  if [ ! -f "$symlinks_file" ]; then
+    echo "Error: $symlinks_file not found"
+    exit 1
+  fi
 
-    if [ -f "$symlink_file" ]; then
-      # Check if the target directory exists, create it if not
-      local full_target_dir="${HOME}/${target_dir}"
+  echo "Creating symlinks (OS: $(_current_os))..."
 
-      # if [ ! -d "$full_target_dir" ]; then
-      #   mkdir -p "$full_target_dir"
-      #   echo "Created directory: $full_target_dir"
-      # fi
-
-      echo "Creating symlinks for $target_dir directory..."
-
-      # Use awk to parse source and target
-      awk -F':' '{gsub(/^[ \t]+|[ \t]+$/, "", $1); gsub(/^[ \t]+|[ \t]+$/, "", $2); print $1, $2}' "$symlink_file" | while read -r source target; do
-        source="${HOME}/.config/dotfiles/$dir$source"
-        target="${HOME}/${target}"
-
-        if [ -e "$target" ]; then
-          if [ -L "$target" ]; then
-            echo "Symlinks already exists."
-            # echo "Symlink already exists: $target -> $(readlink -f $target)"
-          else
-            echo "File or directory already exists: $target"
-          fi
-        else
-          ln -fs "$source" "$target"
-          echo "Symlink created: $target -> $source"
-        fi
-      done
-      echo
+  while IFS=$'\t' read -r tool src dest; do
+    local source_path
+    if [ "$src" = "." ]; then
+      source_path="${HOME}/.config/dotfiles/config/${tool}"
     else
-      echo "Warning: $symlink_file not found. Installation skipped for this directory." > /dev/null
+      source_path="${HOME}/.config/dotfiles/config/${tool}/${src}"
     fi
-  done
+    local target_path="${dest/#\~/$HOME}"
+    local target_dir
+    target_dir="$(dirname "$target_path")"
 
-  ln -fs $DOT_DIR/bin  $HOME/bin
-  echo "Symlink created: $DOT_DIR/bin -> $HOME/bin"
+    if [ ! -d "$target_dir" ]; then
+      mkdir -p "$target_dir"
+    fi
 
-  # Set CSPELL_DIR based on the OS
-  case "$(uname)" in
-    Darwin)
-      CSPELL_DIR="/opt/homebrew/lib"
-      ;;
-    Linux)
-      CSPELL_DIR="/usr/lib"
-      ;;
-    MINGW32*|MSYS*|MINGW64*)
-      CSPELL_DIR="C:\\Program Files\\nodejs\\"
-      ;;
-    *)
-      echo "Unsupported operating system."
-      exit 1
-      ;;
-  esac
+    if [ -e "$target_path" ] || [ -L "$target_path" ]; then
+      if [ -L "$target_path" ]; then
+        echo "Symlink already exists: $target_path"
+      else
+        echo "File or directory already exists: $target_path"
+      fi
+    else
+      ln -fs "$source_path" "$target_path"
+      echo "Symlink created: $target_path -> $source_path"
+    fi
+  done < <(_parse_symlinks "$symlinks_file")
 
-  # DEBUG
-  # echo "DOT_DIR: $DOT_DIR"
-  # echo "CSPELL_DIR: $CSPELL_DIR"
-  # echo "CONFIG_FILE: $CONFIG_FILE"
+  ln -fs "$DOTFILES/bin" "$HOME/bin"
+  echo "Symlink created: $HOME/bin -> $DOTFILES/bin"
+
+  # Generate cspell.json with resolved $HOME path (not symlinked — relative paths
+  # break when cspell resolves them from the symlink target, not the symlink location)
+  local cspell_src="$DOTFILES/config/cspell/cspell.json"
+  local cspell_dest="$HOME/.config/configstore/cspell.json"
+  mkdir -p "$(dirname "$cspell_dest")"
+  sed "s|__HOME__|$HOME|g" "$cspell_src" > "$cspell_dest"
+  echo "Generated: $cspell_dest"
 
   echo -e "\nDotfiles installation completed successfully."
 }
 
 # Function to uninstall dotfiles
 uninstall_dotfiles() {
-  local config_dir="config"
+  local symlinks_file="config/symlinks.yml"
 
-  # Iterate through directories in config and uninstall symlinks
-  for dir in $config_dir/*/; do
-    local symlink_file="$dir/symlinks.txt"
-    local target_dir="${dir#${config_dir}/}"
+  if [ ! -f "$symlinks_file" ]; then
+    echo "Error: $symlinks_file not found"
+    exit 1
+  fi
 
-    if [ -f "$symlink_file" ]; then
-      echo "Removing symlinks for $target_dir directory..."
+  echo "Removing symlinks (OS: $(_current_os))..."
 
-      # Use awk to parse source and target
-      awk -F':' '{gsub(/^[ \t]+|[ \t]+$/, "", $1); gsub(/^[ \t]+|[ \t]+$/, "", $2); print $1, $2}' "$symlink_file" | while read -r source target; do
-        source="${HOME}/.config/dotfiles/$dir$source"
-        target="${HOME}/${target}"
-
-        if [ -L "$target" ]; then
-          rm -f "$target"
-          echo "Symlink removed: $target -> $source"
-        elif [ -e "$target" ]; then
-          rm -f "$target"
-          echo "Not a symlink. File Deleted: $target"
-        else
-          echo "Target not found: $target"
-        fi
-      done
-      echo
+  while IFS=$'\t' read -r tool src dest; do
+    local source_path
+    if [ "$src" = "." ]; then
+      source_path="${HOME}/.config/dotfiles/config/${tool}"
     else
-      echo "Warning: $symlink_file not found. Uninstall skipped for this directory."
+      source_path="${HOME}/.config/dotfiles/config/${tool}/${src}"
     fi
-  done
+    local target_path="${dest/#\~/$HOME}"
 
-  rm -f $HOME/bin
-  echo "Symlink removed: $HOME/bin -> $DOT_DIR/bin"
+    if [ -L "$target_path" ]; then
+      rm -f "$target_path"
+      echo "Symlink removed: $target_path -> $source_path"
+    elif [ -e "$target_path" ]; then
+      rm -f "$target_path"
+      echo "Not a symlink. File deleted: $target_path"
+    else
+      echo "Target not found: $target_path"
+    fi
+  done < <(_parse_symlinks "$symlinks_file")
+
+  rm -f "$HOME/bin"
+  echo "Symlink removed: $HOME/bin -> $DOTFILES/bin"
 
   echo "Dotfiles uninstall completed successfully."
 }
