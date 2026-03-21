@@ -26,13 +26,13 @@ matches:
 
   - trigger: ";sig"
     label: "Basic signature"
-    replace: "Thanks,\nPavel Sanchez"
+    replace: "Thanks,\nPavel"
 
   - trigger: ";sig"
     label: "Full signature"
     replace: |
-      Best,
-      Pavel Sanchez
+      Thanks,
+      Pavel
 
       Pavel Sanchez
       Pronouns: He, him, his

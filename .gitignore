@@ -1,5 +1,14 @@
+# Files
 .env
 .DS_Store
-node_modules
-package-lock.json
 *test.*
+package-lock.json
+config/starship/starship-default.toml
+
+# Folders
+node_modules
+.codacy
+
+# AI
+.github/instructions/codacy.instructions.md
+.claude/
