@@ -141,7 +141,7 @@ def index():
     </body>
     </html>
     """
-    return render_template_string(html, rows=GRID_ROWS, cols=GRID_COLS, hex_grid=HEX_DIGITS)  # noqa: B703 S608
+    return render_template_string(html, rows=GRID_ROWS, cols=GRID_COLS, hex_grid=HEX_DIGITS)  # nosemgrep: python.flask.security.xss.audit.direct-use-of-jinja2
 
 @app.route('/time_hex')
 def time_hex():
