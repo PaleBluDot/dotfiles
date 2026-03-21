@@ -1,3 +1,0 @@
-.npmrc:.npmrc
-.nvmrc:.nvmrc
-npm-globals.txt:.config/npm-globals.txt

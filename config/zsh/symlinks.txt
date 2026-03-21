@@ -1,3 +1,0 @@
-.zshrc:.zshrc
-.zshenv:.zshenv
-.zprofile:.zprofile

@@ -276,3 +276,24 @@ function dateF() {
 			;;
   esac
 }
+
+
+#! Github Repo Add Token
+# Set NPM_TOKEN GitHub secret for a repo
+# Usage: ghs <repo-name> [username]
+# Sets the NPM_TOKEN env var as a GitHub Actions
+# secret on PaleBluDot/<repo-name>
+# Optionally pass a second argument to override the username: ghs <repo-name> <username>
+ghs() {
+  echo ${(P)1} | gh secret set $1 --repo ${3:-PaleBluDot}/$2
+}
+
+
+
+#! Create ENV varibale
+# Set an environment variable for the current shell session
+# Usage: setenv <VAR_NAME> <value>
+# Example: setenv GH_TOKEN abc123
+setenv() {
+  export $1=$2
+}

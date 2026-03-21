@@ -1,8 +1,14 @@
 .env
 .pushover.cfg
-node_modules
 .DS_Store
 *.pdf
 *.mpg
 *.mp3
 *.aac
+
+# Directories
+node_modules
+
+#Ignore insiders AI rules
+.github/instructions/codacy.instructions.md
+**/.claude/settings.local.json

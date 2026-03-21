@@ -1,0 +1,113 @@
+# Symlink mappings
+#
+# Structure per tool:
+#   enabled:              true/false — toggle without deleting config files
+#   symlinks:             cross-platform entries
+#   darwin/linux/windows: OS-specific entries
+#
+# All targets are full paths starting with ~/
+
+bash:
+  enabled: true
+  symlinks:
+    .bashrc: ~/.bashrc
+    .profile: ~/.profile
+    .bash_profile: ~/.bash_profile
+
+espanso:
+  enabled: true
+  darwin:
+    .: ~/Library/Application Support/Espanso
+  linux:
+    .: ~/.config/Espanso
+  windows:
+    .: ~/AppData/Roaming/Espanso
+
+fastfetch:
+  enabled: true
+  symlinks:
+    config.jsonc: ~/.config/fastfetch/config.jsonc
+
+gh:
+  enabled: true
+  symlinks:
+    config.yml: ~/.config/gh/config.yml
+
+git:
+  enabled: true
+  symlinks:
+    .gitconfig: ~/.gitconfig
+    .gitignore: ~/.config/git/ignore
+
+gobuster:
+  enabled: true
+  symlinks:
+    gobuster.txt: ~/.config/gobuster.txt
+
+massCode:
+  enabled: true
+  symlinks:
+    startburst.yml: ~/.massCode/themes/startburst.yml
+
+nano:
+  enabled: true
+  symlinks:
+    .nanorc: ~/.nanorc
+
+neofetch:
+  enabled: true
+  symlinks:
+    neofetch.conf: ~/.config/neofetch/config.conf
+
+npm:
+  enabled: true
+  symlinks:
+    .npmrc: ~/.npmrc
+    .nvmrc: ~/.nvmrc
+    npm-globals.txt: ~/.config/npm-globals.txt
+
+os-only:
+  enabled: true
+  darwin:
+    macos/cspell.json: ~/.config/configstore/cspell.json
+  linux:
+    linux/cspell.json: ~/.config/configstore/cspell.json
+  windows:
+    windows/cspell.json: ~/AppData/Roaming/configstore/cspell.json
+
+ssh:
+  enabled: true
+  symlinks:
+    config: ~/.ssh/config
+
+starship:
+  enabled: true
+  symlinks:
+    starship.toml: ~/.config/starship.toml
+
+thefuck:
+  enabled: true
+  symlinks:
+    settings.py: ~/.config/thefuck/settings.py
+
+vim:
+  enabled: true
+  symlinks:
+    .vimrc: ~/.vimrc
+
+vscode:
+  enabled: true
+  symlinks:
+    .: ~/.vscode
+
+warp:
+  enabled: true
+  symlinks:
+    starburst.yml: ~/.warp/starburst.yml
+
+zsh:
+  enabled: true
+  symlinks:
+    .zshrc: ~/.zshrc
+    .zshenv: ~/.zshenv
+    .zprofile: ~/.zprofile

@@ -1,0 +1,32 @@
+{
+  "name": "New Theme (Rose Pine)",
+  "author": "",
+  "type": "light",
+  "colors": {
+    "color-primary": "hsl(277, 22%, 57%)",
+    "color-bg": "hsl(35, 67%, 96%)",
+    "color-fg": "hsl(245, 18%, 40%)",
+    "color-text": "hsl(245, 18%, 40%)",
+    "color-text-muted": "hsl(270, 10%, 53%)",
+    "color-border": "hsl(30, 24%, 88%)",
+    "color-button": "hsl(34, 52%, 91%)",
+    "color-button-hover": "hsl(34, 42%, 88%)",
+    "color-list-selection": "hsl(34, 38%, 89%)",
+    "color-list-selection-fg": "hsl(245, 18%, 40%)",
+    "color-scrollbar": "hsla(270, 14%, 73%, 0.5)"
+  },
+  "editorColors": {
+    "editor-keyword": "hsl(277, 22%, 57%)",
+    "editor-string": "hsl(35, 78%, 56%)",
+    "editor-comment": "hsl(270, 8%, 61%)",
+    "editor-number": "hsl(2, 57%, 66%)",
+    "editor-atom": "hsl(340, 37%, 53%)",
+    "editor-variable": "hsl(245, 18%, 40%)",
+    "editor-def": "hsl(198, 52%, 36%)",
+    "editor-property": "hsl(187, 34%, 47%)",
+    "editor-tag": "hsl(340, 37%, 53%)",
+    "editor-attribute": "hsl(198, 52%, 36%)",
+    "editor-operator": "hsl(277, 22%, 57%)",
+    "editor-bracket": "hsl(245, 18%, 40%)"
+  }
+}

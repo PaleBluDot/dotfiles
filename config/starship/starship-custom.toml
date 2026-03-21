@@ -1,0 +1,156 @@
+"$schema" = 'https://starship.rs/config-schema.json'
+command_timeout = 2000
+add_newline = true
+
+format = """
+[](#9A348E)\
+$os\
+[](fg:#9A348E bg:#417E37)\
+$nodejs\
+[](fg:#417E37 bg:#d40f51)\
+${custom.dir}\
+[](fg:#d40f51 bg:#cef542)\
+$package\
+${custom.git_clean}\
+${custom.git_dirty}\
+$time\
+$line_break$character"""
+
+right_format = """\
+$status\
+$cmd_duration\
+$jobs\
+$php"""
+
+[os]
+disabled = false
+style = "bg:#9A348E"
+format = '[ $symbol ]($style)'
+
+[os.symbols]
+Macos = "󰀵"
+
+[time]
+disabled = false
+time_format = "%H:%M:%S"
+style = "bg:#33658A"
+format = '[ $time ]($style)[](fg:#33658A)'
+
+[nodejs]
+symbol = ""
+style = "bg:#417E37 fg:bright-white"
+format = '[ $symbol$version ]($style)'
+detect_files = ["package.json", ".node-version"]
+detect_folders = ["node_modules"]
+
+[directory]
+disabled = true
+
+[custom.dir]
+description = "Directory — clickable GitHub link when inside a github.com project"
+when = "true"
+command = '''
+path=$(pwd)
+display="${path/#$HOME/~}"
+IFS='/' read -ra parts <<< "$display"
+n=${#parts[@]}
+[ "$n" -gt 3 ] && display="…/${parts[$((n-2))]}/${parts[$((n-1))]}"
+case "$path" in
+  *github.com/*)
+    rest="${path#*github.com/}"
+    org="${rest%%/*}"
+    rest2="${rest#*/}"
+    repo="${rest2%%/*}"
+    url="https://github.com/$org/$repo"
+    printf '\033]8;;%s\033\\ %s\033]8;;\033\\' "$url" "$display"
+    ;;
+  *)
+    echo "$display"
+    ;;
+esac
+'''
+style = "bg:#d40f51 fg:bright-white bold"
+format = "[ $output ]($style)"
+shell = ["bash", "--noprofile", "--norc"]
+
+[package]
+style = "bg:#cef542 fg:#1a1a1a"
+symbol = "󰏗 "
+format = '[ $symbol$version ]($style)'
+display_private = true
+# detect_files = ["package.json"]
+disabled = false
+
+[custom.git_clean]
+description = "Green git segment when working tree is clean"
+command = '''
+branch=$(git branch --show-current 2>/dev/null || git rev-parse --abbrev-ref HEAD 2>/dev/null)
+ahead=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)
+behind=$(git rev-list --count HEAD..@{u} 2>/dev/null || echo 0)
+out="  $branch"
+[ "$ahead" -gt 0 ] && out="$out ⇡$ahead"
+[ "$behind" -gt 0 ] && out="$out ⇣$behind"
+echo "$out"
+'''
+when = 'git rev-parse --is-inside-work-tree > /dev/null 2>&1 && test -z "$(git status --porcelain 2>/dev/null)"'
+ignore_timeout = true
+style = "bg:#099c30 fg:bright-white bold"
+format = "[](fg:#cef542 bg:#099c30)[ $output ](bg:#099c30 fg:bright-white bold)[](fg:#099c30 bg:#33658A)"
+shell = ["bash", "--noprofile", "--norc"]
+
+[custom.git_dirty]
+description = "Red git segment when working tree has changes"
+command = '''
+branch=$(git branch --show-current 2>/dev/null || git rev-parse --abbrev-ref HEAD 2>/dev/null)
+staged=$(git diff --staged --name-only 2>/dev/null | wc -l | tr -d ' ')
+modified=$(git diff --name-only 2>/dev/null | wc -l | tr -d ' ')
+untracked=$(git ls-files -o --exclude-standard 2>/dev/null | wc -l | tr -d ' ')
+ahead=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)
+behind=$(git rev-list --count HEAD..@{u} 2>/dev/null || echo 0)
+out="  $branch"
+[ "$staged" -gt 0 ] && out="$out +$staged"
+[ "$modified" -gt 0 ] && out="$out !$modified"
+[ "$untracked" -gt 0 ] && out="$out ?$untracked"
+[ "$ahead" -gt 0 ] && out="$out ⇡$ahead"
+[ "$behind" -gt 0 ] && out="$out ⇣$behind"
+echo "$out"
+'''
+when = 'git rev-parse --is-inside-work-tree > /dev/null 2>&1 && test -n "$(git status --porcelain 2>/dev/null)"'
+ignore_timeout = true
+style = "bg:#e00d23 fg:bright-white bold"
+format = "[](fg:#cef542 bg:#e00d23)[ $output ](bg:#e00d23 fg:bright-white bold)[](fg:#e00d23 bg:#33658A)"
+shell = ["bash", "--noprofile", "--norc"]
+
+[git_branch]
+disabled = true
+
+[git_status]
+disabled = true
+
+[php]
+symbol = " "
+style = "fg:bright-white bg:purple"
+format = '[ $symbol$version ]($style)'
+detect_files = ["composer.json", ".php-version"]
+detect_extensions = ["php"]
+
+[status]
+disabled = false
+format = '[$symbol ]($style)'
+symbol = "✘"
+success_symbol = ""
+style = "fg:red bold"
+
+[cmd_duration]
+format = "[ ⏱ $duration ]($style)"
+style = "fg:bright-yellow"
+min_time = 3_000
+
+[jobs]
+format = "[$symbol$number ]($style)"
+style = "fg:bright-cyan"
+symbol = "⚙ "
+
+[character]
+success_symbol = "[ ❯](bold green)"
+error_symbol = "[ ❯](bold red)"
