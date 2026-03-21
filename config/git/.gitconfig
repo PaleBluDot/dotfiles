@@ -1,7 +1,7 @@
 [user]
 	name = Pavel Sanchez
 	email = 23495830+PaleBluDot@users.noreply.github.com
-	signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN3kIu2EIG/rjdY6NaDD5P7HPDP935kKwO0BTuVbv/bh
+	signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF7jEwz0kG5lG5VzA6c958an7bgbt+UBFgTMwi+GILqV
 [init]
 	defaultBranch = main
 [filter "lfs"]
