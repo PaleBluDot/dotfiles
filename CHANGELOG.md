@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [1.5.1](https://github.com/PaleBluDot/dotfiles/compare/v1.5.0...v1.5.1) (2026-03-21)
+
+
+### Bug Fixes
+
+* **config:** rename ssh config.txt to config ([fd9b3df](https://github.com/PaleBluDot/dotfiles/commit/fd9b3df9c03b1d4d3f3ef733e16e1396abd1be15))
+
 # [1.5.0](https://github.com/PaleBluDot/dotfiles/compare/v1.4.0...v1.5.0) (2026-03-21)
 
 
