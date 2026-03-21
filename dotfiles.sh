@@ -10,7 +10,17 @@ VERBOSE=false
 ##########################
 ##############@ FUNCTIONS
 ##########################
-_detect_os(){
+_log() {
+  echo "$1"
+}
+
+_verbose() {
+  if [[ "$VERBOSE" == true ]]; then
+    echo "$1"
+  fi
+}
+
+_detect_os() {
   case "$(uname)" in
     Darwin)
       echo "darwin"
@@ -36,10 +46,10 @@ _bootstrap() {
   DOTFILES=$(cd "$(dirname "$0")" && pwd)
 
   if command -v yq &>/dev/null; then
-    echo "yq is installed"
+    _verbose "yq is installed"
   else
-    echo "yq is not installed"
-    echo "installing yq..."
+    _log "yq is not installed"
+    _log "installing yq..."
     case "$(_detect_os)" in
       darwin)
         brew install yq
@@ -62,11 +72,11 @@ for arg in "$@"; do
   case "$arg" in
     --dry-run)
       DRY_RUN=true
-      echo "dry run mode"
+      _log "dry run mode"
       ;;
     --verbose)
       VERBOSE=true
-      echo "verbose mode"
+      _log "verbose mode"
       ;;
   esac
 done
