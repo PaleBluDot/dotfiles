@@ -29,7 +29,7 @@ const types = [
 	},
 ];
 
-const scopes = ["ai", "config", "library", "script", "settings", "workflow"].map((name) => ({
+const scopes = ["ai", "alias", "config", "function", "library", "script", "settings", "workflow"].map((name) => ({
 	name,
 }));
 
