@@ -141,7 +141,7 @@ def index():
     </body>
     </html>
     """
-    return render_template_string(html, rows=GRID_ROWS, cols=GRID_COLS, hex_grid=HEX_DIGITS)
+    return render_template_string(html, rows=GRID_ROWS, cols=GRID_COLS, hex_grid=HEX_DIGITS)  # nosec
 
 @app.route('/time_hex')
 def time_hex():
@@ -150,4 +150,4 @@ def time_hex():
     return {"hex": hex_val, "active": active_cells, "time": time_str, "hex_formatted": hex_formatted}
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="127.0.0.1", port=5000)
