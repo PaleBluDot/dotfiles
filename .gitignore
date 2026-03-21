@@ -12,3 +12,4 @@ node_modules
 # AI
 .github/instructions/codacy.instructions.md
 .claude/
+plan.md
