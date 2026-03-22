@@ -13,6 +13,7 @@ node_modules
 .github/instructions/codacy.instructions.md
 .claude/
 plan.md
+CLAUDE.md
 
 # Added by ggshield
 .cache_ggshield
