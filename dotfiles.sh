@@ -4,19 +4,52 @@
 ##############@ VARIABLES
 ##########################
 DRY_RUN=false
-VERBOSE=false
+LOG_LEVEL_DEBUG=0
+LOG_LEVEL_INFO=1
+LOG_LEVEL_WARN=2
+LOG_LEVEL_ERROR=3
+LOG_LEVEL=$LOG_LEVEL_INFO
 
 
 ##########################
 ##############@ FUNCTIONS
 ##########################
 _log() {
-  echo "$1"
-}
+  local level="$1"
+  local message="$2"
+  local level_num
+  local prefix
 
-_verbose() {
-  if [[ "$VERBOSE" == true ]]; then
-    echo "$1"
+  local CYAN="\033[0;36m"
+  local GREEN="\033[0;32m"
+  local YELLOW="\033[0;33m"
+  local RED="\033[0;31m"
+  local RESET="\033[0m"
+
+
+  case "$level" in
+    debug) level_num=$LOG_LEVEL_DEBUG;
+           prefix="${GREEN}[DEBUG]  ${RESET}"
+           ;;
+    info)  level_num=$LOG_LEVEL_INFO;
+           prefix="${CYAN}[INFO]   ${RESET}"
+           ;;
+    warn)  level_num=$LOG_LEVEL_WARN;
+           prefix="${YELLOW}[WARN]   ${RESET}"
+           ;;
+    error) level_num=$LOG_LEVEL_ERROR;
+           prefix="${RED}[ERROR]  ${RESET}"
+           ;;
+  esac
+
+
+  [[ $level_num -lt $LOG_LEVEL ]] && return
+
+
+  if [[ "$level" == "error" ]]; then
+    echo -e "$prefix $message" >&2
+  else
+    echo -e "$prefix $message"
   fi
 }
 
@@ -36,7 +69,7 @@ _detect_os() {
       echo "windows-native"
       ;;
     *)
-      echo "Error: unsupported OS '$(uname)'" >&2
+      _log error "Unsupported OS '$(uname)'"
       exit 1
       ;;
   esac
@@ -46,10 +79,10 @@ _bootstrap() {
   DOTFILES=$(cd "$(dirname "$0")" && pwd)
 
   if command -v yq &>/dev/null; then
-    _verbose "yq is installed"
+    _log debug "yq is installed"
   else
-    _log "yq is not installed"
-    _log "installing yq..."
+    _log info "yq is not installed"
+    _log info "installing yq..."
     case "$(_detect_os)" in
       darwin)
         brew install yq
@@ -72,13 +105,26 @@ for arg in "$@"; do
   case "$arg" in
     --dry-run)
       DRY_RUN=true
-      _log "dry run mode"
+      _log info "dry run mode"
       ;;
-    --verbose)
-      VERBOSE=true
-      _log "verbose mode"
+    --debug)
+      LOG_LEVEL=$LOG_LEVEL_DEBUG
+      _log info "debug mode"
       ;;
   esac
 done
 
 
+
+
+##########################
+####################@ RUN
+##########################
+# _bootstrap
+
+# _log info "test message"
+# _log debug "test message"
+# _log warn "test message"
+# _log error "test message"
+
+# _log info "dotfiles script loaded successfully"
