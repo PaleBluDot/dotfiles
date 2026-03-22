@@ -3,12 +3,12 @@
 ##########################
 ##############@ VARIABLES
 ##########################
-DRY_RUN=false
-LOG_LEVEL_DEBUG=0
-LOG_LEVEL_INFO=1
-LOG_LEVEL_WARN=2
-LOG_LEVEL_ERROR=3
+readonly LOG_LEVEL_DEBUG=0
+readonly LOG_LEVEL_INFO=1
+readonly LOG_LEVEL_WARN=2
+readonly LOG_LEVEL_ERROR=3
 LOG_LEVEL=$LOG_LEVEL_INFO
+DRY_RUN=false
 
 
 ##########################
@@ -29,17 +29,15 @@ _log() {
 
   case "$level" in
     debug) level_num=$LOG_LEVEL_DEBUG;
-           prefix="${GREEN}[DEBUG]  ${RESET}"
-           ;;
+           prefix="${GREEN}[DEBUG]  ${RESET}" ;;
     info)  level_num=$LOG_LEVEL_INFO;
-           prefix="${CYAN}[INFO]   ${RESET}"
-           ;;
+           prefix="${CYAN}[INFO]   ${RESET}" ;;
     warn)  level_num=$LOG_LEVEL_WARN;
-           prefix="${YELLOW}[WARN]   ${RESET}"
-           ;;
+           prefix="${YELLOW}[WARN]   ${RESET}" ;;
     error) level_num=$LOG_LEVEL_ERROR;
-           prefix="${RED}[ERROR]  ${RESET}"
-           ;;
+           prefix="${RED}[ERROR]  ${RESET}" ;;
+    *)     level_num=$LOG_LEVEL_INFO;
+           prefix="${CYAN}[INFO]   ${RESET}" ;;
   esac
 
 
@@ -76,7 +74,8 @@ _detect_os() {
 }
 
 _bootstrap() {
-  DOTFILES=$(cd "$(dirname "$0")" && pwd)
+  export DOTFILES=$(cd "$(dirname "$0")" && pwd)
+
 
   if command -v yq &>/dev/null; then
     _log debug "yq is installed"
@@ -103,28 +102,26 @@ _bootstrap() {
 ##########################
 for arg in "$@"; do
   case "$arg" in
-    --dry-run)
-      DRY_RUN=true
-      _log info "dry run mode"
-      ;;
-    --debug)
-      LOG_LEVEL=$LOG_LEVEL_DEBUG
-      _log info "debug mode"
-      ;;
+    --dry-run|-n)
+      DRY_RUN=true ;;
+    --debug|-d)
+      LOG_LEVEL=$LOG_LEVEL_DEBUG ;;
   esac
 done
 
+[[ "$DRY_RUN" == true ]] && _log info "dry run mode"
+[[ "$LOG_LEVEL" == "$LOG_LEVEL_DEBUG" ]] && _log info "debug mode"
 
 
 
 ##########################
 ####################@ RUN
 ##########################
-# _bootstrap
+_bootstrap
 
-# _log info "test message"
-# _log debug "test message"
-# _log warn "test message"
-# _log error "test message"
+_log info "test message"
+_log debug "test message"
+_log warn "test message"
+_log error "test message"
 
 # _log info "dotfiles script loaded successfully"
