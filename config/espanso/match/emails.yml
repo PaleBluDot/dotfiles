@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/espanso/espanso/dev/schemas/match.schema.json
+
+# Espanso Match File
+# name: emails
+# package_author: Pavel Sanchez <info@tasteink.me>
+# parent: base
+
+matches:
+  - trigger: ";can102"
+    label: "CAN 102 Email"
+    replace: |
+      Thank you for meeting with me today. Below are the slide deck and other tools covered today.
+
+        1. CAN 102 deck (https://aclunational.sharepoint.com/:p:/s/DigitalCampaigns/EVNJuJnBtOpLmqrS-iuVo_cBzNQLZlV4rgzPY2AyxGmFhw?rtime=cBUEgi6J20g)
+        2. User Access Form (https://dbsupport.aclu.org/hc/en-us/requests/new?ticket_form_id=985388)
+        3. Request forms (https://hub.aclu.org/Interact/Pages/Section/ContentListing.aspx?subsection=5185)
+        4. Asana Calendar form (https://form.asana.com/?k=Iyp8UjhWUH889-MfyhEm5g&d=25535823564359)
+        5. Asana Calendar (https://app.asana.com/0/1200170098126627/calendar)
+        6. Grades (https://docs.google.com/spreadsheets/d/1cZrJYqni0I5z5bt5-lQc6zTre6h4REATFz5rj2eGIis/edit#gid=119869387)
+        7. Digital Campaigns Documentation (https://app.getguru.com/card/i64qeaoT/Digital-Campaigns)
+            a. Email Style Guide (https://app.getguru.com/card/TXzebxxc/Email-Style-Guide-Table-of-Contents)
+
+
+# For a complete introduction, visit the official docs at: https://espanso.org/docs/

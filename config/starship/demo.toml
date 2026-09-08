@@ -1,0 +1,202 @@
+"$schema" = 'https://starship.rs/config-schema.json'
+
+palette = 'custom'
+
+format = """
+[](base00)\
+$os\
+[](fg:base00 bg:base0d)\
+$username\
+[](fg:base0d bg:base08)\
+$directory\
+[](fg:base08 bg:base0b)\
+$git_branch\
+$git_status\
+[](fg:base0b bg:base03)\
+$cmake\
+$dart\
+$deno\
+$dotnet\
+$golang\
+$kotlin\
+$lua\
+$nodejs\
+$nix_shell\
+$php\
+$python\
+$rust\
+$ruby\
+[](fg:base03 bg:base0a)\
+$aws\
+$azure\
+$gcloud\
+[](fg:base03 bg:base02)\
+$docker_context\
+[](fg:base02 bg:base0c)\
+$time\
+[ ](fg:base0c)\
+$package\
+"""
+
+# Disable the blank line at the start of the prompt
+# add_newline = false
+
+[os]
+style = "bg:base00 fg:base0c"
+format = "[ $symbol $path ]($style)"
+disabled = false
+
+[os.symbols]
+Arch = "󰣇"
+Debian = ""
+FreeBSD = ""
+Linux = ""
+Macos = ""
+Windows = ""
+
+[username]
+show_always = true
+style_user = "bg:base0d fg:base00"
+style_root = "bg:base09"
+format = '[ $user ]($style)'
+disabled = false
+
+[directory]
+style = "bold bg:base08 fg:base00"
+home_symbol = ""
+format = "[ 󰉋 $path ]($style)"
+truncation_length = 3
+truncation_symbol = "…/"
+
+[git_branch]
+symbol = "󰊢"
+style = "bold bg:base0b fg:base00"
+format = '[ $symbol $branch ]($style)'
+
+[git_status]
+style = "bold bg:base0b fg:base00"
+format = '[$all_status$ahead_behind ]($style)'
+
+
+# Languages
+[cmake]
+symbol = "△"
+style = "bold bg:base03 fg:base00"
+format = '[ $symbol ($version) ]($style)'
+
+[dart]
+symbol = ""
+style = "bold bg:base03 fg:base00"
+format = '[ $symbol ($version) ]($style)'
+
+[deno]
+symbol = "🦕"
+style = "bold bg:base03 fg:base00"
+format = '[ $symbol ($version) ]($style)'
+
+[dotnet]
+symbol = "󰪮"
+style = "bold bg:base03 fg:base00"
+format = '[ $symbol ($version) ]($style)'
+
+[golang]
+symbol = "󰟓"
+style = "bold bg:base03 fg:base00"
+format = '[ $symbol ($version) ]($style)'
+
+[kotlin]
+symbol = ""
+style = "bold bg:base03 fg:base00"
+format = '[ $symbol ($version) ]($style)'
+
+[lua]
+symbol = ""
+style = "bold bg:base03 fg:base00"
+format = '[ $symbol ($version) ]($style)'
+
+[nix_shell]
+symbol = ""
+style = "bold bg:base03 fg:base00"
+format = '[ $symbol $state ]($style)'
+
+[nodejs]
+symbol = "󰎙"
+style = "bold bg:base03 fg:base00"
+format = '[ $symbol ($version) ]($style)'
+
+[php]
+symbol = ""
+style = "bold bg:base03 fg:base00"
+format = '[ $symbol ($version) ]($style)'
+
+[python]
+symbol = ""
+style = "bold bg:base03 fg:base00"
+format = '[ $symbol ($version) ]($style)'
+
+[ruby]
+symbol = ""
+style = "bold bg:base03 fg:base00"
+format = '[ $symbol ($version) ]($style)'
+
+[rust]
+symbol = ""
+style = " bold bg:base03 fg:base00"
+format = '[ $symbol ($version) ]($style)'
+
+# Cloud Services
+[aws]
+symbol = "  "
+style = "bold bg:base0a fg:base00"
+format = '[ $symbol$profile ]($style)'
+disabled = false
+
+[azure]
+symbol = "󰠅 "
+style = "bold bg:base0a fg:base00"
+format = '[ $symbol($subscription) ]($style)'
+disabled = false
+
+[gcloud]
+symbol = "󱇶 "
+style = "bold bg:base0a fg:base00"
+format = '[ $symbol$account(@$domain)(\($region\)) ]($style)'
+disabled = false
+
+# Container
+[docker_context]
+symbol = "󰡨"
+style = "bold bg:base02 fg:base00"
+format = '[ $symbol $context ]($style)'
+
+[package]
+symbol = "󰏗"
+style = "bold bg:base0c fg:base00"
+format = '[ $symbol $version ]($style)'
+
+# Time
+[time]
+disabled = false
+time_format = "%R"
+style = "bold bg:base0c fg:base00"
+format = '[  $time ]($style)'
+
+
+# Color Scheme
+[palettes.custom]
+base00 = '#240809'   # Background — was "os"
+base01 = '#412423'   # Surface
+base02 = '#5c3e3d'   # Selection — was "docker"
+base03 = '#946b6a'   # Muted — was "language"
+base04 = '#bfa2a1'   # Dim text
+base05 = '#ceb5b4'   # Foreground
+base06 = '#d9bebd'   # Bright text
+base07 = '#efd5d4'   # Brightest
+base08 = '#ffc3c1'   # Red — was "directory"
+base09 = '#ffa5a3'   # Orange — was "root"
+base0a = '#ff8384'   # Yellow
+base0b = '#da4a52'   # Green — was "git"
+base0c = '#ffdfde'   # Cyan — was "time"
+base0d = '#a48685'   # Blue — was "username"
+base0e = '#f6646a'   # Magenta
+base0f = '#d6807e'   # Rust

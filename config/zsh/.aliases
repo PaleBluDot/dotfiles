@@ -1,7 +1,6 @@
 # !------------------------------------
 # @@@ LINUX
 # !------------------------------------
-# Force terminal to recognize changes to .zshrc
 if [[ -n "$ZSH_VERSION" ]]
 then
 	alias refresh="source ~/.zshrc"
@@ -9,128 +8,83 @@ else
 	alias refresh="source ~/.bashrc"
 fi
 
-alias fresh="refresh"
+# Base
+alias c="clear"
+alias fenv="source ~/.zshenv"
+alias fresh="clear && refresh"
 alias aliasUpdate="fresh 2>&1 && c"
 
-# Clear terminal
-alias c="clear"
-
-alias ls='eza --icons --group-directories-last'
-
-alias ll="ls -lha"
-
-# Ask before removing files
-alias rm="rm -i"
+# LS replacements
+alias ls="eza --icons --group-directories-last"
+alias ll="ls -l"
+alias la="ls -lah"
+alias lt="ls --tree"
 
 # Update and Upgrade
-alias uu='sudo apt update && sudo apt upgrade -y'
+alias update="sudo apt update && sudo apt upgrade -y"
 
-# Create a user
-alias adduser='sudo adduser $1'
+# Users and groups
+alias adduser="sudo adduser"
+alias deluser="sudo deluser --remove-home"
+alias addgroup="sudo usermod -aG"
+alias delgroup="sudo usermod -G"
 
-# Remove a user
-alias deluser='sudo deluser --remove-home $1'
+# Permissions
+alias xbin="chmod +x ~/bin/*"
+alias rm="rm -i"
 
-# Create a group
-alias addgroup='sudo usermod -aG $1 $2'
+#
+alias histg="history | fzf"
+alias wget="wget --no-hsts"
+alias rmdpkg="sudo apt-get --purge remove"
 
-# Remove a group
-alias delgroup='sudo usermod -G $1 $2'
-
-# Search history. Example usage: `histg git` to recent commands that use git
-alias histg="history | grep"
-
-# Remove Package
-alias rmdpkg='sudo apt-get --purge remove $1'
-
-# Make all files in ~/scripts executable
-alias xbin='chmod +x ~/bin/*'
-
-# Copy SSH Key to remote server
-alias sshcopy="ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 22 $1"
-
-# Short for calling goBuster
-alias gd="gobuster -w ~/.config/gobuster.txt"
-
-# Rename ~/.bash_aliases to ~/.aliases
-alias alre="sed -i 's/~\/.bash_aliases/~\/.aliases/g' ~/.bashrc"
-
-# wget without history
-alias wget='wget --no-hsts'
-
+# SHH
+alias sshcopy="ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 22"
 
 # !------------------------------------
 # @@@ CHANGE DIRECTORIES
 # !------------------------------------
-# PaleBluDot
 alias dotfiles="cd $DOTFILES"
-alias home="cd ~/"
 alias github="cd $GITHUB_DIR"
-alias cspell-dictionaries="cd ~/Github/PaleBluDot/cspell-dictionaries"
-alias lint-config="cd ~/Github/PaleBluDot/lint-config"
-alias psd="cd ~/Github/PaleBluDot/website"
-alias aclu-emails="cd ~/Github/PaleBluDot/aclu-emails"
-alias playground="cd /Users/psanchez/Library/CloudStorage/OneDrive-Personal/Dev/demos/jsExplorer"
-
-# taste-ink
-alias tasteink="cd ~/Github/taste-ink/tasteink.studio"
-
-# american-technion-society
-alias ats="cd ~/Github/American-Technion-Society/purple"
-alias publications="cd ~/Github/American-Technion-Society/publications"
-
-# aclu-national
-alias builder="cd ~/Github/ACLU-National/email-builder"
-
-
 alias sshd="cd /etc/ssh"
-
-alias findAlias="alias | grep \"$1\""
 
 
 # !------------------------------------
 # @@@ FILE EDITS
 # !------------------------------------
-# Edit aliases
 alias edit="$EDITOR ~/.config/dotfiles/config/zsh/.aliases"
-
 alias base="$EDITOR ~/Library/CloudStorage/OneDrive-Personal/Documents/Espanso/match/base.yml"
+alias alre="sed -i "s/~\/.bash_aliases/~\/.aliases/g" ~/.bashrc"
+alias netcfg="sudo $EDITOR /etc/netplan/50-cloud-init.yaml"
+alias cloudcfg="sudo $EDITOR /etc/cloud/cloud.cfg"
 
-# Configure Static IP
-alias netcfg='sudo nano /etc/netplan/50-cloud-init.yaml'
-
-# Configure Hostname
-alias cloudcfg='sudo nano /etc/cloud/cloud.cfg'
-
-# See Groups
-alias group='cat /etc/group'
-
+alias group="cat /etc/group"
+alias findAlias="alias | fzf"
 
 
 # !------------------------------------
 # @@@ Manipulations
 # !------------------------------------
-alias comlist='cat test.html | tr "\n" "," > comma-list.txt'
-
-
+alias comlist="cat test.html | tr "\n" "," > comma-list.txt"
+alias gd="gobuster -w ~/.config/gobuster.txt"
 
 # !------------------------------------
 # @@@ GIT
 # !------------------------------------
 alias gs="git status"
-alias s="git status -s"
-alias gbs="git status -bs"
-alias clone="git clone"
-alias gnit="git init"
+alias gss="git status -s"
+alias gsb="git status -bs"
+alias gc="git clone"
+alias gi="git init"
 alias gcm="git commit -m"
-alias amend="git commit --amend --no-edit"
+alias gam="git commit --amend --no-edit"
 alias ga="git add"
 alias gaa="git add ."
-alias push="git push"
-alias pushup="git push -u origin main"
-alias pull="git pull"
-alias nb="git checkout -b"
-alias switch="git switch"
+alias gp="git push"
+alias gpu="git push -u origin main"
+alias gpl="git pull"
+alias gco="git checkout -b"
+alias gsw="git switch"
 alias save="gaa && gcm \"chore: save point\""
 alias incom="gaa && gcm \"initial commit\""
 alias cached="git rm -r --cached"
@@ -142,31 +96,39 @@ alias cached="git rm -r --cached"
 alias toi="npm init --scope=@taste-ink --init-author-email=pavel@tasteink.me -y"
 alias npmi="npm init"
 alias npmiy="npm init -y"
-alias build="npm run build"
-alias dev="npm run dev"
-alias start="npm run start"
-alias commit="npm run commit"
+alias npmb="npm run build"
+alias npmd="npm run dev"
+alias npms="npm run start"
+alias npmc="npm run commit"
 alias clean-node="rm -rf ./node_modules && rm -rf package-lock.json"
 
 
 # !------------------------------------
+# @@@ TMUX
+# !------------------------------------
+alias tm="tmux attach -t main || tmux new -s main"
+alias tn="tmux new -s"
+alias ta="tmux attach -t"
+alias td="tmux detach"
+alias tl="tmux ls"
+alias tk="tmux kill-session -t"
+alias tka="tmux kill-server"
+alias trn="tmux rename-session -t"
+alias ts="tmux switch-client -t"
+
+# !------------------------------------
 # @@@ NETWORKING
 # !------------------------------------
-# Get your current IP
 alias myip="curl http://ipecho.net/plain; echo"
-# alias localip="ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'"
+# alias localip="ip -4 addr show eth0 | grep -oP "(?<=inet\s)\d+(\.\d+){3}""
 alias ping="ping -c 3"
 
 
 # !------------------------------------
 # @@@ OS SPECIFIC
 # !------------------------------------
-# Open VSCode Insiders
 alias code="code-insiders"
-
-# Use teach user data
-alias teach="code-insiders --extensions-dir ~/code_profiles/teach/exts --user-data-dir ~/code_profiles/teach/data"
-
+alias teach="code --extensions-dir ~/code_profiles/teach/exts --user-data-dir ~/code_profiles/teach/data"
 alias brew-installs="brew list > .config/brew.txt"
 
 

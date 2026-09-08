@@ -297,3 +297,21 @@ ghs() {
 setenv() {
   export $1=$2
 }
+
+
+exit() {
+    if [ -n "$TMUX" ]; then
+        tmux detach
+    else
+        builtin exit
+    fi
+}
+
+
+detach() {
+    if [ -n "$TMUX" ]; then
+        tmux detach
+    else
+        echo "Not in a tmux session — nothing to detach from."
+    fi
+}
