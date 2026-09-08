@@ -96,4 +96,7 @@ function y() {
 
 # Welcome screen
 [[ ! -x "$(command -v welcome.sh)" ]] || source welcome.sh &&
+echo
 fastfetch --pipe false
+echo
+checkDirtyRepos.sh
