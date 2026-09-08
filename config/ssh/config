@@ -1,18 +1,86 @@
 Host *
 	IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+    IdentitiesOnly yes
+    IdentityFile ~/.ssh/macbook.pub
+    SetEnv TERM=xterm-256color
 
+# Network
 Host pfsense
-	HostName 10.0.17.1
-	User pbd
+    HostName 10.0.17.1
+    User pbd
 
-Host pve
-	HostName 10.0.20.4
-	User pbd
-
+# Servers
 Host helix
-	HostName 10.0.20.2
-	User pbd
+    HostName 192.168.20.2
+    User pbd
 
 Host blazar
-	HostName 10.0.20.3
-	User pbd
+    HostName 192.168.20.3
+    User pbd
+
+Host atlas
+    HostName 10.0.20.3
+    User pbd
+
+# Devices
+Host s23u
+    HostName 10.0.10.14
+    User u0_a312
+    Port 8022
+
+Host uconsole
+    HostName 10.0.10.15
+    User pavel
+
+Host hackberry
+    HostName 10.0.20.25
+    User pbd
+
+
+# VMs
+Host svr-ubuntu
+    HostName 10.0.20.100
+    User pbd
+
+Host svr-arch
+    HostName 10.0.20.101
+    User pbd
+
+Host svr-debian
+    HostName 10.0.20.102
+    User pbd
+
+Host svr-kali
+    HostName 10.0.20.103
+    User pbd
+
+Host svr-omarchy
+    HostName 10.0.20.104
+    User pale
+
+# Containers
+Host postgres
+    HostName 10.0.20.20
+    User root
+
+Host npm
+    HostName 10.0.20.10
+    User root
+
+Host ghrunner
+    HostName 10.0.20.204
+    User ghrunner
+
+Host rustdesk
+    HostName 10.0.20.205
+    User root
+
+Host wakapi
+    HostName 10.0.20.206
+    User root
+
+
+# Tailnet
+Host tn-bluetrix
+    HostName 100.64.233.14
+    User pbd

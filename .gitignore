@@ -3,12 +3,21 @@
 .DS_Store
 *test.*
 package-lock.json
-config/starship/starship-default.toml
 
 # Folders
-node_modules
-.codacy
+node_modules/
+.codacy/
 
 # AI
 .github/instructions/codacy.instructions.md
 .claude/
+plan.md
+CLAUDE.md
+GEMINI.md
+doc/
+
+# Added by ggshield
+.cache_ggshield
+
+# Temp
+.hasrc

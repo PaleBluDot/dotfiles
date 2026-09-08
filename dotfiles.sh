@@ -1,575 +1,127 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 
-# Check if bc command is available
-if ! command -v bc &> /dev/null; then
-    echo "'bc' command not found. Attempting to install..."
-    # Install bc (adjust as needed based on your package manager)
-    sudo apt-get update > /dev/null
-    sudo apt-get install -y bc > /dev/null
-		echo "Installation completed successfully."
-		echo
+##########################
+##############@ VARIABLES
+##########################
+readonly LOG_LEVEL_DEBUG=0
+readonly LOG_LEVEL_INFO=1
+readonly LOG_LEVEL_WARN=2
+readonly LOG_LEVEL_ERROR=3
+LOG_LEVEL=$LOG_LEVEL_INFO
+DRY_RUN=false
 
-    # Check again
-    if ! command -v bc &> /dev/null; then
-        echo "Error: Unable to install 'bc'. Please install bc manually and run the script again."
-        exit 1
-    fi
-fi
 
-# Record start time
-start_time=$(date +%s.%N)
+##########################
+##############@ FUNCTIONS
+##########################
+_log() {
+  local level="$1"
+  local message="$2"
+  local level_num
+  local prefix
 
-######################
-##@ BANNER
-######################
-clear
-echo
+  local CYAN="\033[0;36m"
+  local GREEN="\033[0;32m"
+  local YELLOW="\033[0;33m"
+  local RED="\033[0;31m"
+  local RESET="\033[0m"
 
-cat << "EOF"
-   ..                        s                 .          ..               .x+=:.
- dF                         :8       oec :    @88>  x .d88"               z`    ^%
-'88bu.             u.      .88      @88888    %8P    5888R                   .   <k
-'*88888bu    ...ue888b    :888ooo   8"*88%     .     '888R        .u       .@8Ned8"
-  ^"*8888N   888R Y888r -*8888888   8b.      .@88u    888R     ud8888.   .@^%8888"
- beWE "888L  888R I888>   8888     u888888> ''888E`   888R   :888'8888. x88:  `)8b.
- 888E  888E  888R I888>   8888      8888R     888E    888R   d888 '88%" 8888N=*8888
- 888E  888E  888R I888>   8888      8888P     888E    888R   8888.+"     %8"    R88
- 888E  888F u8888cJ888   .8888Lu=   *888>     888E    888R   8888L        @8Wou 9%
-.888N..888   "*888*P"    ^%888*     4888      888&   .888B . '8888c. .+ .888888P`
- `"888*""      'Y"         'Y"      '888      R888"  ^*888%   "88888%   `   ^"F
-    ""                               88R       ""      "%       "YP'
-                                     88>
-                                     48
-                                     '8
-EOF
 
-echo
-sleep 1
+  case "$level" in
+    debug) level_num=$LOG_LEVEL_DEBUG;
+           prefix="${GREEN}[DEBUG]  ${RESET}" ;;
+    info)  level_num=$LOG_LEVEL_INFO;
+           prefix="${CYAN}[INFO]   ${RESET}" ;;
+    warn)  level_num=$LOG_LEVEL_WARN;
+           prefix="${YELLOW}[WARN]   ${RESET}" ;;
+    error) level_num=$LOG_LEVEL_ERROR;
+           prefix="${RED}[ERROR]  ${RESET}" ;;
+    *)     level_num=$LOG_LEVEL_INFO;
+           prefix="${CYAN}[INFO]   ${RESET}" ;;
+  esac
 
-######################
-##@ VARIABLES
-######################
 
-# Export dotfiles directory as an environment variable
-export DOTFILES=$HOME/.config/dotfiles
+  [[ $level_num -lt $LOG_LEVEL ]] && return
 
-######################
-##@ MACOS
-######################
 
-# Function to install packages for macOS
-install_macos() {
-  local macos_dir="config/os-only/macos/"
-  local install_packages=true
-
-  # Check if Brewfile exists
-  if [ ! -f "$macos_dir/Brewfile" ]; then
-    echo "Error: Brewfile not found in $macos_dir"
-    exit 1
-  fi
-
-  # Check if -d flag is present
-  if [[ $* == *"-d"* ]]; then
-    echo "Packages to be installed for macOS:"
-    cat "$macos_dir/Brewfile"
-    install_packages=false
-  fi
-
-  if [ "$install_packages" == true ]; then
-    # Update Homebrew
-    brew update > /dev/null
-
-    # Install packages for macOS
-    echo "Installing packages for macOS..."
-    while IFS= read -r line; do
-      if [[ $line == brew* ]]; then
-        package=$(echo "$line" | awk -F'"' '{print $2}')
-        brew install "$package" > /dev/null 2>&1
-
-        # Wait for the version information to become available
-        while true; do
-          installed_version=$(brew list --versions "$package" 2>/dev/null || echo "Not Installed")
-          [ "$installed_version" != "Not Installed" ] && break
-        done
-
-        if [ "$installed_version" != "Not Installed" ]; then
-          echo "$package: Installed (Version: $installed_version)"
-        else
-          echo "$package: Installing..."
-        fi
-      fi
-    done < "$macos_dir/Brewfile"
-  fi
-}
-
-# Function to uninstall packages for macOS
-uninstall_macos() {
-  local macos_dir="config/os-only/macos/"
-  local uninstall_packages=true
-
-  # Check if Brewfile exists
-  if [ ! -f "$macos_dir/Brewfile" ]; then
-    echo "Error: Brewfile not found in $macos_dir"
-    exit 1
-  fi
-
-  # Check if -d flag is present
-  if [[ $* == *"-d"* ]]; then
-    echo "Packages to be uninstalled for macOS:"
-    cat "$macos_dir/Brewfile"
-    uninstall_packages=false
-  fi
-
-  if [ "$uninstall_packages" == true ]; then
-    # Update Homebrew
-    brew update > /dev/null
-
-    # Uninstall packages for macOS
-    echo "Uninstalling packages for macOS..."
-    while IFS= read -r line; do
-      if [[ $line == brew* ]]; then
-        package=$(echo "$line" | awk -F'"' '{print $2}')
-        brew uninstall "$package" > /dev/null 2>&1
-
-        # Wait for the version information to become unavailable
-        while true; do
-          installed_version=$(brew list --versions "$package" 2>/dev/null || echo "Not Installed")
-          [ "$installed_version" == "Not Installed" ] && break
-          sleep 1
-        done
-
-        if [ "$installed_version" == "Not Installed" ]; then
-          echo "$package: Uninstalled"
-        else
-          echo "$package: Uninstalling..."
-        fi
-      fi
-    done < "$macos_dir/Brewfile"
-  fi
-}
-
-######################
-##@ LINUX
-######################
-
-# Function to install packages for Linux
-install_linux() {
-  local linux_dir="config/os-only/linux/"
-  local install_packages=true
-
-  # Check if required-packages.txt exists
-  if [ ! -f "$linux_dir/required-packages.txt" ]; then
-    echo "Error: required-packages.txt not found in $linux_dir"
-    exit 1
-  fi
-
-  # Check if -d flag is present
-  if [[ $* == *"-d"* ]]; then
-    echo "Packages to be installed for Linux:"
-    cat "$linux_dir/required-packages.txt"
-    install_packages=false
-  fi
-
-  if [ "$install_packages" == true ]; then
-    # Update package list
-    sudo apt-get update > /dev/null
-
-    # Install packages for Linux
-    echo "Installing packages for Linux..."
-    while IFS= read -r package; do
-      sudo apt-get install -y "$package" > /dev/null
-      sleep 1
-
-      # Wait for the version information to become available
-      while true; do
-        installed_version=$(dpkg-query -W -f='${Version}\n' "$package" 2>/dev/null || echo "Not Installed")
-        [ "$installed_version" != "Not Installed" ] && break
-        sleep 1
-      done
-
-      if [ "$installed_version" != "Not Installed" ]; then
-        echo "$package: Installed (Version: $installed_version)"
-      else
-        echo "$package: Installing..."
-      fi
-    done < "$linux_dir/required-packages.txt"
-  fi
-}
-
-# Function to uninstall packages for Linux
-uninstall_linux() {
-  local linux_dir="config/os-only/linux/"
-
-  # Check if required-packages.txt exists
-  if [ ! -f "$linux_dir/required-packages.txt" ]; then
-    echo "Error: required-packages.txt not found in $linux_dir"
-    exit 1
-  fi
-
-  # Uninstall packages for Linux
-  echo "Uninstalling packages for Linux..."
-  while IFS= read -r package; do
-    if dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
-      sudo apt-get remove -y "$package" > /dev/null
-      echo "$package: Uninstalled"
-    else
-      echo "$package: Not Installed"
-    fi
-  done < "$linux_dir/required-packages.txt"
-}
-
-######################
-##@ WINDOWS
-######################
-
-# Function to install packages for Windows
-install_windows() {
-  local windows_dir="config/os-only/windows/"
-
-  # Display packages to be installed
-  echo "Packages to be installed for Windows:"
-  if [ -f "$windows_dir/required-packages.txt" ]; then
-    cat "$windows_dir/required-packages.txt"
-
-    # Check if packages are already installed (Update this part based on Windows package manager)
-    echo -e "\nChecking installed packages and versions: (Update this part based on Windows package manager)"
-
-    # Wait for 3 seconds
-    sleep 3
-
-    # Install packages for Windows (Adjust as needed, provide instructions or use the appropriate package manager)
-    echo "Installing packages for Windows..."
-    # Example: choco install packageName
+  if [[ "$level" == "error" ]]; then
+    echo -e "$prefix $message" >&2
   else
-    echo "Error: required-packages.txt not found in $windows_dir"
-    exit 1
+    echo -e "$prefix $message"
   fi
 }
 
-# Function to uninstall packages for Windows
-uninstall_windows() {
-  # Uninstall packages for Windows (adjust as needed)
-  echo "Uninstalling packages for Windows..."
-  # Example: choco uninstall packageName
-}
-
-######################
-##@ DOTFILES
-######################
-
-# Resolve uname to the YAML OS key: darwin | linux | windows
-_current_os() {
+_detect_os() {
   case "$(uname)" in
-    Darwin)             echo "darwin"  ;;
-    Linux)              echo "linux"   ;;
-    MINGW*|MSYS*|CYGWIN*) echo "windows" ;;
-    *)                  echo "unknown" ;;
-  esac
-}
-
-# Emit tab-separated "tool src dest" lines for all enabled symlinks on the current OS.
-# dest is always a full ~/... path. Combines cross-platform (symlinks:) and
-# OS-specific (darwin:/linux:/windows:) entries.
-_parse_symlinks() {
-  local symlinks_file="$1"
-  export OS
-  OS=$(_current_os)
-  {
-    # Cross-platform entries
-    yq eval 'to_entries[] | select(.value.enabled == true) | . as $e |
-      .value.symlinks // {} | to_entries[] |
-      [$e.key, .key, .value] | join("\t")' "$symlinks_file"
-    # OS-specific entries
-    yq eval 'to_entries[] | select(.value.enabled == true) | . as $e |
-      .value[env(OS)] | select(. != null) | to_entries[] |
-      [$e.key, .key, .value] | join("\t")' "$symlinks_file"
-  }
-}
-
-# Function to install dotfiles
-install_dotfiles() {
-  local symlinks_file="config/symlinks.yml"
-
-  if [ ! -f "$symlinks_file" ]; then
-    echo "Error: $symlinks_file not found"
-    exit 1
-  fi
-
-  echo "Creating symlinks (OS: $(_current_os))..."
-
-  while IFS=$'\t' read -r tool src dest; do
-    local source_path
-    if [ "$src" = "." ]; then
-      source_path="${HOME}/.config/dotfiles/config/${tool}"
-    else
-      source_path="${HOME}/.config/dotfiles/config/${tool}/${src}"
-    fi
-    local target_path="${dest/#\~/$HOME}"
-    local target_dir
-    target_dir="$(dirname "$target_path")"
-
-    if [ ! -d "$target_dir" ]; then
-      mkdir -p "$target_dir"
-    fi
-
-    if [ -e "$target_path" ] || [ -L "$target_path" ]; then
-      if [ -L "$target_path" ]; then
-        echo "Symlink already exists: $target_path"
+    Darwin)
+      echo "darwin"
+      ;;
+    Linux)
+      if grep -qi "microsoft" /proc/version; then
+        echo "wsl"
       else
-        echo "File or directory already exists: $target_path"
+        echo "linux"
       fi
-    else
-      ln -fs "$source_path" "$target_path"
-      echo "Symlink created: $target_path -> $source_path"
-    fi
-  done < <(_parse_symlinks "$symlinks_file")
-
-  ln -fs "$DOTFILES/bin" "$HOME/bin"
-  echo "Symlink created: $HOME/bin -> $DOTFILES/bin"
-
-  # Generate cspell.json with resolved $HOME path (not symlinked — relative paths
-  # break when cspell resolves them from the symlink target, not the symlink location)
-  local cspell_src="$DOTFILES/config/cspell/cspell.json"
-  local cspell_dest="$HOME/.config/configstore/cspell.json"
-  mkdir -p "$(dirname "$cspell_dest")"
-  sed "s|__HOME__|$HOME|g" "$cspell_src" > "$cspell_dest"
-  echo "Generated: $cspell_dest"
-
-  echo -e "\nDotfiles installation completed successfully."
-}
-
-# Function to uninstall dotfiles
-uninstall_dotfiles() {
-  local symlinks_file="config/symlinks.yml"
-
-  if [ ! -f "$symlinks_file" ]; then
-    echo "Error: $symlinks_file not found"
-    exit 1
-  fi
-
-  echo "Removing symlinks (OS: $(_current_os))..."
-
-  while IFS=$'\t' read -r tool src dest; do
-    local source_path
-    if [ "$src" = "." ]; then
-      source_path="${HOME}/.config/dotfiles/config/${tool}"
-    else
-      source_path="${HOME}/.config/dotfiles/config/${tool}/${src}"
-    fi
-    local target_path="${dest/#\~/$HOME}"
-
-    if [ -L "$target_path" ]; then
-      rm -f "$target_path"
-      echo "Symlink removed: $target_path -> $source_path"
-    elif [ -e "$target_path" ]; then
-      rm -f "$target_path"
-      echo "Not a symlink. File deleted: $target_path"
-    else
-      echo "Target not found: $target_path"
-    fi
-  done < <(_parse_symlinks "$symlinks_file")
-
-  rm -f "$HOME/bin"
-  echo "Symlink removed: $HOME/bin -> $DOTFILES/bin"
-
-  echo "Dotfiles uninstall completed successfully."
-}
-
-
-# Function to update dotfiles
-update_dotfiles() {
-  git pull
-
-  if [ $? -ne 0 ]; then
-    echo "Error during git pull. Please resolve merge conflicts and try again."
-    git status
-    exit 1
-  fi
-
-  echo "Dotfiles updated successfully."
-}
-
-######################
-##@ PACKAGES
-######################
-
-# Function to install packages only
-install_packages() {
-  local os_type="$(uname)"
-
-  case "$os_type" in
-    Darwin)
-      CSPELL_DIR="/opt/homebrew/lib"
-      install_macos
       ;;
-    Linux)
-      CSPELL_DIR="/usr/lib"
-      install_linux
-      ;;
-    MINGW32*|MSYS*|MINGW64*)
-      CSPELL_DIR="C:\\Program Files\\nodejs\\"
-      install_windows
+    MINGW*|MSYS*|CYGWIN*)
+      echo "windows-native"
       ;;
     *)
-      echo "Unsupported operating system."
+      _log error "Unsupported OS '$(uname)'"
       exit 1
       ;;
   esac
 }
 
-# Function to uninstall packages only
-uninstall_packages() {
-  local os_type="$(uname)"
+_bootstrap() {
+  export DOTFILES=$(cd "$(dirname "$0")" && pwd)
 
-  case "$os_type" in
-    Darwin)
-      uninstall_macos
-      ;;
-    Linux)
-      uninstall_linux
-      ;;
-    MINGW32*|MSYS*|MINGW64*)
-      uninstall_windows
-      ;;
-    *)
-      echo "Unsupported operating system."
-      exit 1
-      ;;
+
+  if command -v yq &>/dev/null; then
+    _log debug "yq is installed"
+  else
+    _log info "yq is not installed"
+    _log info "installing yq..."
+    case "$(_detect_os)" in
+      darwin)
+        brew install yq
+        ;;
+      linux|wsl)
+        sudo apt-get install yq
+        ;;
+      windows-native)
+        winget install yq
+        ;;
+    esac
+  fi
+}
+
+
+##########################
+##################@ FLAGS
+##########################
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run|-n)
+      DRY_RUN=true ;;
+    --debug|-d)
+      LOG_LEVEL=$LOG_LEVEL_DEBUG ;;
   esac
-}
+done
+
+[[ "$DRY_RUN" == true ]] && _log info "dry run mode"
+[[ "$LOG_LEVEL" == "$LOG_LEVEL_DEBUG" ]] && _log info "debug mode"
 
 
-######################
-##@ COMMANDS
-######################
 
-# Function to install dotfiles and/or packages based on options
-install() {
-  local options="$1"
+##########################
+####################@ RUN
+##########################
+_bootstrap
 
-  # Ask the user what they want to do
-  echo "Do you want to (1) install packages or (2) symlink files?"
-  read -p "Enter pkg or sym: " choice
+_log info "test message"
+_log debug "test message"
+_log warn "test message"
+_log error "test message"
 
-  # Check if -d flag is present
-  local install_dotfiles=true
-  if [[ $options == *"d"* ]]; then
-    install_dotfiles
-  fi
-
-  # Check if -p flag is present
-  local install_packages=true
-  if [[ $options == *"p"* ]]; then
-    install_packages
-  fi
-
-  # If no flag is used, install both dotfiles and packages
-  if [ -z "$options" ]; then
-    install_dotfiles
-    install_packages
-  fi
-
-  # Process the user's choice
-  case "$choice" in
-    pkg)
-      echo "Installing packages..."
-      # Call your function or commands to install packages here
-      ;;
-    sym)
-      echo "Symlinking files..."
-      # Call your function or commands to symlink files here
-      ;;
-    *)
-      echo "Invalid choice"
-      ;;
-  esac
-}
-
-# Function to uninstall dotfiles and/or packages based on options
-uninstall() {
-  local options="$1"
-
-  # Check if dotfiles option is selected
-  if [[ $options == *"d"* ]]; then
-    uninstall_dotfiles
-  fi
-
-  # Check if packages option is selected
-  if [[ $options == *"p"* ]]; then
-    uninstall_packages
-  fi
-}
-
-# Function to update based on options
-update() {
-  local options="$1"
-
-  # Check if dotfiles option is selected
-  if [[ $options == *"d"* ]]; then
-    update_dotfiles
-  fi
-
-  # Check if packages option is selected
-  if [[ $options == *"p"* ]]; then
-    update_packages
-  fi
-}
-
-# Function to display extensive usage
-usage() {
-  echo "Usage: $0 {command} [options]"
-  echo
-  echo "Commands:"
-  echo "  install   Install dotfiles and/or packages."
-  echo "  uninstall Uninstall dotfiles and/or packages."
-  echo "  update    Update dotfiles and/or packages."
-  echo "  help      Display this help message."
-  echo
-  echo -e "Options:"
-  echo "  -d        Install/uninstall/update dotfiles."
-  echo "  -p        Install/uninstall/update packages."
-  echo "  -h        Display usage information."
-  echo
-  echo -e "Examples:"
-  echo "  $0 install -d -p   # Install both dotfiles and packages."
-  echo "  $0 uninstall -d    # Uninstall dotfiles."
-  echo "  $0 update -p       # Update packages."
-  echo "  $0 help            # Display this help message."
-}
-
-
-# Check command arguments
-if [ "$#" -eq 0 ]; then
-  # No arguments provided, default to 'install'
-  install
-else
-  case "$1" in
-    install)
-      install "$2"
-      ;;
-    uninstall)
-      uninstall "$2"
-      ;;
-    update)
-      update "$2"
-      ;;
-    help)
-      usage
-      ;;
-    *)
-      usage
-      exit 1
-      ;;
-  esac
-fi
-
-# Record the end time
-end_time=$(date +%s.%N)
-
-# Calculate and print the execution time
-execution_time=$(echo "$end_time - $start_time" | bc)
-
-echo
-echo "Script execution time: $execution_time seconds"
-
-exit 0
+# _log info "dotfiles script loaded successfully"

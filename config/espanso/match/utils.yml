@@ -1,10 +1,12 @@
-# Espanso Match File
+# yaml-language-server: $schema=https://raw.githubusercontent.com/espanso/espanso/dev/schemas/match.schema.json
 
-name: utils
-package_author: Pavel Sanchez <info@tasteink.me>
-parent: base
+# Espanso Match File
+# name: utils
+# package_author: Pavel Sanchez <info@tasteink.me>
+# parent: base
+
 matches:
-  - trigger: ";html-link"
+  - trigger: ";link"
     replace: "<a href='{{clipboard}}' />$|$</a>"
     vars:
       - name: "clipboard"
@@ -19,6 +21,16 @@ matches:
         params:
           cmd: "curl 'https://api.ipify.org'"
 
+  # Outputs public IP address
+  - trigger: ";loip"
+    replace: "{{output}}"
+    vars:
+      - name: output
+        type: shell
+        params:
+          cmd: "ifconfig | grep 'broadcast' | awk '{ print $2 }'"
+          # debug: true
+
 # Outputs SSH Pub Key
   - trigger: ";ssh"
     replace: "{{output}}"
@@ -26,7 +38,16 @@ matches:
       - name: output
         type: shell
         params:
-          cmd: "cat ~/.ssh/macbook.pub"
+          cmd: "cat ~/.ssh/config"
+
+  - trigger: ";date"
+    replace: "{{mydate}}"
+    vars:
+      - name: mydate
+        type: date
+        params:
+          format: "%Y%m%d"
+          locale: "en-US"
 
 # Outputs Current Time
   - trigger: ";time"
@@ -87,12 +108,15 @@ matches:
   - trigger: ';-'
     replace: '-$|$-'
 
-# Outputs the month and year (e.g. January 2020)
-  - trigger: ";figlet"
-    replace: "echo {{text}} | figlet -f fraktur -w 90 -c"
+# Outputs the current weather for your location
+  - trigger: ";test"
+    replace: "{{output}}"
     vars:
-    - name: text
-      type: echo
+      - name: output
+        type: shell
+        params:
+          cmd: "loIP"
+          shell: bash
+          # debug: true
 
 # For a complete introduction, visit the official docs at: https://espanso.org/docs/
-

@@ -1,0 +1,27 @@
+# Ghostty Theme: Knuckles
+# Pavel Sanchez
+# https://github.com/PaleBluDot/dotfiles
+# Last updated: 2026-08-27
+
+background = #400716
+foreground = #bdbdbd
+cursor-color = #9e9e9e
+cursor-text = #400716
+selection-background = #e3a6a6
+selection-foreground = #400716
+palette = 0=#000000
+palette = 1=#000000
+palette = 2=#ff4d82
+palette = 3=#f10d0d
+palette = 4=#5e5f56
+palette = 5=#848579
+palette = 6=#b0b1a2
+palette = 7=#833449
+palette = 8=#eb83c5
+palette = 9=#d9004c
+palette = 10=#ff004c
+palette = 11=#e78043
+palette = 12=#f15932
+palette = 13=#8c7bed
+palette = 14=#d94141
+palette = 15=#ff6666

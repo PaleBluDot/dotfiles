@@ -4,29 +4,37 @@ name: ACLU
 package_author: Pavel Sanchez <info@tasteink.me>
 parent: base
 matches:
-  - trigger: aff
-    replace: affiliate
-    propagate_case: true
-    word: true
-
-  - trigger: ";date"
-    replace: "{{mydate}}"
-    vars:
-      - name: mydate
-        type: date
-        params:
-          format: "%Y%m%d"
-          locale: "en-US"
-
   - trigger: ";logo"
     image_path: "$CONFIG/images/aclu-sig-logo.png"
 
   - trigger: ";sup"
+    label: "Default Suppressions"
     replace: "Suppressions:\nCAN Default Suppression\n"
+
+  - trigger: ";sup"
+    label: "Today's Suppressions"
+    replace: "Suppressions:\nCAN Default Suppression\n{{clipboard}}"
+    vars:
+      - name: "clipboard"
+        type: "clipboard"
 
   - trigger: ";sig"
     label: "Basic signature"
     replace: "Thanks,\nPavel"
+
+  - trigger: ";sig"
+    label: "Zendesk signature"
+    replace: |
+      Thanks,
+      Pavel
+
+      Pavel Sanchez
+      Pronouns: He, him, his
+      Associate Director, Affiliates Digital Campaigns
+      American Civil Liberties Union
+      125 Broad St., New York, NY 10004
+      212.284.7371 | psanchez@aclu.org
+      www.aclu.org
 
   - trigger: ";sig"
     label: "Full signature"
@@ -55,20 +63,26 @@ matches:
         type: choice
         params:
           values:
-            - label: "ACLU Blue"
-              id: "#0055aa"
-            - label: "ACLU Red"
-              id: "#ef404e"
-            - label: "ACLU Light Azure"
-              id: "#a3dbe3"
-            - label: "ACLU Light Green"
-              id: "#a7d7b5"
-            - label: "ACLU Light Orange"
-              id: "#fcaa17"
-            - label: "ACLU Light Pink"
-              id: "#fabeaf"
-            - label: "ACLU Light Yellow"
-              id: "#ffe06a"
+            - label: "01. Primary Blue"
+              id: "#146cd2"
+            - label: "02. Primary Red"
+              id: "#d9192b"
+            - label: "03. Primary Yellow"
+              id: "#fdc221"
+            - label: "04. Primary Green"
+              id: "#499764"
+            - label: "05. Primary Orange"
+              id: "#ff7d00"
+            - label: "06. Primary Purple"
+              id: "#862dcb"
+            - label: "07. Primary Pink"
+              id: "#db2a7d"
+            - label: "08. Off White"
+              id: "#f7f9fd"
+            - label: "09. Grey"
+              id: "#696968"
+            - label: "10. Black"
+              id: "#090c0f"
 
   - trigger: ";issues"
     replace: "\nCapital Punishment\nCivil Liberties\nCriminal Law Reform\nDisability Rights\nFree Speech\nHIV and AIDS\nHuman Rights\nImmigrants' Rights\nJuvenile Justice\nLGBT Rights\nMass Incarceration\nNational Security\nNon-Issue Campaign\nPrisoners' Rights\nPrivacy & Technology\nRacial Justice\nReligious Liberty\nReproductive Freedom\nVoting Rights\nWomen's Rights"
@@ -84,6 +98,18 @@ matches:
 
   - trigger: ";uaf"
     replace: "Hello [NAME],\n\nYou can sign up to gain access to Springboard by submitting this webform: https://dbsupport.aclu.org/hc/en-us/requests/new?ticket_form_id=985388.\n\nThanks,\nPavel"
+
+  - regex: ";greet\\((?P<name>.*)\\)"
+    replace: "Hi {{name}}!"
+
+  - trigger: ";seed"
+    replace: "seedlist-nat@aclu.org"
+
+  - trigger: ";ea"
+    replace: "the email has been adjusted."
+
+  - trigger: ";upd"
+    replace: "this has been updated!"
 
 
 # For a complete introduction, visit the official docs at: https://espanso.org/docs/

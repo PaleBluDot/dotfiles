@@ -1,14 +1,7 @@
-# POWERLEVEL10K INSTANT PROMPT
-# Uncomment to revert to p10k
-# -----------------------
-# if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-#   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
-# fi
-
 # OH-MY-ZSH CONFIGURATION
+
 # Theme, update settings, and plugins
 # -----------------------
-# ZSH_THEME="powerlevel10k/powerlevel10k"  # uncomment to revert to p10k
 ZSH_THEME=""
 HIST_STAMPS="yyyy-mm-dd"
 
@@ -22,30 +15,30 @@ NVM_LAZY_LOAD=true
 DISABLE_COMPFIX=true
 
 plugins=(
-  1password
+  # 1password
   brew
   #colored-man-pages
   #composer
   #copypath
-  dotenv
+  # dotenv
   gh
-  git-auto-fetch
+  # git-auto-fetch
   #gulp
   macos
   npm
   nvm
   #postgres
-  #python
+  # python
   #rsync
   ssh
   #systemadmin
   #systemd
-  tailscale
-  tldr
+  # tailscalex
+  # tldr
   #tmux
   #ubuntu
   #ufw
-  urltools
+  # urltools
   #vscode
   #wp-cli
   zsh-autosuggestions
@@ -55,7 +48,7 @@ plugins=(
 # COMPLETIONS
 # fpath must be set before oh-my-zsh loads so compinit picks it up
 # -----------------------
-fpath+=${ZSH_CUSTOM:-${ZSH:-~/.oh-my-zsh}/custom}/plugins/zsh-completions/src
+fpath+=${ZSH_CUSTOM:-${ZSH:-~/.config/zsh/oh-my-zsh}/custom}/plugins/zsh-completions/src
 
 source $ZSH/oh-my-zsh.sh
 
@@ -73,11 +66,12 @@ export WAKATIME_HOME="$HOME/.config/wakatime"
 export SEMGREP_SETTINGS_FILE="$HOME/.config/semgrep/settings.yml"
 export TEALDEER_CONFIG_DIR="$HOME/.config/tldr"
 
-# SHELL TOOLS
-# thefuck is lazy-loaded — only initializes on first use
-# -----------------------
+
+eval "$(starship init zsh)"
 eval "$(zoxide init zsh)"
-POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true
+eval "$(op completion zsh)"; compdef _op op
+eval $(thefuck --alias)
+
 
 thefuck() {
   unfunction thefuck
@@ -85,11 +79,24 @@ thefuck() {
   thefuck "$@"
 }
 
+function y() {
+	local tmp cwd; tmp="$(mktemp -t "yazi-cwd.XXXXXX")"
+	command yazi "$@" --cwd-file="$tmp"
+	IFS= read -r -d '' cwd < "$tmp"
+	[ "$cwd" != "$PWD" ] && [ -d "$cwd" ] && builtin cd -- "$cwd" || builtin true
+	command rm -f -- "$tmp"
+}
+
 # LOCAL CONFIG
 # Aliases, functions, theme, welcome message
 # -----------------------
 [[ ! -f $DOTFILES/config/zsh/.aliases ]] || source $DOTFILES/config/zsh/.aliases
 [[ ! -f $DOTFILES/config/zsh/.functions ]] || source $DOTFILES/config/zsh/.functions
-# [[ ! -f $DOTFILES/config/zsh/.p10k.zsh ]] || source $DOTFILES/config/zsh/.p10k.zsh  # uncomment to revert to p10k
-eval "$(starship init zsh)"
-[[ ! -x "$(command -v welcome.sh)" ]] || source welcome.sh && fastfetch --pipe false
+
+
+# Welcome screen
+[[ ! -x "$(command -v welcome.sh)" ]] || source welcome.sh &&
+echo
+fastfetch --pipe false
+echo
+checkDirtyRepos.sh

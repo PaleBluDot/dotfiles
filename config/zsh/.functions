@@ -152,6 +152,91 @@ function checkGit() {
 	fi
 }
 
+# Walks github.com/org/reponame two levels deep, cd's into each repo,
+# and reports both uncommitted changes (via your existing checkGit)
+# and commits that are ahead of the pushed upstream branch.
+#
+# Usage:
+#   checkAllRepos              # scans ~/github.com by default
+#   checkAllRepos ~/some/path  # scans a different root
+function checkAllRepos() {
+	local root="${1:-/Users/psanchez/Documents/github.com}"
+
+	if [[ ! -d "$root" ]]; then
+		echo "Directory not found: $root"
+		return 1
+	fi
+
+	# org/repo = two levels of directories.
+	# (/N) qualifier: / = dirs only, N = don't error if nothing matches.
+	for org_dir in "$root"/*(/N); do
+		for repo_dir in "$org_dir"/*(/N); do
+			[[ -d "$repo_dir/.git" ]] || continue
+
+			local repo_label="${org_dir:t}/${repo_dir:t}"
+
+			# checkGit reads git status in the current directory, so
+			# subshell + cd keeps us from having to cd back afterward.
+			(
+				cd "$repo_dir" || exit
+				echo "${repo_label}:"
+				checkGit
+
+				# Commits made locally but never pushed to upstream.
+				local unpushed
+				unpushed=$(git log '@{u}..HEAD' --oneline 2>/dev/null)
+				local upstream_exit=$?
+
+				if [[ $upstream_exit -ne 0 ]]; then
+					echo "  ⚠️ ${LIGHTRED}No upstream branch set${NC}"
+				elif [[ -n "$unpushed" ]]; then
+					local count=$(echo "$unpushed" | wc -l | tr -d ' ')
+					echo "  ⬆️ ${LIGHTRED}$count unpushed commit(s)${NC}"
+				fi
+			)
+		done
+	done
+}
+
+# Same repo-walk as checkAllRepos, but silent unless a repo has
+# uncommitted changes or unpushed commits. Designed to be captured
+# and conditionally printed from .zshrc, not called directly.
+function checkAllReposQuiet() {
+	local root="${1:-/Users/psanchez/Documents/github.com}"
+	[[ -d "$root" ]] || return
+
+	for org_dir in "$root"/*(/N); do
+		for repo_dir in "$org_dir"/*(/N); do
+			[[ -d "$repo_dir/.git" ]] || continue
+
+			(
+				cd "$repo_dir" || exit
+
+				local repo_label="${org_dir:t}/${repo_dir:t}"
+
+				local dirty_count
+				dirty_count=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+
+				local unpushed
+				unpushed=$(git log '@{u}..HEAD' --oneline 2>/dev/null)
+				local upstream_exit=$?
+
+				if [[ "$dirty_count" -gt 0 ]]; then
+					echo "  🔴 ${LIGHTRED}${repo_label}: ${dirty_count} uncommitted change(s)${NC}"
+				fi
+
+				if [[ $upstream_exit -eq 0 && -n "$unpushed" ]]; then
+					local ahead_count
+					ahead_count=$(echo "$unpushed" | wc -l | tr -d ' ')
+					echo "  ⬆️ ${LIGHTRED}${repo_label}: ${ahead_count} unpushed commit(s)${NC}"
+				elif [[ $upstream_exit -ne 0 ]]; then
+					echo "  ⚠️ ${LIGHTRED}${repo_label}: no upstream branch set${NC}"
+				fi
+			)
+		done
+	done
+}
+
 # Checks if HTTP Status is 200
 # if not, then it outputs errors message.
 function getHTTPCode() {
@@ -296,4 +381,22 @@ ghs() {
 # Example: setenv GH_TOKEN abc123
 setenv() {
   export $1=$2
+}
+
+
+exit() {
+    if [ -n "$TMUX" ]; then
+        tmux detach
+    else
+        builtin exit
+    fi
+}
+
+
+detach() {
+    if [ -n "$TMUX" ]; then
+        tmux detach
+    else
+        echo "Not in a tmux session — nothing to detach from."
+    fi
 }

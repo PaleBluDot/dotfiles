@@ -1,27 +1,27 @@
 "$schema" = 'https://starship.rs/config-schema.json'
 
 # color scheme
-# yellow #cef542
-# blue #0a63c9
-# red #d40f51
-# organge #db490b
-# pink #c91e7a
-# purple #9a348e
-# green #417e37
-# aqua #06969a
-# teal #33658a
+# yellow #ffdfde
+# blue #a48685
+# red #c0303e
+# organge #da4a52
+# pink #c0303e
+# purple #c0303e
+# green #a48685
+# aqua #a48685
+# teal #a48685
 
 format = """
-[](#cef542)\
+[](#ffdfde)\
 $os\
-[](fg:#cef542 bg:#0a63c9)\
+[](fg:#ffdfde bg:#a48685)\
 $username\
-[](fg:#0a63c9 bg:#c91e7a)\
+[](fg:#a48685 bg:#c0303e)\
 $directory\
-[](fg:#c91e7a bg:#9a348e)\
+[](fg:#c0303e bg:#c0303e)\
 $git_branch\
 $git_status\
-[](fg:#9a348e bg:#417e37)\
+[](fg:#c0303e bg:#a48685)\
 $c\
 $elixir\
 $elm\
@@ -34,11 +34,11 @@ $nodejs\
 $nim\
 $rust\
 $scala\
-[](fg:#417e37 bg:#06969a)\
+[](fg:#a48685 bg:#a48685)\
 $docker_context\
-[](fg:#06969a bg:#33658a)\
+[](fg:#a48685 bg:#a48685)\
 $time\
-[ ](fg:#33658a)\
+[ ](fg:#a48685)\
 """
 
 # Disable the blank line at the start of the prompt
@@ -47,7 +47,7 @@ $time\
 # An alternative to the username module which displays a symbol that
 # represents the current operating system
 [os]
-style = "bg:#cef542 fg:#151515"
+style = "bg:#ffdfde fg:#240809"
 format = "[ $symbol $path ]($style)"
 disabled = false # Disabled by default
 
@@ -64,13 +64,13 @@ Windows = ""
 [username]
 show_always = true
 # symbol = ""
-style_user = "bg:#0a63c9"
-style_root = "bg:#db490b"
+style_user = "bg:#a48685"
+style_root = "bg:#da4a52"
 format = '[ $user ]($style)'
 disabled = false
 
 [directory]
-style = "bold bg:#c91e7a"
+style = "bold bg:#c0303e"
 home_symbol = ""
 format = "[ 󰉋 $path ]($style)"
 truncation_length = 3
@@ -87,84 +87,84 @@ truncation_symbol = "…/"
 
 [git_branch]
 symbol = "󰊢"
-style = "bold bg:#9a348e"
+style = "bold bg:#c0303e"
 format = '[ $symbol $branch ]($style)'
 
 [git_status]
-style = "bold bg:#9a348e"
+style = "bold bg:#c0303e"
 format = '[$all_status$ahead_behind ]($style)'
 
 [c]
 symbol = ""
-style = "bold bg:#417e37"
+style = "bold bg:#a48685"
 format = '[ $symbol ($version) ]($style)'
 
 [cpp]
 symbol = ""
-style = "bold bg:#417e37"
+style = "bold bg:#a48685"
 format = '[ $symbol ($version) ]($style)'
 
 [elixir]
 symbol = ""
-style = "bold bg:#417e37"
+style = "bold bg:#a48685"
 format = '[ $symbol ($version) ]($style)'
 
 [elm]
 symbol = ""
-style = "bold bg:#417e37"
+style = "bold bg:#a48685"
 format = '[ $symbol ($version) ]($style)'
 
 [golang]
 symbol = "󰟓"
-style = "bold bg:#417e37"
+style = "bold bg:#a48685"
 format = '[ $symbol ($version) ]($style)'
 
 [gradle]
-style = "bold bg:#417e37"
+style = "bold bg:#a48685"
 format = '[ $symbol ($version) ]($style)'
 
 [haskell]
 symbol = " "
-style = "bold bg:#417e37"
+style = "bold bg:#a48685"
 format = '[ $symbol ($version) ]($style)'
 
 [java]
 symbol = " "
-style = "bold bg:#417e37"
+style = "bold bg:#a48685"
 format = '[ $symbol ($version) ]($style)'
 
 [julia]
 symbol = " "
-style = "bold bg:#417e37"
+style = "bold bg:#a48685"
 format = '[ $symbol ($version) ]($style)'
 
 [nodejs]
 symbol = "󰎙"
-style = "bold bg:#417e37"
+style = "bold bg:#a48685"
 format = '[ $symbol ($version) ]($style)'
 
 [nim]
 symbol = "󰆥"
-style = "bold bg:#417e37"
+style = "bold bg:#a48685"
 format = '[ $symbol ($version) ]($style)'
 
 [rust]
 symbol = ""
-style = " bold bg:#417e37"
+style = " bold bg:#a48685"
 format = '[ $symbol ($version) ]($style)'
 
 [scala]
 symbol = " "
-style = "bold bg:#417e37"
+style = "bold bg:#a48685"
 format = '[ $symbol ($version) ]($style)'
 
 [docker_context]
 symbol = "󰡨"
-style = "bold bg:#06969a"
+style = "bold bg:#a48685"
 format = '[ $symbol $context ]($style)'
 
 [time]
 disabled = false
 time_format = "%R"
-style = "bold bg:#33658a"
+style = "bold bg:#a48685"
 format = '[  $time ]($style)'
