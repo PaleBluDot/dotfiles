@@ -19,7 +19,7 @@ export XDG_CACHE_HOME="$HOME/.cache"
 
 export ZSH="$HOME/.config/zsh/oh-my-zsh"
 export DOTFILES="$HOME/.config/dotfiles"
-export STARSHIP_CONFIG="$HOME/.config/starship/demo.toml"
+export STARSHIP_CONFIG="$HOME/.config/starship/starship.toml"
 
 # LANGUAGE RUNTIMES
 # Go and NVM directories
