@@ -41,6 +41,6 @@ export NODE_REPL_HISTORY=""
 
 # PATH
 # -----------------------
-export PATH="$HOME/bin:$HOME/.config/npm/bin:$GOPATH/bin:$GOROOT/bin:$PATH"
+export PATH="$HOME/bin:$HOME/.config/npm/bin:$GOPATH/bin:$GOROOT/bin:$HOME/.docker/bin$PATH"
 
 
