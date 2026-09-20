@@ -3,15 +3,15 @@
 # !------------------------------------
 if [[ -n "$ZSH_VERSION" ]]
 then
-	alias refresh="source ~/.zshrc"
+	alias reload="source ~/.zshrc"
 else
-	alias refresh="source ~/.bashrc"
+	alias reload="source ~/.bashrc"
 fi
 
 # Base
 alias c="clear"
 alias fenv="source ~/.zshenv"
-alias fresh="clear && refresh"
+alias fresh="c && reload"
 alias aliasUpdate="fresh 2>&1 && c"
 
 # LS replacements
@@ -33,7 +33,6 @@ alias delgroup="sudo usermod -G"
 alias xbin="chmod +x ~/bin/*"
 alias rm="rm -i"
 
-#
 alias histg="history | fzf"
 alias wget="wget --no-hsts"
 alias rmdpkg="sudo apt-get --purge remove"
@@ -52,21 +51,27 @@ alias sshd="cd /etc/ssh"
 # !------------------------------------
 # @@@ FILE EDITS
 # !------------------------------------
-alias edit="$EDITOR ~/.config/dotfiles/config/zsh/.aliases"
+alias edit="$EDITOR"
+alias ea="$EDITOR ~/.config/dotfiles/config/zsh/.aliases"
 alias base="$EDITOR ~/Library/CloudStorage/OneDrive-Personal/Documents/Espanso/match/base.yml"
-alias alre="sed -i "s/~\/.bash_aliases/~\/.aliases/g" ~/.bashrc"
 alias netcfg="sudo $EDITOR /etc/netplan/50-cloud-init.yaml"
 alias cloudcfg="sudo $EDITOR /etc/cloud/cloud.cfg"
 
+
+# !------------------------------------
+# @@@ FILE OUTPUT
+# !------------------------------------
 alias group="cat /etc/group"
 alias findAlias="alias | fzf"
 
 
 # !------------------------------------
-# @@@ Manipulations
+# @@@ MANIPULATION
 # !------------------------------------
 alias comlist="cat test.html | tr "\n" "," > comma-list.txt"
 alias gd="gobuster -w ~/.config/gobuster.txt"
+alias brew-installs="brew list > ~/.config/brew.txt"
+
 
 # !------------------------------------
 # @@@ GIT
@@ -116,6 +121,7 @@ alias tka="tmux kill-server"
 alias trn="tmux rename-session -t"
 alias ts="tmux switch-client -t"
 
+
 # !------------------------------------
 # @@@ NETWORKING
 # !------------------------------------
@@ -129,7 +135,6 @@ alias ping="ping -c 3"
 # !------------------------------------
 alias code="code-insiders"
 alias teach="code --extensions-dir ~/code_profiles/teach/exts --user-data-dir ~/code_profiles/teach/data"
-alias brew-installs="brew list > .config/brew.txt"
 
 
 # !------------------------------------
