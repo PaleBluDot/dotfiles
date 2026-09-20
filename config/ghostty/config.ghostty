@@ -21,14 +21,14 @@ mouse-hide-while-typing = true
 mouse-shift-capture = true
 
 # screen
-fullscreen = true
-quick-terminal-size = 600px
+fullscreen = false
+quick-terminal-size = 1000px
 window-padding-x = 10
 window-padding-y = 10
 window-decoration = true
 window-inherit-working-directory = true
 window-save-state = always
-background-opacity = 0.92
+background-opacity = 0.80
 background-blur-radius = 30
 unfocused-split-opacity = 0.5
 unfocused-split-fill = #151515
