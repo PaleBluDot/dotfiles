@@ -1,0 +1,119 @@
+# AeroSpace config
+# See: https://nikitabobko.github.io/AeroSpace/guide
+
+# Startup & reload behavior
+config-version = 2
+after-startup-command = []
+start-at-login = true
+auto-reload-config = true
+
+# Input & interaction behavior
+key-mapping.preset = 'qwerty'
+focus-follows-mouse.enabled = false
+on-focused-monitor-changed = ['move-mouse monitor-lazy-center']
+automatically-unhide-macos-hidden-apps = false
+on-mode-changed = []
+
+# Layout defaults
+default-root-container-layout = 'tiles'
+default-root-container-orientation = 'auto'
+accordion-padding = 30
+
+# Normalizations are ON — AeroSpace auto-flattens/reorients nested containers.
+# This is why 'join-with' is used below instead of i3's 'split': split is a
+# no-op while flatten-containers normalization is enabled.
+enable-normalization-flatten-containers = true
+enable-normalization-opposite-orientation-for-nested-containers = true
+
+# Gaps
+gaps.inner.horizontal = 0
+gaps.inner.vertical = 0
+gaps.outer.left = 0
+gaps.outer.bottom = 0
+gaps.outer.top = 0
+gaps.outer.right = 0
+
+# Keeps workspaces 1-10 alive/visible (e.g. in workspace indicators) even
+# when they currently hold no windows.
+persistent-workspaces = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+
+
+# Pin workspaces to a physical monitor by name. Patterns are regex —
+# literal parens in a monitor name (e.g. "(1)") must stay escaped as \(  \).
+# First matching pattern wins; 'built-in' is the laptop-only fallback.
+[workspace-to-monitor-force-assignment]
+1 = ['u3223qe', 'DELL U2520D \(1\)', 'built-in']
+2 = ['u3223qe', 'DELL U2520D \(1\)', 'built-in']
+3 = ['u3223qe', 'DELL U2520D \(1\)', 'built-in']
+4 = ['u3223qe', 'DELL U2520D \(1\)', 'built-in']
+5 = ['u2713hm', 'DELL U2520D \(2\)', 'built-in']
+6 = ['u2713hm', 'DELL U2520D \(2\)', 'built-in']
+7 = ['u2713hm', 'DELL U2520D \(2\)', 'built-in']
+8 = ['u2713hm', 'DELL U2520D \(2\)', 'built-in']
+9 = ['u2713hm', 'DELL U2520D \(2\)', 'built-in']
+
+[mode.main.binding]
+
+# Layout toggles
+alt-slash = 'layout tiles horizontal vertical'
+alt-comma = 'layout accordion horizontal vertical'
+
+# Focus (move between windows without moving them)
+alt-h = 'focus left'
+alt-j = 'focus down'
+alt-k = 'focus up'
+alt-l = 'focus right'
+
+# Move (relocate the focused window)
+alt-shift-h = 'move left'
+alt-shift-j = 'move down'
+alt-shift-k = 'move up'
+alt-shift-l = 'move right'
+
+# Join (merge focused window into the container in that direction)
+alt-ctrl-h = 'join-with left'
+alt-ctrl-j = 'join-with down'
+alt-ctrl-k = 'join-with up'
+alt-ctrl-l = 'join-with right'
+
+# Workspaces — switch
+alt-1 = 'workspace 1'
+alt-2 = 'workspace 2'
+alt-3 = 'workspace 3'
+alt-4 = 'workspace 4'
+alt-5 = 'workspace 5'
+alt-6 = 'workspace 6'
+alt-7 = 'workspace 7'
+alt-8 = 'workspace 8'
+alt-9 = 'workspace 9'
+alt-0 = 'workspace 10'
+
+# Workspaces — move focused window to
+alt-shift-1 = 'move-node-to-workspace 1'
+alt-shift-2 = 'move-node-to-workspace 2'
+alt-shift-3 = 'move-node-to-workspace 3'
+alt-shift-4 = 'move-node-to-workspace 4'
+alt-shift-5 = 'move-node-to-workspace 5'
+alt-shift-6 = 'move-node-to-workspace 6'
+alt-shift-7 = 'move-node-to-workspace 7'
+alt-shift-8 = 'move-node-to-workspace 8'
+alt-shift-9 = 'move-node-to-workspace 9'
+alt-shift-0 = 'move-node-to-workspace 10'
+
+# Workspace / monitor navigation
+alt-tab = 'workspace-back-and-forth'
+alt-shift-tab = 'move-workspace-to-monitor --wrap-around next'
+
+# Resize & window-state toggles
+alt-minus = 'resize smart -50'
+alt-equal = 'resize smart +50'
+alt-f = 'fullscreen'
+alt-shift-f = 'layout floating tiling'
+
+# Launch apps
+alt-shift-enter =       'exec-and-forget open -na "Ghostty"'
+alt-shift-backspace =   'exec-and-forget open -a "Spotify"'
+
+# Config / layout recovery
+alt-shift-c = 'reload-config'
+alt-shift-r = 'flatten-workspace-tree'
