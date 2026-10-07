@@ -15,32 +15,13 @@ NVM_LAZY_LOAD=true
 DISABLE_COMPFIX=true
 
 plugins=(
-  # 1password
   brew
-  #colored-man-pages
-  #composer
-  #copypath
-  # dotenv
   gh
-  # git-auto-fetch
-  #gulp
   macos
   npm
   nvm
-  #postgres
-  # python
-  #rsync
   ssh
-  #systemadmin
-  #systemd
-  # tailscalex
-  # tldr
-  #tmux
-  #ubuntu
-  #ufw
-  # urltools
-  #vscode
-  #wp-cli
+  vscode
   zsh-autosuggestions
   zsh-syntax-highlighting
 )
