@@ -1,7 +1,13 @@
-# Looks inside the ~/github folder
-# to find the user and orgs and let
-# you select where to create the folder
-# and moves you into it and open $EDITOR.
+# mkprj — create a new project folder under ~/github/<org>/ and open it.
+#
+# Lists the folders inside ~/github (your user and orgs), asks you to pick
+# one, asks for a project name, then creates the folder, cd's into it,
+# runs `git init`, and opens it with `code-insiders .`.
+#
+# Usage:
+#   mkprj
+#
+# Requires: ~/github with one folder per user/org, and `code-insiders` on PATH.
 ##! Need to add git init and gh creation.
 function mkprj() {
 	echo "Selected org:"
@@ -20,8 +26,18 @@ function mkprj() {
 	done
 }
 
-# Create a Husky script to automate
-# git-hooks, like pre-commit.
+# husky — create a Husky git hook script in the current repo.
+#
+# Runs `npx husky add .husky/<hook> "<command>"`, which writes a hook file
+# that runs <command> when the git hook fires.
+#
+# Usage:
+#   husky <hook-name> "<command>"
+#
+# Example:
+#   husky pre-commit "npm test"
+#
+# Run it from the root of a repo that already has Husky set up.
 ##! Need to add a check if already exist.
 function husky() {
 	echo "\n⏳ Creating…\n"
@@ -29,8 +45,13 @@ function husky() {
 	echo "\n✅ Husky script has been created.\n"
 }
 
-# Get the local IP of your machine.
-# This is using ifconfig
+# loIP — print the local IP address of this machine.
+#
+# Uses `ip` if it is installed, otherwise falls back to `ifconfig`. In both
+# cases it prints the second field of every line containing "broadcast".
+#
+# Usage:
+#   loIP
 function loIP() {
 	ip=
 
@@ -51,7 +72,17 @@ function loIP() {
 	# fi
 }
 
-# Gets website IP address.
+# getWebsiteIP — look up the IP address of one or more hostnames.
+#
+# Runs `dscacheutil -q host -a name <host>` for each argument and prints the
+# full record it returns. macOS only (dscacheutil does not exist on Linux).
+#
+# Usage:
+#   getWebsiteIP <host> [host...]
+#   getWebsiteIP hosts <host> [host...]   # a leading "hosts" is ignored
+#
+# Example:
+#   getWebsiteIP example.com
 function getWebsiteIP() {
   [ "$1" = "hosts" ] && shift
   for x
@@ -61,7 +92,19 @@ function getWebsiteIP() {
   done
 }
 
-# Find DIR that are common hack points
+# gobust — run gobuster against a site using your wordlist.
+#
+# Mode "dns" runs `gobuster dns -d <url>`. Any other mode runs
+# `gobuster -d https://<url>`. The wordlist is ~/.config/gobuster.txt.
+#
+# Usage:
+#   gobust <mode> <url>
+#
+# Example:
+#   gobust dns example.com
+#
+# Requires: gobuster on PATH and the wordlist file above.
+# Only use this on sites you own or have permission to test.
 function gobust() {
 	MODE=$1
 	URL=$2
@@ -82,9 +125,26 @@ function gobust() {
 	fi
 }
 
-# Sends a message to the pushover
-# platform. Intending on using to send
-# errors script messages.
+# pushover — send a notification to the Pushover platform.
+#
+# Intended for sending script error messages to your phone. The message is
+# sent as HTML, prefixed with the hostname and followed by the current user
+# and a "View" link.
+#
+# Usage:
+#   pushover <message> [title] [priority] [url]
+#
+# Arguments (positional, in this order):
+#   message   Required. Text to send.
+#   title     Optional. Defaults to user@hostname.
+#   priority  Optional. Defaults to 0.
+#   url       Optional. Defaults to https://example.com/.
+#
+# Example:
+#   pushover "Backup finished" "Backup" 0
+#
+# Notes: with no arguments it prints the usage line and calls `exit 1`,
+# which closes your shell (or detaches tmux, see the exit override below).
 function pushover() {
 	APP_TOKEN="azgrm981bxopyyxd74b7qbrisxxfjx"
 	USER_TOKEN="g4yhnf9391i3wgpgkvi7scruipy2g7"
@@ -123,7 +183,16 @@ function pushover() {
   https://api.pushover.net/1/messages.json
 }
 
-# Updates Dotfiles to the latests changes.
+# dotfiles-update — pull the latest dotfiles and re-apply them.
+#
+# If $DOTFILES is not set it defaults to $HOME/.config/dotfiles. Then it
+# cd's there, checks out main, runs `git pull`, runs `fresh`, and finally
+# cd's to $HOME (it does not return you to where you started).
+#
+# Usage:
+#   dotfiles-update
+#
+# Requires: the `fresh` dotfiles manager on PATH.
 function dotfiles-update() {
 	if [[ -z "${DOTFILES}" ]]; then
 		echo "Does not Exits. Creating dotfiles."
@@ -139,8 +208,16 @@ function dotfiles-update() {
 	cd $HOME
 }
 
-# Checks if there are any changes
-# to be committed and pushed.
+# checkGit — report whether the current git repo has uncommitted changes.
+#
+# Counts the lines of `git status --porcelain` and prints a green line when
+# there are 0 changes or a red line with the count otherwise. It always
+# returns 0, so read the output rather than the exit status.
+#
+# Usage:
+#   checkGit        # run inside a git repo
+#
+# Requires: the color variables LIGHTGREEN, LIGHTRED and NC to be defined.
 function checkGit() {
 	COUNT=$(git status --porcelain | wc -l)
 
@@ -152,13 +229,18 @@ function checkGit() {
 	fi
 }
 
-# Walks github.com/org/reponame two levels deep, cd's into each repo,
-# and reports both uncommitted changes (via your existing checkGit)
-# and commits that are ahead of the pushed upstream branch.
+# checkAllRepos — report the state of every repo under a root folder.
+#
+# Walks <root>/<org>/<repo> two levels deep, cd's into each repo, and
+# reports both uncommitted changes (via checkGit) and commits that are ahead
+# of the pushed upstream branch. Repos with no upstream branch get a warning.
 #
 # Usage:
-#   checkAllRepos              # scans ~/github.com by default
+#   checkAllRepos              # scans the default root (set on the `root=` line)
 #   checkAllRepos ~/some/path  # scans a different root
+#
+# Requires: zsh (uses zsh glob qualifiers), checkGit, and the LIGHTRED / NC
+# color variables.
 function checkAllRepos() {
 	local root="${1:-/Users/psanchez/Documents/github.com}"
 
@@ -198,9 +280,20 @@ function checkAllRepos() {
 	done
 }
 
-# Same repo-walk as checkAllRepos, but silent unless a repo has
-# uncommitted changes or unpushed commits. Designed to be captured
-# and conditionally printed from .zshrc, not called directly.
+# checkAllReposQuiet — same repo walk as checkAllRepos, but silent unless
+# something needs attention.
+#
+# Prints one line per repo that has uncommitted changes, unpushed commits,
+# or no upstream branch, and prints nothing for clean repos. Designed to be
+# captured and conditionally printed from .zshrc, not called directly.
+#
+# Usage:
+#   checkAllReposQuiet [root]     # root defaults to the path on the `root=` line
+#
+# Example (in .zshrc):
+#   out=$(checkAllReposQuiet); [[ -n "$out" ]] && echo "$out"
+#
+# Requires: zsh and the LIGHTRED / NC color variables.
 function checkAllReposQuiet() {
 	local root="${1:-/Users/psanchez/Documents/github.com}"
 	[[ -d "$root" ]] || return
@@ -237,8 +330,19 @@ function checkAllReposQuiet() {
 	done
 }
 
-# Checks if HTTP Status is 200
-# if not, then it outputs errors message.
+# getHTTPCode — print the HTTP status code of a URL.
+#
+# Uses curl to fetch the status code and prints "Status Code: <code>".
+# The code is printed whether or not it is 200.
+#
+# Usage:
+#   getHTTPCode <url>
+#
+# Example:
+#   getHTTPCode https://example.com
+#
+# Note: on a 200 response it calls `exit 0`, which closes your shell (or
+# detaches tmux, see the exit override below) when run interactively.
 function getHTTPCode() {
 	local url=$1
 	status_code=$(curl --write-out "%{http_code}\n" --silent --output /dev/null "$url");
@@ -251,9 +355,18 @@ function getHTTPCode() {
   fi
 }
 
-# Takes a file and outputs CSpell
-# flags. These flags will flag a
-# error if the word is misspelled.
+# add_flags — turn a word list into CSpell "forbidden word" entries.
+#
+# Reads a file with one word per line. For each word it writes three
+# entries, each with a leading "!": the word as written, lowercase, and
+# uppercase. CSpell flags a "!word" entry as an error wherever it appears.
+# The output file is overwritten on every run.
+#
+# Usage:
+#   add_flags <word-list-file>
+#
+# Output: the OUTPUTFILE path set inside the function, under $GITHUB_DIR.
+# Requires: the GITHUB_DIR environment variable.
 function add_flags() {
 	local FILE=$1
 	local FLAG=\!
@@ -271,7 +384,20 @@ function add_flags() {
 }
 
 
-# Delete local and remote branch.
+# delete — delete a git branch locally and on the remote.
+#
+# Runs `git branch -D <branch>` (force delete, even if unmerged) and then
+# `git push origin --delete <branch>`. With no argument it prints a reminder
+# instead of deleting anything.
+#
+# Usage:
+#   delete <branch-name>
+#
+# Example:
+#   delete feature/old-idea
+#
+# Run it inside the repo. Git will refuse to delete the branch you are
+# currently on.
 ##! Need to add a check to see if
 ##! branch is removed on remote.
 function delete {
@@ -288,7 +414,14 @@ function delete {
 	fi
 }
 
-# Get the type of system you are on.
+# getSystem — print what type of machine you are on.
+#
+# Currently prints "This is a Mac machine" when `uname` is Darwin and
+# "This is a Windows machine" for everything else. The Linux branch repeats
+# the Darwin test, so it never matches and Linux falls through to Windows.
+#
+# Usage:
+#   getSystem
 ##! Need to update this for windows response
 ##! MINGW64_NT and MINGW32_NT.
 function getSystem () {
@@ -301,8 +434,24 @@ function getSystem () {
   fi
 }
 
-# Formats the date command to add
-# commonly used formats.
+# dateF — print today's date in a common format, prefixed with 📅.
+#
+# Usage:
+#   dateF <format> [-s | --separator <char>]
+#
+# Formats:
+#   yyyymmdd   full year, month, day
+#   mmddyyyy   month, day, full year
+#   mmddyy     month, day, short year
+#
+# Options:
+#   -s | --separator   character placed between the parts (default: none)
+#
+# Examples:
+#   dateF mmddyyyy                    # 10072026
+#   dateF mmddyy --separator "-"      # 10-07-26
+#
+# Running it with no or an unknown format prints this usage.
 ##! Add more formats and roll this
 ##! out to its own script.
 function dateF() {
@@ -364,11 +513,21 @@ function dateF() {
 
 
 #! Github Repo Add Token
-# Set NPM_TOKEN GitHub secret for a repo
-# Usage: ghs <repo-name> [username]
-# Sets the NPM_TOKEN env var as a GitHub Actions
-# secret on PaleBluDot/<repo-name>
-# Optionally pass a second argument to override the username: ghs <repo-name> <username>
+# ghs — set a GitHub Actions secret on a repo, using the value of an
+# environment variable of the same name from your current shell.
+#
+# Pipes the value of $<SECRET_NAME> into `gh secret set <SECRET_NAME>` for
+# the repo <owner>/<repo-name>. The owner defaults to PaleBluDot.
+#
+# Usage:
+#   ghs <SECRET_NAME> <repo-name> [owner]
+#
+# Example:
+#   ghs NPM_TOKEN my-repo            # sets NPM_TOKEN on PaleBluDot/my-repo
+#   ghs NPM_TOKEN my-repo some-org   # sets it on some-org/my-repo
+#
+# Requires: zsh (uses ${(P)1}), an authenticated `gh` CLI, and the variable
+# already set in the current shell.
 ghs() {
   echo ${(P)1} | gh secret set $1 --repo ${3:-PaleBluDot}/$2
 }
@@ -376,14 +535,32 @@ ghs() {
 
 
 #! Create ENV varibale
-# Set an environment variable for the current shell session
-# Usage: setenv <VAR_NAME> <value>
-# Example: setenv GH_TOKEN abc123
+# setenv — set an environment variable for the current shell session only.
+#
+# Same as `export <VAR_NAME>=<value>`. It is gone when the shell closes.
+#
+# Usage:
+#   setenv <VAR_NAME> <value>
+#
+# Example:
+#   setenv GH_TOKEN abc123
 setenv() {
   export $1=$2
 }
 
 
+
+# exit — override of the built-in `exit` that is safe to use inside tmux.
+#
+# Inside tmux it detaches from the session instead of closing it, so your
+# session keeps running. Outside tmux it behaves like the normal `exit`.
+#
+# Usage:
+#   exit
+#
+# Because this replaces the built-in, any function that calls `exit`
+# (such as pushover and getHTTPCode) gets this behavior too. Use
+# `builtin exit` to bypass the override.
 exit() {
     if [ -n "$TMUX" ]; then
         tmux detach
@@ -393,10 +570,70 @@ exit() {
 }
 
 
+# detach — detach from the current tmux session.
+#
+# Prints a message instead if you are not inside tmux.
+#
+# Usage:
+#   detach
 detach() {
     if [ -n "$TMUX" ]; then
         tmux detach
     else
         echo "Not in a tmux session — nothing to detach from."
     fi
+}
+
+
+
+# sysup — update all installed packages with the native package manager
+# for the OS you are on.
+#
+# Detects the OS with `uname`, and on Linux reads ID / ID_LIKE from
+# /etc/os-release to pick the package manager:
+#   macOS            brew update && brew upgrade
+#   Windows (Git Bash) winget upgrade --all
+#   Arch-based       sudo pacman -Syu --noconfirm
+#   Fedora-based     sudo dnf upgrade -y
+#   Debian-based     sudo apt update && sudo apt upgrade -y
+#
+# Usage:
+#   sysup
+#
+# Returns 1 with a message on stderr if the OS or distro is not recognized.
+# Linux needs sudo; the -y / --noconfirm flags skip the confirmation prompt.
+sysup() {
+  local distro
+
+  case "$(uname -s)" in
+    Darwin)
+      brew update && brew upgrade
+      ;;
+    MINGW* | MSYS*)
+      winget upgrade --all --accept-package-agreements --accept-source-agreements
+      ;;
+    Linux)
+      if [[ ! -f /etc/os-release ]]; then
+        echo "sysup: /etc/os-release not found" >&2
+        return 1
+      fi
+
+      # The ( ... ) subshell keeps ID, NAME, VERSION etc. from leaking into your live shell.
+      distro=$( . /etc/os-release; echo "${ID:-} ${ID_LIKE:-}" )
+
+      case " $distro " in
+        *" arch "*)   sudo pacman -Syu --noconfirm ;;
+        *" fedora "*) sudo dnf upgrade -y ;;
+        *" debian "*) sudo apt update && sudo apt upgrade -y ;;
+        *)
+          echo "sysup: unsupported distro ($distro)" >&2
+          return 1
+          ;;
+      esac
+      ;;
+    *)
+      echo "sysup: unsupported OS ($(uname -s))" >&2
+      return 1
+      ;;
+  esac
 }
