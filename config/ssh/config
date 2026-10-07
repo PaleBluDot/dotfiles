@@ -9,6 +9,7 @@ Host pfsense
     HostName {{ op://lab/pfsense/hostname }}
     User {{ op://lab/pfsense/username }}
 
+
 # Servers
 Host helix
     HostName {{ op://lab/helix/hostname }}
@@ -21,6 +22,7 @@ Host blazar
 Host atlas
     HostName {{ op://lab/atlas/hostname }}
     User {{ op://lab/atlas/username }}
+
 
 # Devices
 Host s23u
@@ -58,26 +60,15 @@ Host svr-omarchy
     HostName {{ op://lab/svr-omarchy/hostname }}
     User {{ op://lab/svr-omarchy/username }}
 
-# Containers
-Host postgres
-    HostName {{ op://lab/postgres/hostname }}
-    User {{ op://lab/postgres/username }}
 
-Host npm
-    HostName {{ op://lab/npm/hostname }}
-    User {{ op://lab/npm/username }}
+# Test
+Host svr-ubuntu-2204
+    HostName {{ op://lab/svr-ubuntu-2204/hostname }}
+    User {{ op://lab/svr-ubuntu-2204/username }}
 
-Host ghrunner
-    HostName {{ op://lab/ghrunner/hostname }}
-    User {{ op://lab/ghrunner/username }}
-
-Host rustdesk
-    HostName {{ op://lab/rustdesk/hostname }}
-    User {{ op://lab/rustdesk/username }}
-
-Host wakapi
-    HostName {{ op://lab/wakapi/hostname }}
-    User {{ op://lab/wakapi/username }}
+Host svr-centos-7
+    HostName {{ op://lab/svr-centos-7/hostname }}
+    User {{ op://lab/svr-centos-7/username }}
 
 
 # Tailnet
