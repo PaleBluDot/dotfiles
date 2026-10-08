@@ -1,0 +1,73 @@
+{
+  "Built-in Retina Display:1800x1169" : {
+    "displayKey" : "Built-in Retina Display:1800x1169",
+    "isManual" : true,
+    "schemaVersion" : 1,
+    "timestamp" : "2026-10-05T22:10:52Z",
+    "workspaces" : [
+      {
+        "root" : {
+          "leaf" : {
+            "bundleID" : "com.microsoft.edgemac",
+            "title" : "CAN Productions - Asana - Pinned - High memory usage - 1.1 GB - Microsoft Edge - Work"
+          }
+        },
+        "workspace" : 1
+      },
+      {
+        "root" : {
+          "leaf" : {
+            "bundleID" : "com.microsoft.Outlook",
+            "title" : "Inbox • psanchez@aclu.org"
+          }
+        },
+        "workspace" : 2
+      },
+      {
+        "root" : {
+          "leaf" : {
+            "bundleID" : "com.tinyspeck.slackmacgap",
+            "title" : "qa-campaigns (Channel) - ACLU Digital - 3 new items - Slack"
+          }
+        },
+        "workspace" : 3
+      },
+      {
+        "root" : {
+          "leaf" : {
+            "bundleID" : "com.microsoft.edgemac",
+            "title" : "Email - Grammarly - Pinned - Microsoft Edge - Work"
+          }
+        },
+        "workspace" : 4
+      },
+      {
+        "root" : {
+          "leaf" : {
+            "bundleID" : "com.microsoft.VSCodeInsiders",
+            "title" : ": aclu-emails - test.html"
+          }
+        },
+        "workspace" : 5
+      },
+      {
+        "root" : {
+          "leaf" : {
+            "bundleID" : "com.microsoft.edgemac",
+            "title" : "feat: per-display-config layout persistence by joops · Pull Request #14 · zacharytgray\/HyprMac - Microsoft Edge - Personal"
+          }
+        },
+        "workspace" : 9
+      },
+      {
+        "root" : {
+          "leaf" : {
+            "bundleID" : "com.mitchellh.ghostty",
+            "title" : "…\/dotfiles\/config\/HyprMac"
+          }
+        },
+        "workspace" : 10
+      }
+    ]
+  }
+}

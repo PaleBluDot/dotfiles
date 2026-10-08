@@ -4,6 +4,11 @@ name: autocorrect
 package_author: Pavel Sanchez <info@tasteink.me>
 parent: base
 matches:
+  - trigger: aff
+    replace: affiliate
+    propagate_case: true
+    word: true
+
   - trigger: emial
     replace: email
     propagate_case: true

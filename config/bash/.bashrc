@@ -89,27 +89,13 @@ fi
 #export GCC_COLORS='error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01'
 
 # some more ls aliases
-alias ll='ls -alF'
+alias ll='ls -alFhr'
 alias la='ls -A'
 alias l='ls -CF'
 
 # Add an "alert" alias for long running commands.  Use like so:
 #   sleep 10; alert
 alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
-
-# Alias definitions.
-# You may want to put all your additions into a separate file like
-# ~/.bash_aliases, instead of adding them here directly.
-# See /usr/share/doc/bash-doc/examples in the bash-doc package.
-if [ -f ~/.aliases ]; then
-    . ~/.aliases
-fi
-
-# Functions definitions.
-# You may want to put all your additions into a separate file like
-if [ -f $HOME/.functions ]; then
-    . $HOME/.functions
-fi
 
 # enable programmable completion features (you don't need to enable
 # this, if it's already enabled in /etc/bash.bashrc and /etc/profile
@@ -121,6 +107,40 @@ if ! shopt -oq posix; then
     . /etc/bash_completion
   fi
 fi
+
+
+# Alias definitions.
+# You may want to put all your additions into a separate file like
+# ~/.bash_aliases, instead of adding them here directly.
+# See /usr/share/doc/bash-doc/examples in the bash-doc package.
+if [ -f ~/.config/dotfiles/config/zsh/.aliases ]; then
+    . ~/.config/dotfiles/config/zsh/.aliases
+fi
+
+# Functions definitions.
+# You may want to put all your additions into a separate file like
+if [ -f $HOME/.functions ]; then
+    . $HOME/.functions
+fi
+
+# my basic alias and functions to get a system up and running
+alias c="clear"
+alias df='df -h'
+alias pi="apt-mark showmanual"
+alias fresh='source ~/.bashrc && echo refreshed'
+alias tm="tmux attach -t main || tmux new -s main"
+alias ta='tmux attach -t'
+alias td='tmux detach'
+alias tl='tmux ls'
+alias tk='tmux kill-session -t'
+
+detach() {
+    if [ -n "$TMUX" ]; then
+        tmux detach
+    else
+        echo "Not in a tmux session _ nothing to detach from."
+    fi
+}
 
 # Intro message shown on terminal
 source welcome.sh
