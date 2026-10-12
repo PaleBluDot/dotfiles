@@ -1,7 +1,16 @@
+# Host entries 1Password generates (SSH bookmarks), if any.
+Include ~/.ssh/1Password/config
+
+# All keys live in 1Password; its agent approves every use. Agent path differs per OS.
+Match exec "test \"$(uname)\" = Darwin"
+    IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+
 Host *
-	IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+    IdentityAgent ~/.1password/agent.sock
+    # Each machine keeps exactly one public key, exposed as ~/.ssh/identity.pub
+    # (link.sh points it at the single *.pub). Only that key is offered.
     IdentitiesOnly yes
-    IdentityFile ~/.ssh/macbook.pub
+    IdentityFile ~/.ssh/identity.pub
     SetEnv TERM=xterm-256color
 
 # Network
