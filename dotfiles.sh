@@ -336,48 +336,56 @@ run_cmd() {
   done
 }
 
-# Install one package with this OS's package manager.
-pm_install() {
-  local package="$1"
+# Install or remove one package with this OS's package manager.
+# _pm install|remove <package>
+_pm() {
+  local action="$1" package="$2"
   local -a cmd
 
-  case "$DOTFILES_OS:$DISTRO_ID" in
-    linux:pacman) cmd=(pacman -S --needed --noconfirm "$package") ;;
-    linux:debian) cmd=(apt-get install -y "$package") ;;
-    linux:fedora) cmd=(dnf install -y "$package") ;;
-    macos:*)
-      if ! command -v brew >/dev/null 2>&1; then
-        log error "can't install $package: Homebrew isn't installed (https://brew.sh)"
-        return 1
-      fi
-      cmd=(brew install "$package")
-      ;;
-    windows:*)
+  case "$action:$DOTFILES_OS:$DISTRO_ID" in
+    install:linux:pacman) cmd=(pacman -S --needed --noconfirm "$package") ;;
+    remove:linux:pacman)  cmd=(pacman -R --noconfirm "$package") ;;
+    install:linux:debian) cmd=(apt-get install -y "$package") ;;
+    remove:linux:debian)  cmd=(apt-get remove -y "$package") ;;
+    install:linux:fedora) cmd=(dnf install -y "$package") ;;
+    remove:linux:fedora)  cmd=(dnf remove -y "$package") ;;
+    install:macos:*)      cmd=(brew install "$package") ;;
+    remove:macos:*)       cmd=(brew uninstall "$package") ;;
+    install:windows:*)
       cmd=(winget install -e --accept-package-agreements --accept-source-agreements --id "$package")
       ;;
+    remove:windows:*)     cmd=(winget uninstall -e --id "$package") ;;
     *)
-      log error "can't install $package: no package manager for ${DOTFILES_OS:-this OS}${DISTRO_ID:+ ($DISTRO_ID)}"
+      log error "can't $action $package: no package manager for ${DOTFILES_OS:-this OS}${DISTRO_ID:+ ($DISTRO_ID)}"
       return 1
       ;;
   esac
 
+  if [[ $DOTFILES_OS == macos ]] && ! command -v brew >/dev/null 2>&1; then
+    log error "can't $action $package: Homebrew isn't installed (https://brew.sh)"
+    return 1
+  fi
+
   # Linux package managers need root. $EUID is 0 when already root (VMs, containers).
   if [[ $DOTFILES_OS == linux && $EUID -ne 0 ]]; then
     if ! command -v sudo >/dev/null 2>&1; then
-      log error "can't install $package: needs root, and sudo isn't installed"
+      log error "can't $action $package: needs root, and sudo isn't installed"
       return 1
     fi
     cmd=(sudo "${cmd[@]}")
     # apt needs fresh package lists on a new machine.
-    if [[ $DISTRO_ID == debian ]]; then
+    if [[ $action == install && $DISTRO_ID == debian ]]; then
       run_cmd sudo apt-get update
     fi
-  elif [[ $DISTRO_ID == debian ]]; then
+  elif [[ $action == install && $DISTRO_ID == debian ]]; then
     run_cmd apt-get update
   fi
 
   run_cmd "${cmd[@]}"
 }
+
+pm_install() { _pm install "$1"; }
+pm_remove()  { _pm remove "$1"; }
 
 # ════════════════════════════════════════════════════════════════════════
 # ARGUMENTS (plan Section 7)
@@ -488,8 +496,6 @@ _not_built() {
   exit 1
 }
 cmd_interactive() { _not_built "interactive install/uninstall" 9; }
-cmd_install()   { _not_built install "7 and 9"; }
-cmd_uninstall() { _not_built uninstall "7 and 9"; }
 cmd_update()    { _not_built update 10; }
 # ─── status (plan Sections 7 and 8) ─────────────────────────────────────
 
@@ -1031,6 +1037,163 @@ cmd_unlink() {
   done
 
   _summary unlinked "$good" "$bad"
+  if [[ -n $bad ]]; then
+    exit 1
+  fi
+}
+
+# ─── install / uninstall (plan Sections 7, 8, 11) ───────────────────────
+
+# Install one tool's package if it's missing. Sets INSTALL_NOTE to the
+# tool's err_install_msg when there's no package to install.
+INSTALL_NOTE=""
+_install_package() {
+  local tool="$1" check_cmd package path
+  INSTALL_NOTE=""
+  check_cmd="$(tool_field "$tool" check_cmd)"
+  package="$(tool_field "$tool" package)"
+
+  if path="$(command -v "$check_cmd" 2>/dev/null)"; then
+    log success "$tool: already installed: $path ($(_tool_version "$check_cmd"))"
+    return 0
+  fi
+  if [[ -z $package ]]; then
+    INSTALL_NOTE="$(tool_field "$tool" err_install_msg)"
+    log warn "$tool: not installed, and there's no package for it here: ${INSTALL_NOTE:-no package and no err_install_msg}"
+    return 0
+  fi
+
+  log info "$tool: not installed, installing package $package"
+  if ! pm_install "$package"; then
+    log error "$tool: installing $package failed"
+    return 1
+  fi
+  if [[ $DRY_RUN == true ]]; then
+    return 0
+  fi
+  hash -r
+  if ! path="$(command -v "$check_cmd" 2>/dev/null)"; then
+    log error "$tool: $package installed, but $check_cmd still isn't on PATH"
+    return 1
+  fi
+  log success "$tool: installed $package: $path ($(_tool_version "$check_cmd"))"
+}
+
+cmd_install() {
+  if [[ $# -eq 0 ]]; then
+    _not_built "interactive install" 9
+  fi
+  _require_manifest
+  _pick_tools install "$@"
+  local tool src dest ok good="" bad="" manual=""
+
+  for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
+    ok=true
+    if ! _install_package "$tool"; then
+      ok=false
+    fi
+    # Link even when there was nothing to install (plan Section 5).
+    if [[ $ok == true ]]; then
+      while IFS=$'\t' read -r src dest; do
+        if ! _link_one "$tool" "$src" "$dest"; then
+          ok=false
+        fi
+      done < <(tool_links "$tool")
+    fi
+    if [[ $ok == true ]] && ! set_enabled "$tool" true; then
+      ok=false
+    fi
+
+    if [[ $ok != true ]]; then
+      bad="${bad:+$bad, }$tool"
+    elif [[ -n $INSTALL_NOTE ]]; then
+      manual="${manual:+$manual; }$tool: $INSTALL_NOTE"
+    elif [[ $DRY_RUN == true ]]; then
+      good="${good:+$good, }$tool"
+    else
+      good="${good:+$good, }$tool ($(_tool_version "$(tool_field "$tool" check_cmd)"))"
+    fi
+  done
+
+  _summary installed "$good" "$bad"
+  if [[ -n $manual && ${#TOOLS[@]} -gt 1 ]]; then
+    out "  install by hand: $manual"
+  fi
+  if [[ -n $bad ]]; then
+    exit 1
+  fi
+}
+
+# Remove one tool's package, after asking. Returns 1 when the tool should
+# stop here (declined or failed).
+_remove_package() {
+  local tool="$1" check_cmd package
+  check_cmd="$(tool_field "$tool" check_cmd)"
+  package="$(tool_field "$tool" package)"
+
+  if [[ -z $package ]]; then
+    log warn "$tool: no package to remove here; if you installed it by hand, remove it the same way"
+    return 0
+  fi
+  if ! command -v "$check_cmd" >/dev/null 2>&1; then
+    log info "$tool: $check_cmd isn't installed; nothing to remove"
+    return 0
+  fi
+
+  if [[ $FORCE != true ]]; then
+    if [[ $DRY_RUN == true ]]; then
+      log info "dry run, would ask: remove package $package?"
+    elif ! confirm "$tool: remove package $package?"; then
+      log warn "$tool: kept package $package; nothing changed"
+      return 1
+    fi
+  fi
+  if ! pm_remove "$package"; then
+    log error "$tool: removing $package failed"
+    return 1
+  fi
+  if [[ $DRY_RUN == true ]]; then
+    return 0
+  fi
+  hash -r
+  if command -v "$check_cmd" >/dev/null 2>&1; then
+    log warn "$tool: $package removed, but $check_cmd is still on PATH ($(command -v "$check_cmd")); it may be installed another way too"
+  else
+    log success "$tool: removed package $package"
+  fi
+}
+
+cmd_uninstall() {
+  if [[ $# -eq 0 ]]; then
+    _not_built "interactive uninstall" 9
+  fi
+  _require_manifest
+  _pick_tools uninstall "$@"
+  local tool src dest ok good="" bad=""
+
+  for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
+    ok=true
+    if ! _remove_package "$tool"; then
+      ok=false
+    fi
+    if [[ $ok == true ]]; then
+      while IFS=$'\t' read -r src dest; do
+        if ! _unlink_one "$tool" "$src" "$dest"; then
+          ok=false
+        fi
+      done < <(tool_links "$tool")
+    fi
+    if [[ $ok == true ]] && ! set_enabled "$tool" false; then
+      ok=false
+    fi
+    if [[ $ok == true ]]; then
+      good="${good:+$good, }$tool"
+    else
+      bad="${bad:+$bad, }$tool"
+    fi
+  done
+
+  _summary uninstalled "$good" "$bad"
   if [[ -n $bad ]]; then
     exit 1
   fi
