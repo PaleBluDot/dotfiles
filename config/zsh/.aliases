@@ -1,73 +1,60 @@
 # !------------------------------------
-# @@@ LINUX
+# @@@ SHELL
 # !------------------------------------
 if [[ -n "$ZSH_VERSION" ]]
 then
-	alias reload="source ~/.zshrc"
+	alias reload='source "${ZDOTDIR:-$HOME}/.zshrc"'
 else
 	alias reload="source ~/.bashrc"
 fi
 
-# Base
 alias c="clear"
+alias cl="clear"
 alias fenv="source ~/.zshenv"
-alias fresh="c && reload"
+alias fresh="source $ZDOTDIR/.zshrc; clear"
 alias aliasUpdate="fresh 2>&1 && c"
-
-# LS replacements
-alias ls="eza --icons --group-directories-last"
-alias ll="ls -lh"
-alias la="ls -lah"
-alias lt="ls --tree"
-
-# Users and groups
-alias adduser="sudo adduser"
-alias deluser="sudo deluser --remove-home"
-alias addgroup="sudo usermod -aG"
-alias delgroup="sudo usermod -G"
-
-# Permissions
-alias xbin="chmod +x ~/bin/*"
-alias rm="rm -i"
-
 alias histg="history | fzf"
-alias wget="wget --no-hsts"
-alias rmdpkg="sudo apt-get --purge remove"
+alias findAlias="alias | fzf"
 
-# SHH
-alias sshcopy="ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 22"
 
 # !------------------------------------
-# @@@ CHANGE DIRECTORIES
+# @@@ CODING AGENTS
 # !------------------------------------
-alias dotfiles="cd $DOTFILES"
-alias github="cd $GITHUB_DIR"
-alias sshd="cd /etc/ssh"
+alias cc='claude'
+alias cx='codex'
+alias co='copilot'
+alias hm='hermes'
+alias oc='opencode'
+alias a="omarchy-agent --inline"
+alias ic='tdl c'
+alias icx='tdl c cx'
+alias ix='tdl cx'
 
 
 # !------------------------------------
 # @@@ FILE EDITS
 # !------------------------------------
-alias edit="$EDITOR"
-alias ea="$EDITOR ~/.config/dotfiles/config/zsh/.aliases"
+# alias edit="$EDITOR"   # replaced by the edit() function in .functions
+alias ea="$EDITOR $DOTFILES/config/zsh/.aliases"
+alias ef="$EDITOR $DOTFILES/config/zsh/.functions"
+alias ee="$EDITOR $DOTFILES/config/zsh/.zshenv"
 alias base="$EDITOR ~/Library/CloudStorage/OneDrive-Personal/Documents/Espanso/match/base.yml"
 alias netcfg="sudo $EDITOR /etc/netplan/50-cloud-init.yaml"
 alias cloudcfg="sudo $EDITOR /etc/cloud/cloud.cfg"
 
 
 # !------------------------------------
-# @@@ FILE OUTPUT
+# @@@ FILES
 # !------------------------------------
-alias group="cat /etc/group"
-alias findAlias="alias | fzf"
-
-
-# !------------------------------------
-# @@@ MANIPULATION
-# !------------------------------------
-alias comlist="cat test.html | tr "\n" "," > comma-list.txt"
-alias gd="gobuster -w ~/.config/gobuster.txt"
-alias brew-installs="brew list > ~/.config/brew.txt"
+alias ls="eza --icons --group-directories-last"
+alias ll="ls -lh"
+alias la="ls -lah"
+alias lt="ls --tree"
+alias rm="rm -i"
+alias xbin="chmod +x ~/bin/*"
+alias decompress='tar -xzf'
+alias ff='fzf --preview '\''bat --style=numbers --color=always {}'\'''
+alias eff='$EDITOR "$(ff)"'
 
 
 # !------------------------------------
@@ -93,6 +80,32 @@ alias cached="git rm -r --cached"
 
 
 # !------------------------------------
+# @@@ GOTCHAS
+# !------------------------------------
+alias get="git"
+alias got="git"
+alias sudp="sudo"
+
+
+# !------------------------------------
+# @@@ NAVIGATION
+# !------------------------------------
+alias cd='zd'
+alias dotfiles="cd $DOTFILES"
+alias github="cd $GITHUB_DIR"
+alias sshd="cd /etc/ssh"
+
+
+# !------------------------------------
+# @@@ NETWORKING
+# !------------------------------------
+alias pubip="curl http://ipecho.net/plain; echo"
+alias locip='ip -4 addr show eth0 | grep -oP "(?<=inet\s)\d+(\.\d+){3}"'
+alias ping="ping -c3"
+alias sshcopy="ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 22"
+
+
+# !------------------------------------
 # @@@ NPM
 # !------------------------------------
 alias toi="npm init --scope=@taste-ink --init-author-email=23495830+PaleBluDot@users.noreply.github.com -y"
@@ -103,6 +116,23 @@ alias npmd="npm run dev"
 alias npms="npm run start"
 alias npmc="npm run commit"
 alias clean-node="rm -rf ./node_modules && rm -rf package-lock.json"
+
+
+# !------------------------------------
+# @@@ PACKAGES
+# !------------------------------------
+alias rmdpkg="sudo apt-get --purge remove"
+alias brew-installs="brew list > ~/.config/brew.txt"
+alias mup='MISE_MINIMUM_RELEASE_AGE=0 mise up'
+
+
+# !------------------------------------
+# @@@ SHORTCUTS
+# !------------------------------------
+alias h="herdr"
+alias d="docker"
+alias g="git"
+alias r="rails"
 
 
 # !------------------------------------
@@ -120,23 +150,25 @@ alias ts="tmux switch-client -t"
 
 
 # !------------------------------------
-# @@@ NETWORKING
+# @@@ TOOLS
 # !------------------------------------
-alias pubip="curl http://ipecho.net/plain; echo"
-alias locip='ip -4 addr show eth0 | grep -oP "(?<=inet\s)\d+(\.\d+){3}"'
-alias ping="ping -c3"
+alias gd="gobuster -w ~/.config/gobuster.txt"
+alias comlist="cat test.html | tr "\n" "," > comma-list.txt"
+alias wget="wget --no-hsts"
 
 
 # !------------------------------------
-# @@@ OS SPECIFIC
+# @@@ USERS & GROUPS
+# !------------------------------------
+alias adduser="sudo adduser"
+alias deluser="sudo deluser --remove-home"
+alias addgroup="sudo usermod -aG"
+alias delgroup="sudo usermod -G"
+alias group="cat /etc/group"
+
+
+# !------------------------------------
+# @@@ VS CODE
 # !------------------------------------
 alias code="code-insiders"
 alias teach="code --extensions-dir ~/code_profiles/teach/exts --user-data-dir ~/code_profiles/teach/data"
-
-
-# !------------------------------------
-# @@@ GOTCHAS
-# !------------------------------------
-alias get="git"
-alias got="git"
-alias sudp="sudo"
