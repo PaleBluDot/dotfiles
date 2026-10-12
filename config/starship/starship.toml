@@ -17,7 +17,7 @@ $os\
 [](fg:#cef542 bg:#0a63c9)\
 $username\
 [](fg:#0a63c9 bg:#c91e7a)\
-$directory\
+${custom.directory}\
 [](fg:#c91e7a bg:#9a348e)\
 $git_branch\
 $git_status\
@@ -71,10 +71,50 @@ disabled = false
 
 [directory]
 style = "bold bg:#c91e7a"
-home_symbol = ""
+# home_symbol = ""
 format = "[ 󰉋 $path ]($style)"
 truncation_length = 3
 truncation_symbol = "…/"
+
+# Replaces $directory in the format above. Inside a github.com/<org>/<repo>
+# folder it shows the GitHub icon + repo name (plus any subfolder you're in).
+# Everywhere else it shows a normal short path.
+[custom.directory]
+description = "GitHub icon + repo name inside github.com/<org>/<repo>, else the path"
+when = true
+shell = ["bash", "--noprofile", "--norc"]
+command = '''
+case "$PWD" in
+  */github.com/*/*)
+    rest=${PWD#*/github.com/}
+    org=${rest%%/*}
+    rest=${rest#*/}
+    repo=${rest%%/*}
+    sub=""
+    if [ "$rest" != "$repo" ]; then
+      sub="/${rest#*/}"
+      # keep only the last 2 subfolders: /…/b/c
+      if [ "$(printf '%s' "$sub" | tr -cd '/' | wc -c)" -gt 2 ]; then
+        sub="/…/$(basename "$(dirname "$sub")")/$(basename "$sub")"
+      fi
+    fi
+    # \357\220\210 is the GitHub icon (Nerd Font U+F408) as UTF-8 bytes.
+    # No clickable link: starship can't mark OSC 8 links as zero-width for zsh,
+    # which throws off the cursor position.
+    printf '\357\220\210 %s%s' "$repo" "$sub"
+    ;;
+  *)
+    path=${PWD/#$HOME/\~}
+    # same as the directory module: last 3 folders, "…/" when cut
+    if [ "$(printf '%s' "$path" | tr -cd '/' | wc -c)" -gt 3 ]; then
+      path="…/$(printf '%s' "$path" | rev | cut -d/ -f1-3 | rev)"
+    fi
+    printf '󰉋 %s' "$path"
+    ;;
+esac
+'''
+style = "bold bg:#c91e7a"
+format = "[ $output ]($style)"
 
 # Here is how you can shorten some long paths by text replacement
 # similar to mapped_locations in Oh My Posh:
@@ -164,7 +204,7 @@ style = "bold bg:#06969a"
 format = '[ $symbol $context ]($style)'
 
 [time]
-disabled = false
+disabled = true
 time_format = "%R"
 style = "bold bg:#33658a"
 format = '[  $time ]($style)'
