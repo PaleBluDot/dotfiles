@@ -14,6 +14,7 @@ export DOTFILES_VERSION
 DRY_RUN=false
 FORCE=false
 VERBOSE=false
+QUIET=false   # interactive mode: info/success and command output go to the log only
 
 # ─── Logging state ──────────────────────────────────────────────────────
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
@@ -73,7 +74,9 @@ log() {
       fi
       ;;
     *)
-      printf '[%s] %s\n' "$label" "$message"
+      if [[ $QUIET != true || $VERBOSE == true ]]; then
+        printf '[%s] %s\n' "$label" "$message"
+      fi
       ;;
   esac
 }
@@ -461,7 +464,9 @@ run_cmd() {
   # With pipefail, the pipeline's exit code is the command's, not the loop's.
   # </dev/null: the command can't eat input meant for a loop around run_cmd.
   "$@" </dev/null 2>&1 | while IFS= read -r line || [[ -n $line ]]; do
-    printf '%s\n' "$line"
+    if [[ $QUIET != true || $VERBOSE == true ]]; then
+      printf '%s\n' "$line"
+    fi
     _log_to_file "DEBUG" "  > $line"
   done
 }
@@ -558,7 +563,7 @@ parse_args() {
 warn_unused_flags() {
   local cmd="$1"
   case "$cmd" in
-    install | link | unlink | uninstall) return 0 ;;
+    install | link | unlink | uninstall | interactive) return 0 ;;
   esac
   if [[ $DRY_RUN == true && $cmd != doctor && $cmd != default ]]; then
     log warn "--dry-run has no effect on '$cmd'"
@@ -591,7 +596,7 @@ cmd_help() {
 dotfiles.sh $DOTFILES_VERSION
 
 Usage: dotfiles.sh [command] [tool...] [flags]
-       dotfiles.sh            with no command: interactive install/uninstall
+       dotfiles.sh            with no command: interactive install
 
 Commands:
   install [tool...]     install packages and link their configs (no tool = interactive)
@@ -626,12 +631,21 @@ _not_built() {
   log error "$1: not built yet (Step $2)"
   exit 1
 }
-cmd_interactive() { _not_built "interactive install/uninstall" 9; }
+cmd_interactive() { _interactive_install; }
 cmd_update()    { _not_built update 10; }
 # ─── status (plan Sections 7 and 8) ─────────────────────────────────────
 
 # Program output (tables, details): stdout, and a copy in the log file.
+# Quiet mode keeps it in the log only.
 out() {
+  if [[ $QUIET != true || $VERBOSE == true ]]; then
+    printf '%s\n' "$*"
+  fi
+  _log_to_file "INFO" "$*"
+}
+
+# Interactive screens and their one-line results: always shown.
+ui() {
   printf '%s\n' "$*"
   _log_to_file "INFO" "$*"
 }
@@ -1103,29 +1117,32 @@ _link_one() {
   fi
 }
 
+# Link one tool and set enabled: true. Returns 1 when a link isn't in place.
+_link_tool() {
+  local tool="$1" src dest ok=true
+  while IFS=$'\t' read -r src dest; do
+    if ! _link_one "$tool" "$src" "$dest"; then
+      ok=false
+    fi
+  done < <(tool_links "$tool")
+  if [[ $ok == true ]] && ! set_enabled "$tool" true; then
+    ok=false
+  fi
+  [[ $ok == true ]]
+}
+
 cmd_link() {
   _require_config
   _pick_tools link "$@"
-  local tool src dest ok good="" bad=""
-
+  local tool good="" bad=""
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
-    ok=true
     CHANGED=false
-    while IFS=$'\t' read -r src dest; do
-      if ! _link_one "$tool" "$src" "$dest"; then
-        ok=false
-      fi
-    done < <(tool_links "$tool")
-    if [[ $ok == true ]] && ! set_enabled "$tool" true; then
-      ok=false
-    fi
-    if [[ $ok == true && $CHANGED == true ]]; then
-      good="${good:+$good }$tool"
-    elif [[ $ok != true ]]; then
+    if ! _link_tool "$tool"; then
       bad="${bad:+$bad }$tool"
+    elif [[ $CHANGED == true ]]; then
+      good="${good:+$good }$tool"
     fi
   done
-
   _summary linked "$good" "$bad"
   if [[ -n $bad ]]; then
     exit 1
@@ -1167,29 +1184,32 @@ _unlink_one() {
   esac
 }
 
+# Unlink one tool and set enabled: false. Returns 1 on failure.
+_unlink_tool() {
+  local tool="$1" src dest ok=true
+  while IFS=$'\t' read -r src dest; do
+    if ! _unlink_one "$tool" "$src" "$dest"; then
+      ok=false
+    fi
+  done < <(tool_links "$tool")
+  if [[ $ok == true ]] && ! set_enabled "$tool" false; then
+    ok=false
+  fi
+  [[ $ok == true ]]
+}
+
 cmd_unlink() {
   _require_config
   _pick_tools unlink "$@"
-  local tool src dest ok good="" bad=""
-
+  local tool good="" bad=""
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
-    ok=true
     CHANGED=false
-    while IFS=$'\t' read -r src dest; do
-      if ! _unlink_one "$tool" "$src" "$dest"; then
-        ok=false
-      fi
-    done < <(tool_links "$tool")
-    if [[ $ok == true ]] && ! set_enabled "$tool" false; then
-      ok=false
-    fi
-    if [[ $ok == true && $CHANGED == true ]]; then
-      good="${good:+$good }$tool"
-    elif [[ $ok != true ]]; then
+    if ! _unlink_tool "$tool"; then
       bad="${bad:+$bad }$tool"
+    elif [[ $CHANGED == true ]]; then
+      good="${good:+$good }$tool"
     fi
   done
-
   _summary unlinked "$good" "$bad"
   if [[ -n $bad ]]; then
     exit 1
@@ -1234,45 +1254,47 @@ _install_package() {
   log success "$tool: installed $package: $path ($(_tool_version "$cmd_name"))"
 }
 
+# Install, link and set enabled: true for one tool. Returns 1 on failure.
+# Links even when there was nothing to install (plan Section 18).
+_install_tool() {
+  local tool="$1"
+  if ! _install_package "$tool"; then
+    return 1
+  fi
+  _link_tool "$tool"
+}
+
+# "tool (version)": the installed version; for a tool not installed yet
+# in a dry run, the version that would be installed.
+_tool_with_version() {
+  local tool="$1"
+  if [[ $(_tool_installed "$tool") == true ]]; then
+    _with_version "$tool" "$(_tool_version "$(tool_command "$tool")")"
+  elif [[ $DRY_RUN == true ]]; then
+    _with_version "$tool" "$(package_available_version "$(tool_package "$tool")")"
+  else
+    echo "$tool"
+  fi
+}
+
 cmd_install() {
   if [[ $# -eq 0 ]]; then
-    _not_built "interactive install" 9
+    _interactive_install
+    return 0
   fi
   _require_config
   _pick_tools install "$@"
-  local tool src dest ok good="" bad="" manual=""
-
+  local tool good="" bad="" manual=""
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
-    ok=true
     CHANGED=false
-    if ! _install_package "$tool"; then
-      ok=false
-    fi
-    # Link even when there was nothing to install (plan Section 18).
-    if [[ $ok == true ]]; then
-      while IFS=$'\t' read -r src dest; do
-        if ! _link_one "$tool" "$src" "$dest"; then
-          ok=false
-        fi
-      done < <(tool_links "$tool")
-    fi
-    if [[ $ok == true ]] && ! set_enabled "$tool" true; then
-      ok=false
-    fi
-
-    if [[ $ok != true ]]; then
+    if ! _install_tool "$tool"; then
       bad="${bad:+$bad, }$tool"
     elif [[ -n $INSTALL_NOTE ]]; then
       manual="${manual:+$manual; }$tool: $INSTALL_NOTE"
-    elif [[ $CHANGED != true ]]; then
-      :   # already installed and linked: nothing to report
-    elif [[ $DRY_RUN == true ]]; then
-      good="${good:+$good, }$(_with_version "$tool" "$(package_available_version "$(tool_package "$tool")")")"
-    else
-      good="${good:+$good, }$tool ($(_tool_version "$(tool_command "$tool")"))"
+    elif [[ $CHANGED == true ]]; then
+      good="${good:+$good, }$(_tool_with_version "$tool")"
     fi
   done
-
   _summary installed "$good" "$bad"
   if [[ -n $manual && ${#TOOLS[@]} -gt 1 ]]; then
     out "  install by hand: $manual"
@@ -1321,44 +1343,345 @@ _remove_package() {
   fi
 }
 
+# Remove the package, unlink, set enabled: false. Returns 1 when declined
+# or failed (declining leaves everything as it was).
+_uninstall_tool() {
+  local tool="$1"
+  if ! _remove_package "$tool"; then
+    return 1
+  fi
+  _unlink_tool "$tool"
+}
+
 cmd_uninstall() {
   if [[ $# -eq 0 ]]; then
-    _not_built "interactive uninstall" 9
+    _interactive_uninstall
+    return 0
   fi
   _require_config
   _pick_tools uninstall "$@"
-  local tool src dest ok good="" bad=""
-
+  local tool good="" bad=""
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
-    ok=true
     CHANGED=false
-    if ! _remove_package "$tool"; then
-      ok=false
-    fi
-    if [[ $ok == true ]]; then
-      while IFS=$'\t' read -r src dest; do
-        if ! _unlink_one "$tool" "$src" "$dest"; then
-          ok=false
-        fi
-      done < <(tool_links "$tool")
-    fi
-    if [[ $ok == true ]] && ! set_enabled "$tool" false; then
-      ok=false
-    fi
-    if [[ $ok == true && $CHANGED == true ]]; then
-      good="${good:+$good, }$tool"
-    elif [[ $ok != true ]]; then
+    if ! _uninstall_tool "$tool"; then
       bad="${bad:+$bad, }$tool"
+    elif [[ $CHANGED == true ]]; then
+      good="${good:+$good, }$tool"
     fi
   done
-
   _summary uninstalled "$good" "$bad"
   if [[ -n $bad ]]; then
     exit 1
   fi
 }
 
+# ─── interactive install / uninstall (plan Section 7) ───────────────────
+
+ANSWER=""
+
+# Interactive mode reads answers from the terminal.
+_require_tty() {
+  if ! { true </dev/tty; } 2>/dev/null; then
+    log error "interactive mode needs a terminal; name tools instead, e.g. dotfiles.sh install neovim"
+    exit 1
+  fi
+}
+
+# Show a prompt and read one line from the terminal into ANSWER.
+_ask() {
+  printf '%s' "$1" >/dev/tty
+  ANSWER=""
+  read -r ANSWER </dev/tty || true
+  _log_to_file "INFO" "asked: $1-> ${ANSWER:-<Enter>}"
+}
+
+# Turn picks like "1 3 5-7" or "a" into numbers between 1 and max, in
+# PICKS. Returns 1, with a message, when something isn't a valid pick.
+PICKS=()
+_parse_picks() {
+  local input="${1//,/ }" max="$2" word from to i
+  PICKS=()
+  # Only digits, letters, spaces and dashes: keeps * and ? from being
+  # expanded as file names when $input is split into words below.
+  if [[ $input == *[!0-9A-Za-z\ -]* ]]; then
+    ui "  Use numbers (1 3), ranges (2-4) or a."
+    return 1
+  fi
+  for word in $input; do
+    case "$word" in
+      a | A | all)
+        for ((i = 1; i <= max; i++)); do
+          PICKS+=("$i")
+        done
+        ;;
+      *-*)
+        from="${word%-*}"
+        to="${word#*-}"
+        if ! [[ $from =~ ^[0-9]+$ && $to =~ ^[0-9]+$ ]] || ((from < 1 || to > max || from > to)); then
+          ui "  \"$word\" isn't a range between 1 and $max."
+          return 1
+        fi
+        for ((i = from; i <= to; i++)); do
+          PICKS+=("$i")
+        done
+        ;;
+      *)
+        if ! [[ $word =~ ^[0-9]+$ ]] || ((word < 1 || word > max)); then
+          ui "  \"$word\" isn't a number between 1 and $max."
+          return 1
+        fi
+        PICKS+=("$word")
+        ;;
+    esac
+  done
+}
+
+# Short state of a tool for the lists: installed / linked.
+_state_text() {
+  local tool="$1" text="" installed linked
+  installed="$(_tool_installed "$tool")"
+  linked="$(_tool_linked "$tool")"
+  if [[ $installed == true ]]; then
+    text="installed"
+  elif [[ -z $(tool_package "$tool") ]]; then
+    text="install by hand"
+  fi
+  if [[ $linked == true ]]; then
+    text="${text:+$text, }linked"
+  fi
+  echo "${text:--}"
+}
+
+# Screen 1: the default: list. Enter = install every missing one.
+_screen_defaults() {
+  local -a names=() missing=()
+  local name package version status i n
+  while IFS= read -r name; do
+    names+=("$name")
+  done < <(default_list)
+
+  ui ""
+  if [[ ${#names[@]} -eq 0 ]]; then
+    ui "Default packages: none (add names to default: in config.yaml)"
+    return 0
+  fi
+  ui "Default packages:"
+  for ((i = 0; i < ${#names[@]}; i++)); do
+    package="$(default_package "${names[i]}")"
+    if [[ -z $package ]]; then
+      status="install by hand"
+    elif version="$(package_version "$package")"; then
+      status="installed $version"
+    else
+      status="not installed"
+      missing+=("$((i + 1))")
+    fi
+    ui "$(printf '  %2d) %-16s %s' "$((i + 1))" "${names[i]}" "$status")"
+  done
+  if [[ ${#missing[@]} -eq 0 ]]; then
+    ui "  All installed."
+    return 0
+  fi
+
+  while true; do
+    _ask "Install: Enter = all missing, numbers = only those, n = skip: "
+    case "$ANSWER" in
+      "")    PICKS=("${missing[@]}"); break ;;
+      n | N) return 0 ;;
+      *)     if _parse_picks "$ANSWER" "${#names[@]}"; then break; fi ;;
+    esac
+  done
+
+  for n in "${PICKS[@]}"; do
+    name="${names[n - 1]}"
+    _default_one "$name"
+    case "$DEFAULT_RESULT" in
+      installed) ui "  $name: installed ($DEFAULT_VERSION)" ;;
+      test)      ui "  Test: $(_with_version "$name" "$DEFAULT_VERSION")" ;;
+      already)   ui "  $name: already installed" ;;
+      manual)    ui "  $name: install by hand: $(tool_manual "$name")" ;;
+      failed)    ui "  $name: failed (see the error above)" ;;
+    esac
+  done
+}
+
+# Screen 2: packages: with the enabled ones marked. Enter = continue;
+# numbers switch packages on/off. On = install and link; switched off =
+# unlink (the program stays installed).
+INTERACTIVE_FAILED=false
+_screen_packages() {
+  local -a names=() selected=() before=()
+  local name enabled mark i n
+
+  while IFS= read -r name; do
+    enabled="$(tool_enabled "$name")"
+    names+=("$name")
+    selected+=("$enabled")
+    before+=("$enabled")
+  done < <(manifest_tools)
+
+  ui ""
+  if [[ ${#names[@]} -eq 0 ]]; then
+    ui "Packages: none (add them under packages: in config.yaml)"
+    return 0
+  fi
+
+  while true; do
+    ui "Packages ([x] = enabled):"
+    for ((i = 0; i < ${#names[@]}; i++)); do
+      mark=" "
+      if [[ ${selected[i]} == true ]]; then
+        mark="x"
+      fi
+      ui "$(printf '  %2d) [%s] %-16s %s' "$((i + 1))" "$mark" "${names[i]}" "$(_state_text "${names[i]}")")"
+    done
+    _ask "Enter = continue, or numbers to switch on/off (a = all on): "
+    if [[ -z $ANSWER ]]; then
+      break
+    fi
+    if [[ $ANSWER == a || $ANSWER == A ]]; then
+      for ((i = 0; i < ${#names[@]}; i++)); do
+        selected[i]=true
+      done
+    elif _parse_picks "$ANSWER" "${#names[@]}"; then
+      for n in "${PICKS[@]}"; do
+        if [[ ${selected[n - 1]} == true ]]; then
+          selected[n - 1]=false
+        else
+          selected[n - 1]=true
+        fi
+      done
+    fi
+    ui ""
+  done
+
+  ui ""
+  for ((i = 0; i < ${#names[@]}; i++)); do
+    name="${names[i]}"
+    CHANGED=false
+    if [[ ${selected[i]} == true ]]; then
+      if ! _install_tool "$name"; then
+        ui "  $name: failed (see the messages above)"
+        INTERACTIVE_FAILED=true
+      elif [[ -n $INSTALL_NOTE ]]; then
+        ui "  $name: linked; install by hand: $INSTALL_NOTE"
+      elif [[ $CHANGED != true ]]; then
+        ui "  $name: already installed and linked"
+      elif [[ $DRY_RUN == true ]]; then
+        ui "  Test: $(_tool_with_version "$name")"
+      else
+        ui "  $name: installed and linked ($(_tool_version "$(tool_command "$name")"))"
+      fi
+    elif [[ ${before[i]} == true ]]; then
+      if ! _unlink_tool "$name"; then
+        ui "  $name: unlinking failed (see the messages above)"
+        INTERACTIVE_FAILED=true
+      elif [[ $DRY_RUN == true ]]; then
+        ui "  Test: unlink $name"
+      else
+        ui "  $name: unlinked (still installed)"
+      fi
+    fi
+  done
+}
+
+# dotfiles.sh, or dotfiles.sh install with no tool.
+_interactive_install() {
+  _require_config
+  _require_tty
+  QUIET=true
+  INTERACTIVE_FAILED=false
+  _screen_defaults
+  _screen_packages
+  if [[ $INTERACTIVE_FAILED == true ]]; then
+    exit 1
+  fi
+}
+
+# dotfiles.sh uninstall with no tool: pick from the enabled packages.
+_interactive_uninstall() {
+  _require_config
+  _require_tty
+  QUIET=true
+  local -a names=()
+  local name n failed=false
+  while IFS= read -r name; do
+    if [[ $(tool_enabled "$name") == true ]]; then
+      names+=("$name")
+    fi
+  done < <(manifest_tools)
+
+  ui ""
+  if [[ ${#names[@]} -eq 0 ]]; then
+    ui "No package has enabled: true in config.yaml; nothing to uninstall."
+    return 0
+  fi
+  ui "Enabled packages:"
+  for ((n = 0; n < ${#names[@]}; n++)); do
+    ui "$(printf '  %2d) %-16s %s' "$((n + 1))" "${names[n]}" "$(_state_text "${names[n]}")")"
+  done
+  while true; do
+    _ask "Uninstall: numbers (a = all), Enter = nothing: "
+    if [[ -z $ANSWER ]]; then
+      return 0
+    fi
+    if _parse_picks "$ANSWER" "${#names[@]}"; then
+      break
+    fi
+  done
+
+  for n in "${PICKS[@]}"; do
+    name="${names[n - 1]}"
+    CHANGED=false
+    if ! _uninstall_tool "$name"; then
+      ui "  $name: not uninstalled (declined or failed)"
+      failed=true
+    elif [[ $DRY_RUN == true ]]; then
+      ui "  Test: uninstall $name"
+    else
+      ui "  $name: uninstalled"
+    fi
+  done
+  if [[ $failed == true ]]; then
+    exit 1
+  fi
+}
+
 # ─── default (plan Section 18): install the default: list, link nothing ──
+
+# Install one entry of the default: list if it's missing. Sets
+# DEFAULT_RESULT (installed, test, already, manual, failed) and
+# DEFAULT_VERSION.
+DEFAULT_RESULT=""
+DEFAULT_VERSION=""
+_default_one() {
+  local name="$1" package version
+  DEFAULT_VERSION=""
+  package="$(default_package "$name")"
+  if [[ -z $package ]]; then
+    log warn "$name: no package here${name:+: $(tool_manual "$name")}"
+    DEFAULT_RESULT="manual"
+  elif version="$(package_version "$package")"; then
+    log success "$name: already installed ($package $version)"
+    DEFAULT_RESULT="already"
+    DEFAULT_VERSION="$version"
+  elif log info "$name: not installed, installing package $package" && pm_install "$package"; then
+    if [[ $DRY_RUN == true ]]; then
+      DEFAULT_RESULT="test"
+      DEFAULT_VERSION="$(package_available_version "$package")"
+    elif version="$(package_version "$package")"; then
+      log success "$name: installed $package $version"
+      DEFAULT_RESULT="installed"
+      DEFAULT_VERSION="$version"
+    else
+      log error "$name: installed $package, but the package manager doesn't list it"
+      DEFAULT_RESULT="failed"
+    fi
+  else
+    log error "$name: installing $package failed"
+    DEFAULT_RESULT="failed"
+  fi
+}
 
 cmd_default() {
   _require_config
@@ -1366,29 +1689,15 @@ cmd_default() {
     log info "default: the default: list in config.yaml is empty; nothing to install"
     return 0
   fi
-  local name package version good="" bad="" manual="" count=0
+  local name good="" bad="" manual="" count=0
   while IFS= read -r name; do
     count=$((count + 1))
-    package="$(default_package "$name")"
-    if [[ -z $package ]]; then
-      log warn "$name: no package here${name:+: $(tool_manual "$name")}"
-      manual="${manual:+$manual, }$name"
-    elif version="$(package_version "$package")"; then
-      log success "$name: already installed ($package $version)"
-    elif log info "$name: not installed, installing package $package" && pm_install "$package"; then
-      if [[ $DRY_RUN == true ]]; then
-        good="${good:+$good, }$(_with_version "$name" "$(package_available_version "$package")")"
-      elif version="$(package_version "$package")"; then
-        log success "$name: installed $package $version"
-        good="${good:+$good, }$name ($version)"
-      else
-        log error "$name: installed $package, but the package manager doesn't list it"
-        bad="${bad:+$bad, }$name"
-      fi
-    else
-      log error "$name: installing $package failed"
-      bad="${bad:+$bad, }$name"
-    fi
+    _default_one "$name"
+    case "$DEFAULT_RESULT" in
+      installed | test) good="${good:+$good, }$(_with_version "$name" "$DEFAULT_VERSION")" ;;
+      manual)           manual="${manual:+$manual, }$name" ;;
+      failed)           bad="${bad:+$bad, }$name" ;;
+    esac
   done < <(default_list)
 
   # Only what changed and what failed; nothing to report = no summary.
