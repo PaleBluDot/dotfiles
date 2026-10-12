@@ -31,7 +31,7 @@ LIGHTYELLOW='\033[0;33m'
 NC='\033[0m'
 
 set -a
-export DOTFILES="$HOME/.config/dotfiles"
+export DOTFILES="${DOTFILES:-$HOME/Projects/github.com/PaleBluDot/dotfiles}"
 set +a
 
 ##########################################
