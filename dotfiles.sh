@@ -383,14 +383,29 @@ pm_install() {
 # ════════════════════════════════════════════════════════════════════════
 
 # Flags can go anywhere on the line. Everything else lands in ARGS.
+# Short flags combine: -dv = -d -v.
 ARGS=()
 parse_args() {
-  local arg
+  local arg i char
   for arg in "$@"; do
     case "$arg" in
-      --dry-run)    DRY_RUN=true ;;
-      --force)      FORCE=true ;;
-      -v | --verbose) VERBOSE=true ;;
+      --dry-run) DRY_RUN=true ;;
+      --force)   FORCE=true ;;
+      --verbose) VERBOSE=true ;;
+      -[!-]*)
+        # One dash: walk the letters after it. ${arg:i:1} = 1 char at i.
+        for ((i = 1; i < ${#arg}; i++)); do
+          char="${arg:i:1}"
+          case "$char" in
+            d) DRY_RUN=true ;;
+            v) VERBOSE=true ;;
+            *)
+              log error "unknown flag: -$char in $arg (see: dotfiles.sh help)"
+              exit 2
+              ;;
+          esac
+        done
+        ;;
       -*)
         log error "unknown flag: $arg (see: dotfiles.sh help)"
         exit 2
@@ -451,9 +466,10 @@ Commands:
   version               print the script version
 
 Flags:
-  --dry-run             show what would happen, change nothing (install, link, unlink, uninstall, doctor)
+  -d, --dry-run         show what would happen, change nothing (install, link, unlink, uninstall, doctor)
   --force               no prompts, no backups (install, link, unlink, uninstall)
   -v, --verbose         show debug lines in the terminal
+  Short flags combine: -dv = --dry-run --verbose
 
 Log file: ${LOG_FILE:-<not available>}
 EOF
