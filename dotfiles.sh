@@ -222,6 +222,71 @@ detect_os() {
 }
 
 # ════════════════════════════════════════════════════════════════════════
+# RUNNING COMMANDS AND INSTALLING PACKAGES
+# Bare bones, so doctor can install its prerequisites. Step 7 builds the
+# full install/uninstall on top of this.
+# ════════════════════════════════════════════════════════════════════════
+
+# Run a command that changes the system. Its output shows in the terminal
+# and goes into the log file line by line. Honors --dry-run.
+run_cmd() {
+  if [[ $DRY_RUN == true ]]; then
+    log info "dry run, would run: $*"
+    return 0
+  fi
+  log info "running: $*"
+  local line
+  # With pipefail, the pipeline's exit code is the command's, not the loop's.
+  "$@" 2>&1 | while IFS= read -r line || [[ -n $line ]]; do
+    printf '%s\n' "$line"
+    _log_to_file "DEBUG" "  > $line"
+  done
+}
+
+# Install one package with this OS's package manager.
+pm_install() {
+  local package="$1"
+  local -a cmd
+
+  case "$DOTFILES_OS:$DISTRO_ID" in
+    linux:pacman) cmd=(pacman -S --needed --noconfirm "$package") ;;
+    linux:debian) cmd=(apt-get install -y "$package") ;;
+    linux:fedora) cmd=(dnf install -y "$package") ;;
+    macos:*)
+      if ! command -v brew >/dev/null 2>&1; then
+        log error "can't install $package: Homebrew isn't installed (https://brew.sh)"
+        return 1
+      fi
+      cmd=(brew install "$package")
+      ;;
+    windows:*)
+      cmd=(winget install -e --accept-package-agreements --accept-source-agreements --id "$package")
+      ;;
+    *)
+      log error "can't install $package: no package manager for ${DOTFILES_OS:-this OS}${DISTRO_ID:+ ($DISTRO_ID)}"
+      return 1
+      ;;
+  esac
+
+  # Linux package managers need root. $EUID is 0 when already root (VMs, containers).
+  if [[ $DOTFILES_OS == linux && $EUID -ne 0 ]]; then
+    if ! command -v sudo >/dev/null 2>&1; then
+      log error "can't install $package: needs root, and sudo isn't installed"
+      return 1
+    fi
+    cmd=(sudo "${cmd[@]}")
+    # apt needs fresh package lists on a new machine.
+    if [[ $DISTRO_ID == debian ]]; then
+      run_cmd sudo apt-get update
+    fi
+  elif [[ $DISTRO_ID == debian ]]; then
+    run_cmd apt-get update
+  fi
+
+  run_cmd "${cmd[@]}"
+}
+
+# ════════════════════════════════════════════════════════════════════════
 # ARGUMENTS (plan Section 7)
 # ════════════════════════════════════════════════════════════════════════
 
@@ -243,13 +308,13 @@ parse_args() {
   done
 }
 
-# --dry-run and --force only mean something for these four commands.
+# --dry-run means something for these five commands, --force for four.
 warn_unused_flags() {
   local cmd="$1"
   case "$cmd" in
     install | link | unlink | uninstall) return 0 ;;
   esac
-  if [[ $DRY_RUN == true ]]; then
+  if [[ $DRY_RUN == true && $cmd != doctor ]]; then
     log warn "--dry-run has no effect on '$cmd'"
   fi
   if [[ $FORCE == true ]]; then
@@ -289,12 +354,12 @@ Commands:
   unlink [tool...]      remove symlinks (no tool = all enabled tools)
   update                git pull, install missing packages, relink
   status [tool]         show tools, links and default-packages
-  doctor                check git, yq, packages.yaml and OS detection
+  doctor                check git, yq, packages.yaml and OS detection; installs missing git/yq
   help [command]        show this help, or help for one command
   version               print the script version
 
 Flags:
-  --dry-run             show what would happen, change nothing (install, link, unlink, uninstall)
+  --dry-run             show what would happen, change nothing (install, link, unlink, uninstall, doctor)
   --force               no prompts, no backups (install, link, unlink, uninstall)
   -v, --verbose         show debug lines in the terminal
 
@@ -320,7 +385,150 @@ cmd_link()      { _not_built link 6; }
 cmd_unlink()    { _not_built unlink 6; }
 cmd_update()    { _not_built update 10; }
 cmd_status()    { _not_built status 5; }
-cmd_doctor()    { _not_built doctor 3; }
+# ─── doctor (plan Section 7): checks only, changes nothing ──────────────
+
+DOCTOR_FAILED=0
+YQ_OK=false
+
+_check_ok()   { log success "$1"; }
+# $((x + 1)) instead of ((x++)): ((x++)) returns 1 when x was 0, and
+# set -e would end the script right there.
+_check_fail() { log error "$1"; DOCTOR_FAILED=$((DOCTOR_FAILED + 1)); }
+
+_doctor_os() {
+  case "$DOTFILES_OS" in
+    "")
+      _check_fail "OS: not supported ($(uname -s))"
+      ;;
+    linux)
+      if [[ -n $DISTRO_ID ]]; then
+        _check_ok "OS: linux, $DOTFILES_DISTRO (package family: $DISTRO_ID)"
+      else
+        _check_fail "OS: linux, but this distro isn't supported ($DOTFILES_DISTRO)"
+      fi
+      ;;
+    *)
+      _check_ok "OS: $DOTFILES_OS"
+      ;;
+  esac
+}
+
+# Package name of a prerequisite on this OS. Prints nothing (and the
+# reason on stderr via log) when there's no native package for it.
+_prereq_package() {
+  local tool="$1"
+  case "$tool:$DOTFILES_OS:$DISTRO_ID" in
+    git:windows:*)     echo "Git.Git" ;;
+    git:*)             echo "git" ;;
+    yq:linux:pacman)   echo "go-yq" ;;
+    yq:linux:fedora)   echo "yq" ;;   # unverified: confirm in a Fedora VM
+    yq:macos:*)        echo "yq" ;;
+    yq:windows:*)      echo "MikeFarah.yq" ;;
+    yq:linux:debian)
+      log error "yq: apt's 'yq' package is the Python one; install mikefarah/yq from https://github.com/mikefarah/yq/releases"
+      ;;
+  esac
+}
+
+# Install a missing prerequisite, then look for it again.
+_doctor_install() {
+  local tool="$1" package
+  package="$(_prereq_package "$tool")"
+  if [[ -z $package ]]; then
+    return 1
+  fi
+  log info "$tool: not installed, installing package $package"
+  if ! pm_install "$package"; then
+    log error "$tool: installing $package failed"
+    return 1
+  fi
+  # hash -r forgets remembered command locations, so the new one is found.
+  hash -r
+}
+
+# Why a prerequisite is still missing after _doctor_install.
+_missing_reason() {
+  if [[ $DRY_RUN == true ]]; then
+    echo "not installed (dry run: nothing was installed)"
+  else
+    echo "not installed"
+  fi
+}
+
+_doctor_git() {
+  if ! command -v git >/dev/null 2>&1; then
+    _doctor_install git || true
+    if ! command -v git >/dev/null 2>&1; then
+      _check_fail "git: $(_missing_reason)"
+      return 0
+    fi
+  fi
+  _check_ok "git: $(git --version) at $(command -v git)"
+}
+
+# Two different tools are called yq. The plan needs mikefarah/yq (Go, v4);
+# the Python one (kislyuk/yq) has a different syntax.
+_doctor_yq() {
+  if ! command -v yq >/dev/null 2>&1; then
+    _doctor_install yq || true
+    if ! command -v yq >/dev/null 2>&1; then
+      _check_fail "yq: $(_missing_reason) (needs mikefarah/yq v4)"
+      return 0
+    fi
+  fi
+
+  local version
+  version="$(yq --version 2>&1 || true)"
+  log debug "yq --version: $version"
+
+  case "$version" in
+    *mikefarah*)
+      YQ_OK=true
+      _check_ok "yq: $version at $(command -v yq)"
+      ;;
+    *)
+      # Not replaced automatically: both install a command called yq.
+      _check_fail "yq: $(command -v yq) is not mikefarah/yq ($version); remove it, then run doctor again"
+      ;;
+  esac
+}
+
+_doctor_packages_file() {
+  if [[ -z $DOTFILES ]]; then
+    _check_fail "packages.yaml: DOTFILES isn't set and the script isn't running from a clone"
+    return 0
+  fi
+  if [[ ! -f $DOTFILES_PACKAGES_FILE ]]; then
+    _check_fail "packages.yaml: not found at $DOTFILES_PACKAGES_FILE"
+    return 0
+  fi
+  if [[ $YQ_OK != true ]]; then
+    _check_fail "packages.yaml: can't check it without mikefarah/yq"
+    return 0
+  fi
+
+  # 2>&1 >/dev/null: keep only the error text, throw the parsed output away.
+  local err
+  if err="$(yq eval '.' "$DOTFILES_PACKAGES_FILE" 2>&1 >/dev/null)"; then
+    _check_ok "packages.yaml: valid YAML ($DOTFILES_PACKAGES_FILE)"
+  else
+    _check_fail "packages.yaml: invalid YAML: $err"
+  fi
+}
+
+cmd_doctor() {
+  _doctor_os
+  _doctor_git
+  _doctor_yq
+  _doctor_packages_file
+  log warn "default-packages: not checked yet (Step 8)"
+
+  if [[ $DOCTOR_FAILED -gt 0 ]]; then
+    log error "doctor: $DOCTOR_FAILED check(s) failed"
+    exit 1
+  fi
+  log success "doctor: all checks passed"
+}
 
 # ════════════════════════════════════════════════════════════════════════
 # MAIN
