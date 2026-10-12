@@ -1,0 +1,114 @@
+#!/bin/sh
+# osinfo — detect the OS, distro, version and package manager (plus CPU arch and WSL).
+# POSIX sh: works from bash, zsh, dash, macOS and Git Bash on Windows.
+#
+# Usage:
+#   osinfo               human-readable summary
+#   osinfo <field>       print one value (for scripts):  os distro like version pkg wsl arch name
+#   osinfo --env         shell variables:  eval "$(osinfo --env)"
+#                        -> OS_NAME OS_DISTRO OS_LIKE OS_VERSION OS_PKG OS_WSL OS_ARCH OS_PRETTY
+#   osinfo --json        JSON object
+#   osinfo --help
+#
+# Values:
+#   os       mac | windows | linux | bsd | unknown
+#   distro   Linux only: os-release ID (arch, omarchy, ubuntu, debian, fedora, ...)
+#            BSD: freebsd | openbsd | netbsd    Mac/Windows: empty
+#   like     os-release ID_LIKE, e.g. "arch", "debian", "rhel fedora" (empty if none)
+#   version  Linux: os-release VERSION_ID (or "rolling");  Mac/Windows/BSD: OS version
+#   pkg      brew port pacman apt dnf yum zypper apk xbps emerge nix pkg pkg_add pkgin winget scoop choco | unknown
+#   wsl      yes | no
+#   arch     uname -m (x86_64, arm64, aarch64, ...)
+#   name     pretty name, e.g. "Omarchy", "Ubuntu 24.04 LTS", "macOS 15.1"
+#
+# Script examples:
+#   [ "$(osinfo pkg)" = pacman ] && sudo pacman -S --needed bat
+#   eval "$(osinfo --env)"; case "$OS_PKG" in apt) ...;; pacman) ...;; esac
+#   case " $(osinfo distro) $(osinfo like) " in *" arch "*) echo "Arch-based" ;; esac
+
+has() { command -v "$1" >/dev/null 2>&1; }
+
+# read one KEY from /etc/os-release (strips quotes)
+osr() { sed -n "s/^$1=//p" /etc/os-release 2>/dev/null | head -n1 | sed 's/^"//; s/"$//'; }
+
+detect() {
+  OS_ARCH=$(uname -m 2>/dev/null)
+  OS_WSL=no
+  OS_LIKE=
+  case "$(uname -s 2>/dev/null)" in
+    Darwin)
+      OS_NAME=mac
+      OS_DISTRO=
+      OS_VERSION=$(sw_vers -productVersion 2>/dev/null)
+      OS_PRETTY="macOS $OS_VERSION"
+      if has brew; then OS_PKG=brew; elif has port; then OS_PKG=port; else OS_PKG=unknown; fi
+      ;;
+    Linux)
+      OS_NAME=linux
+      OS_DISTRO=$(osr ID); [ -n "$OS_DISTRO" ] || OS_DISTRO=linux
+      OS_LIKE=$(osr ID_LIKE)
+      OS_VERSION=$(osr VERSION_ID); [ -n "$OS_VERSION" ] || OS_VERSION=rolling
+      OS_PRETTY=$(osr PRETTY_NAME); [ -n "$OS_PRETTY" ] || OS_PRETTY="Linux"
+      if [ -n "${WSL_DISTRO_NAME:-}" ] || grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; then OS_WSL=yes; fi
+      # native package managers first; Homebrew on Linux only as a last resort
+      OS_PKG=unknown
+      for p in pacman:pacman apt-get:apt dnf:dnf yum:yum zypper:zypper apk:apk xbps-install:xbps emerge:emerge nix-env:nix brew:brew; do
+        if has "${p%%:*}"; then OS_PKG=${p#*:}; break; fi
+      done
+      ;;
+    MINGW* | MSYS* | CYGWIN*)
+      OS_NAME=windows
+      OS_DISTRO=
+      OS_VERSION=$(cmd.exe //c ver 2>/dev/null | sed -n 's/.*Version \([0-9.]*\).*/\1/p' | tr -d '\r')
+      OS_PRETTY="Windows $OS_VERSION"
+      OS_PKG=unknown
+      for p in winget scoop choco; do if has "$p" || has "$p.exe"; then OS_PKG=$p; break; fi; done
+      ;;
+    FreeBSD | OpenBSD | NetBSD | DragonFly)
+      OS_NAME=bsd
+      OS_DISTRO=$(uname -s | tr '[:upper:]' '[:lower:]')
+      OS_VERSION=$(uname -r)
+      OS_PRETTY="$(uname -s) $OS_VERSION"
+      OS_PKG=unknown
+      for p in pkg:pkg pkg_add:pkg_add pkgin:pkgin; do
+        if has "${p%%:*}"; then OS_PKG=${p#*:}; break; fi
+      done
+      ;;
+    *)
+      OS_NAME=unknown OS_DISTRO=unknown OS_VERSION=unknown OS_PRETTY=unknown OS_PKG=unknown
+      ;;
+  esac
+}
+
+q() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; } # shell-quote
+j() { printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; } # json-quote
+
+detect
+case "${1:-}" in
+  "")
+    case "$OS_NAME" in mac) label=Mac ;; windows) label=Windows ;; linux) label=Linux ;; bsd) label=BSD ;; *) label=Unknown ;; esac
+    printf '%-8s %s\n' os "$label"
+    [ -n "$OS_DISTRO" ] && printf '%-8s %s\n' distro "$OS_DISTRO${OS_LIKE:+ (like $OS_LIKE)}"
+    printf '%-8s %s\n' version "$OS_VERSION" pkg "$OS_PKG" wsl "$OS_WSL" arch "$OS_ARCH" name "$OS_PRETTY"
+    ;;
+  os) echo "$OS_NAME" ;;
+  distro) echo "$OS_DISTRO" ;;
+  like) echo "$OS_LIKE" ;;
+  version) echo "$OS_VERSION" ;;
+  pkg) echo "$OS_PKG" ;;
+  wsl) echo "$OS_WSL" ;;
+  arch) echo "$OS_ARCH" ;;
+  name) echo "$OS_PRETTY" ;;
+  --env)
+    for v in OS_NAME OS_DISTRO OS_LIKE OS_VERSION OS_PKG OS_WSL OS_ARCH OS_PRETTY; do
+      eval "printf 'export %s=%s\n' $v \"\$(q \"\$$v\")\""
+    done
+    ;;
+  --json)
+    printf '{"os":%s,"distro":%s,"like":%s,"version":%s,"pkg":%s,"wsl":%s,"arch":%s,"name":%s}\n' \
+      "$(j "$OS_NAME")" "$(j "$OS_DISTRO")" "$(j "$OS_LIKE")" "$(j "$OS_VERSION")" \
+      "$(j "$OS_PKG")" "$(j "$OS_WSL")" "$(j "$OS_ARCH")" "$(j "$OS_PRETTY")"
+    ;;
+  -h | --help) sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) echo "osinfo: unknown option '$1' (try --help)" >&2; exit 2 ;;
+esac
