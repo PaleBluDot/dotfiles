@@ -1,7 +1,8 @@
 [user]
 	name = Pavel Sanchez
 	email = 23495830+PaleBluDot@users.noreply.github.com
-	signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF7jEwz0kG5lG5VzA6c958an7bgbt+UBFgTMwi+GILqV
+	# No signingkey here: each machine has exactly one public key in ~/.ssh,
+	# exposed as ~/.ssh/identity.pub, and 1Password signs with the matching private key.
 [init]
 	defaultBranch = main
 [filter "lfs"]
@@ -12,6 +13,14 @@
 [gpg]
 	format = ssh
 [gpg "ssh"]
-	program = /Applications/1Password.app/Contents/MacOS/op-ssh-sign
+	# Used when user.signingkey is unset: sign with this machine's only key.
+	defaultKeyCommand = sh -c 'echo key::$(cat ~/.ssh/identity.pub)'
 [commit]
 	gpgsign = true
+[tag]
+	gpgsign = true
+[core]
+	excludesFile = ~/.config/git/.gitignore
+[include]
+	# Per-machine settings written by link.sh (1Password's op-ssh-sign path differs per OS). Not tracked.
+	path = local.gitconfig
