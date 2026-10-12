@@ -329,7 +329,8 @@ run_cmd() {
   log info "running: $*"
   local line
   # With pipefail, the pipeline's exit code is the command's, not the loop's.
-  "$@" 2>&1 | while IFS= read -r line || [[ -n $line ]]; do
+  # </dev/null: the command can't eat input meant for a loop around run_cmd.
+  "$@" </dev/null 2>&1 | while IFS= read -r line || [[ -n $line ]]; do
     printf '%s\n' "$line"
     _log_to_file "DEBUG" "  > $line"
   done
@@ -489,8 +490,6 @@ _not_built() {
 cmd_interactive() { _not_built "interactive install/uninstall" 9; }
 cmd_install()   { _not_built install "7 and 9"; }
 cmd_uninstall() { _not_built uninstall "7 and 9"; }
-cmd_link()      { _not_built link 6; }
-cmd_unlink()    { _not_built unlink 6; }
 cmd_update()    { _not_built update 10; }
 # ─── status (plan Sections 7 and 8) ─────────────────────────────────────
 
@@ -714,6 +713,326 @@ cmd_status() {
     _status_tool "$1"
   else
     _status_all
+  fi
+}
+
+# ─── link / unlink (plan Sections 7, 10, 11) ────────────────────────────
+
+# Ask yes/no on the terminal. /dev/tty works even under curl | bash, where
+# stdin is the script itself. No terminal = no.
+confirm() {
+  local question="$1" answer=""
+  if ! { true </dev/tty; } 2>/dev/null; then
+    log warn "no terminal to ask \"$question\"; treating it as no"
+    return 1
+  fi
+  printf '%s [y/N] ' "$question" >/dev/tty
+  read -r answer </dev/tty || true
+  _log_to_file "INFO" "asked: $question -> ${answer:-<no answer>}"
+  case "$answer" in
+    y | Y | yes | Yes | YES) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# The closest part of a path that exists: /a/b/c -> /a/b if c is missing.
+_nearest_existing() {
+  local path="$1"
+  while [[ ! -e $path && ! -L $path && $path != "/" ]]; do
+    path="$(dirname "$path")"
+  done
+  echo "$path"
+}
+
+# True when a path is inside the repo once symlinks are resolved.
+_inside_repo() {
+  local path repo
+  path="$(_physical "$(_nearest_existing "$1")")"
+  repo="$(_physical "$DOTFILES")"
+  case "$path/" in
+    "$repo/"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# The closest folder above a path that is a symlink, for messages.
+_linked_parent() {
+  local path
+  path="$(dirname "$1")"
+  while [[ $path != "/" && $path != "$HOME" ]]; do
+    if [[ -L $path ]]; then
+      echo "$path"
+      return 0
+    fi
+    path="$(dirname "$path")"
+  done
+}
+
+# ~/... form of a path under $HOME, for messages.
+_tilde() {
+  case "$1" in
+    "$HOME"/*) echo "~/${1#"$HOME"/}" ;;
+    *) echo "$1" ;;
+  esac
+}
+
+# Set enabled: true|false for one tool. Only that one line changes, so
+# comments and blank lines stay (yq -i would reformat the file). yq reads
+# it back to confirm.
+set_enabled() {
+  local tool="$1" value="$2" file="$DOTFILES_PACKAGES_FILE" tmp
+  if [[ $(tool_enabled "$tool") == "$value" ]]; then
+    log debug "$tool: packages.yaml already has enabled: $value"
+    return 0
+  fi
+  if [[ $DRY_RUN == true ]]; then
+    log info "dry run, would set enabled: $value for $tool in packages.yaml"
+    return 0
+  fi
+  tmp="$file.tmp.$$"
+  # In the block under "  <tool>:", replace the first "    enabled: ...".
+  awk -v prefix="  $tool:" -v value="$value" '
+    substr($0, 1, length(prefix)) == prefix && substr($0, length(prefix) + 1) ~ /^[[:space:]]*(#.*)?$/ {
+      in_tool = 1; print; next
+    }
+    in_tool && /^  [^ #]/ { in_tool = 0 }
+    in_tool && !done && /^    enabled:/ {
+      sub(/enabled:[[:space:]]*[A-Za-z]+/, "enabled: " value); done = 1
+    }
+    { print }
+  ' "$file" >"$tmp"
+  mv "$tmp" "$file"
+  if [[ $(tool_enabled "$tool") != "$value" ]]; then
+    log error "$tool: couldn't set enabled: $value in packages.yaml (needs an 'enabled:' line indented 4 spaces under the tool)"
+    return 1
+  fi
+  log info "$tool: packages.yaml now has enabled: $value"
+}
+
+# Tools to act on: the ones named, or every tool with enabled: true.
+# Sets TOOLS. Unknown names stop the run before anything changes.
+TOOLS=()
+_pick_tools() {
+  local cmd="$1" tool
+  shift
+  TOOLS=()
+  if [[ $# -gt 0 ]]; then
+    for tool in "$@"; do
+      if [[ $(_yq ".packages | has(\"$tool\")") != true ]]; then
+        log error "unknown tool: $tool (in packages.yaml: $(manifest_tools | paste -sd ' ' -))"
+        exit 2
+      fi
+      TOOLS+=("$tool")
+    done
+  else
+    while IFS= read -r tool; do
+      if [[ $(tool_enabled "$tool") == true ]]; then
+        TOOLS+=("$tool")
+      fi
+    done < <(manifest_tools)
+    if [[ ${#TOOLS[@]} -eq 0 ]]; then
+      log info "$cmd: no tool has enabled: true in packages.yaml; name one: dotfiles.sh $cmd <tool>"
+    fi
+  fi
+  log debug "$cmd: tools: ${TOOLS[*]:-<none>}"
+}
+
+# Print the end-of-run summary when more than one tool was handled.
+_summary() {
+  local verb="$1" good="$2" bad="$3"
+  if [[ ${#TOOLS[@]} -le 1 ]]; then
+    return 0
+  fi
+  if [[ $DRY_RUN == true ]]; then
+    verb="would be $verb"
+  fi
+  out ""
+  out "Summary:"
+  out "  $verb: ${good:-none}"
+  out "  failed: ${bad:-none}"
+}
+
+# Link one src/dest pair. Returns 1 when the link isn't in place afterwards.
+_link_one() {
+  local tool="$1" src="$2" dest="$3"
+  local src_path dest_path state shown target
+  src_path="$(_src_path "$tool" "$src")"
+  dest_path="$HOME/$dest"
+  shown="~/$dest"
+
+  if [[ ! -e $src_path ]]; then
+    log error "$tool: source ${src_path#"$DOTFILES"/} doesn't exist"
+    return 1
+  fi
+
+  state="$(_link_state "$src_path" "$dest_path")"
+  log debug "$tool: $shown is $state"
+
+  if [[ $state == linked ]]; then
+    log success "$tool: already linked: $shown"
+    out "$(ls -ld "$dest_path")"
+    return 0
+  fi
+  if [[ $state == linked-parent ]]; then
+    target="$(_linked_parent "$dest_path")"
+    log success "$tool: already linked: $shown (through the linked folder $(_tilde "$target"))"
+    out "$(ls -ld "$target")"
+    return 0
+  fi
+
+  # If the folder dest sits in is really inside the repo (through a linked
+  # folder), whatever is there is the repo's own file: moving, deleting or
+  # adding to it would change the repo. The folder decides, not dest
+  # itself: an old symlink pointing into the repo can still be replaced.
+  if _inside_repo "$(dirname "$dest_path")"; then
+    log error "$tool: $shown is inside the repo (through $(_tilde "$(_linked_parent "$dest_path")")); not touching it"
+    return 1
+  fi
+
+  case "$state" in
+    missing) ;;
+    file)
+      if [[ $FORCE == true ]]; then
+        log warn "$tool: --force: replacing the real file $shown, no backup"
+        run_cmd rm -f "$dest_path"
+      else
+        if [[ -e $dest_path.bak || -L $dest_path.bak ]]; then
+          log error "$tool: $shown is a real file, and an old backup $shown.bak is in the way; check it, delete it, then run link again"
+          return 1
+        fi
+        if [[ $DRY_RUN == true ]]; then
+          log info "dry run, would ask: back up $shown to $shown.bak and link it?"
+        elif ! confirm "$tool: $shown is a real file. Back it up to $shown.bak and link it?"; then
+          log warn "$tool: left $shown alone"
+          return 1
+        fi
+        run_cmd mv "$dest_path" "$dest_path.bak"
+        if [[ $DRY_RUN != true ]]; then
+          log warn "$tool: backup made: $shown.bak (delete it once you're sure)"
+        fi
+      fi
+      ;;
+    folder)
+      if [[ $FORCE != true ]]; then
+        log warn "$tool: $shown is a real folder; left it alone (--force replaces it, with no backup)"
+        return 1
+      fi
+      log warn "$tool: --force: deleting the real folder $shown, no backup"
+      run_cmd rm -rf "$dest_path"
+      ;;
+    elsewhere | broken)
+      target="$(readlink "$dest_path")"
+      if [[ $FORCE != true ]]; then
+        if [[ $DRY_RUN == true ]]; then
+          log info "dry run, would ask: replace the symlink $shown (now -> $target)?"
+        elif ! confirm "$tool: $shown links to $target. Replace it?"; then
+          log warn "$tool: left $shown alone"
+          return 1
+        fi
+      fi
+      if [[ $DRY_RUN != true ]]; then
+        log info "$tool: replacing the symlink $shown (was -> $target)"
+      fi
+      run_cmd rm -f "$dest_path"
+      ;;
+  esac
+
+  run_cmd mkdir -p "$(dirname "$dest_path")"
+  run_cmd ln -s "$src_path" "$dest_path"
+  if [[ $DRY_RUN != true ]]; then
+    log success "$tool: linked $shown -> ${src_path#"$DOTFILES"/}"
+    out "$(ls -ld "$dest_path")"
+  fi
+}
+
+cmd_link() {
+  _require_manifest
+  _pick_tools link "$@"
+  local tool src dest ok good="" bad=""
+
+  for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
+    ok=true
+    while IFS=$'\t' read -r src dest; do
+      if ! _link_one "$tool" "$src" "$dest"; then
+        ok=false
+      fi
+    done < <(tool_links "$tool")
+    if [[ $ok == true ]] && ! set_enabled "$tool" true; then
+      ok=false
+    fi
+    if [[ $ok == true ]]; then
+      good="${good:+$good }$tool"
+    else
+      bad="${bad:+$bad }$tool"
+    fi
+  done
+
+  _summary linked "$good" "$bad"
+  if [[ -n $bad ]]; then
+    exit 1
+  fi
+}
+
+# Remove one link and put its .bak back if there is one.
+_unlink_one() {
+  local tool="$1" src="$2" dest="$3"
+  local src_path dest_path state shown
+  src_path="$(_src_path "$tool" "$src")"
+  dest_path="$HOME/$dest"
+  shown="~/$dest"
+  state="$(_link_state "$src_path" "$dest_path")"
+  log debug "$tool: $shown is $state"
+
+  case "$state" in
+    linked)
+      run_cmd rm "$dest_path"
+      if [[ -e $dest_path.bak || -L $dest_path.bak ]]; then
+        run_cmd mv "$dest_path.bak" "$dest_path"
+        if [[ $DRY_RUN != true ]]; then
+          log success "$tool: unlinked $shown and restored the backup"
+        fi
+      elif [[ $DRY_RUN != true ]]; then
+        log success "$tool: unlinked $shown"
+      fi
+      ;;
+    linked-parent)
+      log error "$tool: $shown is linked through the folder $(_tilde "$(_linked_parent "$dest_path")"); unlink that folder instead"
+      return 1
+      ;;
+    missing)
+      log info "$tool: $shown isn't linked; nothing to do"
+      ;;
+    *)
+      log warn "$tool: $shown isn't a link to the repo ($(_link_state_text "$state" "$dest_path")); left it alone"
+      ;;
+  esac
+}
+
+cmd_unlink() {
+  _require_manifest
+  _pick_tools unlink "$@"
+  local tool src dest ok good="" bad=""
+
+  for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
+    ok=true
+    while IFS=$'\t' read -r src dest; do
+      if ! _unlink_one "$tool" "$src" "$dest"; then
+        ok=false
+      fi
+    done < <(tool_links "$tool")
+    if [[ $ok == true ]] && ! set_enabled "$tool" false; then
+      ok=false
+    fi
+    if [[ $ok == true ]]; then
+      good="${good:+$good }$tool"
+    else
+      bad="${bad:+$bad }$tool"
+    fi
+  done
+
+  _summary unlinked "$good" "$bad"
+  if [[ -n $bad ]]; then
+    exit 1
   fi
 }
 # ─── doctor (plan Section 7): checks only, changes nothing ──────────────
