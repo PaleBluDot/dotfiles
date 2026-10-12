@@ -492,7 +492,230 @@ cmd_uninstall() { _not_built uninstall "7 and 9"; }
 cmd_link()      { _not_built link 6; }
 cmd_unlink()    { _not_built unlink 6; }
 cmd_update()    { _not_built update 10; }
-cmd_status()    { _not_built status 5; }
+# ─── status (plan Sections 7 and 8) ─────────────────────────────────────
+
+# Program output (tables, details): stdout, and a copy in the log file.
+out() {
+  printf '%s\n' "$*"
+  _log_to_file "INFO" "$*"
+}
+
+# Commands that read packages.yaml need the file and yq.
+_require_manifest() {
+  if [[ -z $DOTFILES_PACKAGES_FILE || ! -f $DOTFILES_PACKAGES_FILE ]]; then
+    log error "packages.yaml not found${DOTFILES_PACKAGES_FILE:+ at $DOTFILES_PACKAGES_FILE}; run: dotfiles.sh doctor"
+    exit 1
+  fi
+  if ! command -v yq >/dev/null 2>&1; then
+    log error "yq is not installed; run: dotfiles.sh doctor"
+    exit 1
+  fi
+}
+
+# Absolute path with every symlink resolved. Missing paths come back as is.
+_physical() {
+  local path="$1" dir
+  if [[ -d $path ]]; then
+    (cd -P "$path" 2>/dev/null && pwd -P) || echo "$path"
+  elif [[ -e $path ]]; then
+    if dir="$(cd -P "$(dirname "$path")" 2>/dev/null && pwd -P)"; then
+      echo "$dir/$(basename "$path")"
+    else
+      echo "$path"
+    fi
+  else
+    echo "$path"
+  fi
+}
+
+# Where a link's source lives in the repo. src "." = the whole folder.
+_src_path() {
+  local tool="$1" src="$2"
+  if [[ $src == "." ]]; then
+    echo "$DOTFILES/config/$tool"
+  else
+    echo "$DOTFILES/config/$tool/$src"
+  fi
+}
+
+# State of one link:
+#   linked          dest is a symlink to src
+#   linked-parent   dest is src already, through a linked parent folder
+#   elsewhere       dest is a symlink to somewhere else
+#   broken          dest is a symlink to nothing
+#   file / folder   a real file or folder is in the way
+#   missing         nothing at dest
+_link_state() {
+  local src_path="$1" dest_path="$2" target
+  if [[ -L $dest_path ]]; then
+    if [[ ! -e $dest_path ]]; then
+      echo "broken"
+      return 0
+    fi
+    target="$(readlink "$dest_path")"
+    case "$target" in
+      /*) ;;
+      *) target="$(dirname "$dest_path")/$target" ;;
+    esac
+    if [[ $(_physical "$target") == "$(_physical "$src_path")" ]]; then
+      echo "linked"
+    else
+      echo "elsewhere"
+    fi
+  elif [[ -e $dest_path ]]; then
+    if [[ $(_physical "$dest_path") == "$(_physical "$src_path")" ]]; then
+      echo "linked-parent"
+    elif [[ -d $dest_path ]]; then
+      echo "folder"
+    else
+      echo "file"
+    fi
+  else
+    echo "missing"
+  fi
+}
+
+# A link state in words.
+_link_state_text() {
+  case "$1" in
+    linked)        echo "linked" ;;
+    linked-parent) echo "linked (through a linked parent folder)" ;;
+    elsewhere)     echo "links somewhere else: $(readlink "$2")" ;;
+    broken)        echo "broken link to $(readlink "$2")" ;;
+    file)          echo "a real file is in the way" ;;
+    folder)        echo "a real folder is in the way" ;;
+    missing)       echo "not linked" ;;
+  esac
+}
+
+# Best-effort version (plan Section 8): first line of "<check_cmd> --version".
+# </dev/null so a tool that ignores --version can't sit waiting for input.
+_tool_version() {
+  local check_cmd="$1" output
+  if output="$("$check_cmd" --version </dev/null 2>&1)" && [[ -n $output ]]; then
+    echo "${output%%$'\n'*}"
+  else
+    echo "unknown"
+  fi
+}
+
+# "true" when the tool's check_cmd is on PATH.
+_tool_installed() {
+  local check_cmd
+  check_cmd="$(tool_field "$1" check_cmd)"
+  if [[ -n $check_cmd ]] && command -v "$check_cmd" >/dev/null 2>&1; then
+    echo true
+  else
+    echo false
+  fi
+}
+
+# "true" when every link is in place (directly or through a linked parent).
+_tool_linked() {
+  local tool="$1" src dest state result=true
+  while IFS=$'\t' read -r src dest; do
+    state="$(_link_state "$(_src_path "$tool" "$src")" "$HOME/$dest")"
+    log debug "$tool: ~/$dest is $state"
+    case "$state" in
+      linked | linked-parent) ;;
+      *) result=false ;;
+    esac
+  done < <(tool_links "$tool")
+  echo "$result"
+}
+
+# A tool counts as enabled when it's installed and linked.
+_and() {
+  if [[ $1 == true && $2 == true ]]; then echo true; else echo false; fi
+}
+
+# One line per tool.
+_status_all() {
+  local tool installed linked
+  out "$(printf '%-16s %-8s %-10s %s' TOOL ENABLED INSTALLED LINKED)"
+  while IFS= read -r tool; do
+    installed="$(_tool_installed "$tool")"
+    linked="$(_tool_linked "$tool")"
+    out "$(printf '%-16s %-8s %-10s %s' "$tool" "$(_and "$installed" "$linked")" "$installed" "$linked")"
+  done < <(manifest_tools)
+  log warn "default-packages: not shown yet (Step 8)"
+}
+
+# Details for one tool.
+_status_tool() {
+  local tool="$1"
+  local check_cmd package err_install_msg path src dest state
+  local installed linked enabled why="" selected first=true
+
+  if [[ $(_yq ".packages | has(\"$tool\")") != true ]]; then
+    log error "unknown tool: $tool (in packages.yaml: $(manifest_tools | paste -sd ' ' -))"
+    exit 2
+  fi
+
+  check_cmd="$(tool_field "$tool" check_cmd)"
+  package="$(tool_field "$tool" package)"
+  err_install_msg="$(tool_field "$tool" err_install_msg)"
+  installed="$(_tool_installed "$tool")"
+  linked="$(_tool_linked "$tool")"
+  enabled="$(_and "$installed" "$linked")"
+  if [[ $installed != true ]]; then why="not installed"; fi
+  if [[ $linked != true ]]; then why="${why:+$why, }not linked"; fi
+  selected="$(tool_enabled "$tool")"
+
+  out "$tool"
+  if [[ $enabled == true ]]; then
+    out "  enabled:    true (installed and linked)"
+  else
+    out "  enabled:    false ($why)"
+  fi
+  if [[ $selected != "$enabled" ]]; then
+    out "  note:       packages.yaml has enabled: $selected"
+  fi
+  if [[ -n $package ]]; then
+    out "  package:    $package ($DOTFILES_OS${DISTRO_ID:+, $DISTRO_ID})"
+  else
+    out "  package:    none: ${err_install_msg:-no package and no err_install_msg}"
+  fi
+  out "  check_cmd:  ${check_cmd:-<unset>}"
+  if [[ $installed == true ]]; then
+    path="$(command -v "$check_cmd")"
+    out "  installed:  $path"
+    out "  version:    $(_tool_version "$check_cmd")"
+  else
+    out "  installed:  no"
+  fi
+  out "  links:"
+  while IFS=$'\t' read -r src dest; do
+    if [[ $first != true ]]; then
+      out ""
+    fi
+    first=false
+    state="$(_link_state "$(_src_path "$tool" "$src")" "$HOME/$dest")"
+    if [[ $src == "." ]]; then
+      out "    source:   config/$tool"
+    else
+      out "    source:   config/$tool/$src"
+    fi
+    out "    symlink:  ~/$dest"
+    case "$state" in
+      linked | linked-parent) ;;
+      *) out "    problem:  $(_link_state_text "$state" "$HOME/$dest")" ;;
+    esac
+  done < <(tool_links "$tool")
+}
+
+cmd_status() {
+  _require_manifest
+  if [[ $# -gt 1 ]]; then
+    log error "status takes at most one tool (got: $*)"
+    exit 2
+  fi
+  if [[ $# -eq 1 ]]; then
+    _status_tool "$1"
+  else
+    _status_all
+  fi
+}
 # ─── doctor (plan Section 7): checks only, changes nothing ──────────────
 
 DOCTOR_FAILED=0
