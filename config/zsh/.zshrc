@@ -41,7 +41,7 @@ HISTFILE="$HOME/.local/share/zsh/history"
 # TOOL DIRECTORIES
 # Interactive-only tool paths
 # -----------------------
-export GITHUB_DIR="$HOME/github"
+export GITHUB_DIR="$HOME/Projects/github.com"
 export COMPOSER_HOME="$HOME/.config/composer"
 export WAKATIME_HOME="$HOME/.config/wakatime"
 export SEMGREP_SETTINGS_FILE="$HOME/.config/semgrep/settings.yml"
@@ -50,6 +50,7 @@ export TEALDEER_CONFIG_DIR="$HOME/.config/tldr"
 
 eval "$(starship init zsh)"
 eval "$(zoxide init zsh)"
+(( $+commands[mise] )) && eval "$(mise activate zsh)"
 eval "$(op completion zsh)"; compdef _op op
 eval $(thefuck --alias)
 
@@ -67,6 +68,12 @@ function y() {
 	[ "$cwd" != "$PWD" ] && [ -d "$cwd" ] && builtin cd -- "$cwd" || builtin true
 	command rm -f -- "$tmp"
 }
+
+# OS DETECTION
+# OS_NAME, OS_DISTRO, OS_LIKE, OS_VERSION, OS_PKG, ... from bin/osinfo,
+# set once here so .aliases and .functions can branch on them
+# -----------------------
+(( $+commands[osinfo] )) && eval "$(osinfo --env)"
 
 # LOCAL CONFIG
 # Aliases, functions, theme, welcome message
