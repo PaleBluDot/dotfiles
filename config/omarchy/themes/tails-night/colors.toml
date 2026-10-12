@@ -1,0 +1,35 @@
+mode = "dark"
+
+# Tails Night — monotone
+accent = "#ff9f1c"
+selection = "#5c3a10"
+muted = "#6b4a24"
+
+background = "#1c1206"
+dark_background = "#140d04"
+darker_background = "#0c0802"
+lighter_background = "#2e1f0c"
+
+foreground = "#ffe8c8"
+dark_foreground = "#b07a38"
+light_foreground = "#f5d4a6"
+bright_foreground = "#fff6e8"
+
+active_border_color = "#ff9f1c"
+active_tab_background = "#ff9f1c"
+
+red = "#d9771a"
+yellow = "#ffc86b"
+orange = "#ff9f1c"
+green = "#e0a040"
+cyan = "#ffd99a"
+blue = "#c7802a"
+magenta = "#f0b060"
+brown = "#6e4a22"
+
+bright_red = "#f09540"
+bright_yellow = "#ffdca0"
+bright_green = "#f5bd66"
+bright_cyan = "#ffecc4"
+bright_blue = "#e89a45"
+bright_magenta = "#ffc888"

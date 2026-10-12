@@ -1,0 +1,35 @@
+mode = "dark"
+
+# Knuckles Night — monotone
+accent = "#e0262e"
+selection = "#5c1418"
+muted = "#6b2a2a"
+
+background = "#1c0808"
+dark_background = "#140505"
+darker_background = "#0c0303"
+lighter_background = "#2e0f0f"
+
+foreground = "#ffd8d6"
+dark_foreground = "#b04a4a"
+light_foreground = "#f5bdbb"
+bright_foreground = "#fff0ef"
+
+active_border_color = "#e0262e"
+active_tab_background = "#e0262e"
+
+red = "#e0262e"
+yellow = "#ff9a94"
+orange = "#f06a64"
+green = "#c94a48"
+cyan = "#ffbcb8"
+blue = "#b83036"
+magenta = "#e8807c"
+brown = "#6e2c2a"
+
+bright_red = "#ff5a5f"
+bright_yellow = "#ffc4c0"
+bright_green = "#e27470"
+bright_cyan = "#ffdcda"
+bright_blue = "#e04a50"
+bright_magenta = "#f5a5a2"

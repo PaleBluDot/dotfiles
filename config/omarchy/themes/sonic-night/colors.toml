@@ -1,0 +1,35 @@
+mode = "dark"
+
+# Sonic Night — monotone cobalt blue, inspired by Sonic the Hedgehog
+accent = "#2f6bff"
+selection = "#1c3380"
+muted = "#2a3f7a"
+
+background = "#0a1230"
+dark_background = "#070d24"
+darker_background = "#040818"
+lighter_background = "#13204d"
+
+foreground = "#d4e0ff"
+dark_foreground = "#4a68c2"
+light_foreground = "#b8cbff"
+bright_foreground = "#f0f5ff"
+
+active_border_color = "#2f6bff"
+active_tab_background = "#2f6bff"
+
+red = "#3d5fd1"
+yellow = "#8fb0ff"
+orange = "#6a90ff"
+green = "#4a7dff"
+cyan = "#a9c4ff"
+blue = "#2f6bff"
+magenta = "#7596f0"
+brown = "#34487f"
+
+bright_red = "#6384ea"
+bright_yellow = "#b8cdff"
+bright_green = "#7aa0ff"
+bright_cyan = "#d0e0ff"
+bright_blue = "#5a8cff"
+bright_magenta = "#a2b8f5"

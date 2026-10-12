@@ -1,0 +1,4 @@
+#!/bin/bash
+# Omarchy theme-set hook: ask the root service to rebuild the boot screen in the new theme's colors.
+mkdir -p "$HOME/.local/state/surface-boot"
+date +%s.%N > "$HOME/.local/state/surface-boot/trigger"
