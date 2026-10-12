@@ -134,9 +134,18 @@ resolve_dotfiles() {
     fi
   fi
 
-  DOTFILES_PACKAGES_FILE="${DOTFILES:+$DOTFILES/config/packages.yaml}"
-  export DOTFILES DOTFILES_PACKAGES_FILE
-  log debug "DOTFILES_PACKAGES_FILE: ${DOTFILES_PACKAGES_FILE:-<none>}"
+  # The config file: ~/.config/dotfiles/config.yaml (linked from the repo),
+  # else the repo's own copy (a new machine, before anything is linked).
+  local user_config="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/config.yaml"
+  if [[ -f $user_config ]]; then
+    DOTFILES_CONFIG="$user_config"
+  elif [[ -n $DOTFILES ]]; then
+    DOTFILES_CONFIG="$DOTFILES/config/dotfiles/config.yaml"
+  else
+    DOTFILES_CONFIG=""
+  fi
+  export DOTFILES DOTFILES_CONFIG
+  log debug "DOTFILES_CONFIG: ${DOTFILES_CONFIG:-<none>}"
 }
 
 # ════════════════════════════════════════════════════════════════════════
@@ -146,6 +155,7 @@ resolve_dotfiles() {
 DOTFILES_OS=""      # macos | linux | windows
 DOTFILES_DISTRO=""  # display only, Linux only: "<NAME> <kernel>"
 DISTRO_ID=""        # internal, Linux only: debian | pacman | fedora
+PKG_MANAGER=""      # internal: pacman | apt | dnf | brew | winget (the keys in config.yaml)
 
 # Print one field from an os-release file. The file is read, not sourced:
 # sourcing would run it as code and overwrite variables like NAME and ID.
@@ -217,84 +227,117 @@ detect_os() {
     *) log warn "unsupported OS: $kernel" ;;
   esac
 
+  case "$DOTFILES_OS:$DISTRO_ID" in
+    linux:pacman) PKG_MANAGER="pacman" ;;
+    linux:debian) PKG_MANAGER="apt" ;;
+    linux:fedora) PKG_MANAGER="dnf" ;;
+    macos:*)      PKG_MANAGER="brew" ;;
+    windows:*)    PKG_MANAGER="winget" ;;
+  esac
+
   export DOTFILES_OS DOTFILES_DISTRO
-  log debug "DOTFILES_OS=${DOTFILES_OS:-<unknown>} DOTFILES_DISTRO=${DOTFILES_DISTRO:-<none>} distro id=${DISTRO_ID:-<none>}"
+  log debug "DOTFILES_OS=${DOTFILES_OS:-<unknown>} DOTFILES_DISTRO=${DOTFILES_DISTRO:-<none>} package manager=${PKG_MANAGER:-<none>}"
 }
 
 # ════════════════════════════════════════════════════════════════════════
-# MANIFEST: config/packages.yaml (plan Section 5)
+# CONFIG FILE: config/dotfiles/config.yaml (plan Section 18)
 # ════════════════════════════════════════════════════════════════════════
 
-# Run one yq query against packages.yaml.
+BACKUP_SUFFIX=".bak"
+
+# Run one yq query against the config file.
 _yq() {
-  yq eval "$1" "$DOTFILES_PACKAGES_FILE"
+  yq eval "$1" "$DOTFILES_CONFIG"
 }
 
-# Every tool name in packages.yaml, one per line.
+# Settings from the config, once it can be read. Unset = built-in default.
+load_settings() {
+  if [[ -z $DOTFILES_CONFIG || ! -f $DOTFILES_CONFIG ]] || ! command -v yq >/dev/null 2>&1; then
+    return 0
+  fi
+  local value
+  value="$(_yq '.settings.backup_suffix // ""' 2>/dev/null)" || value=""
+  if [[ -n $value ]]; then
+    BACKUP_SUFFIX="$value"
+  fi
+  value="$(_yq '.settings.log_file // ""' 2>/dev/null)" || value=""
+  # "~" in YAML is plain text; ${value/#\~/$HOME} turns a leading ~ into $HOME.
+  value="${value/#\~/$HOME}"
+  if [[ -n $value && $value != "$LOG_FILE" ]]; then
+    if mkdir -p "$(dirname "$value")" 2>/dev/null && touch "$value" 2>/dev/null; then
+      log debug "settings.log_file: logging to $value from here on"
+      LOG_FILE="$value"
+    else
+      log warn "settings.log_file: can't write $value; still logging to ${LOG_FILE:-the terminal only}"
+    fi
+  fi
+  log debug "settings: backup_suffix=$BACKUP_SUFFIX log_file=${LOG_FILE:-<none>}"
+}
+
+# Every package name under packages:, one per line.
 manifest_tools() {
-  _yq '.packages | keys | .[]'
+  _yq '.packages // {} | keys | .[]'
 }
 
-# The tiers to search for a tool, most specific first, as yq paths.
-# ["name"] instead of .name, so any folder name works as a key.
-_tiers() {
-  local base=".packages[\"$1\"]"
-  case "$DOTFILES_OS" in
-    linux)
-      if [[ -n $DISTRO_ID ]]; then
-        echo "$base.os.linux.$DISTRO_ID"
-      fi
-      echo "$base.os.linux"
+# True when the name is a key under packages:.
+_tool_exists() {
+  [[ $(_yq ".packages | has(\"$1\")") == true ]]
+}
+
+# A field that is either one value, or a map of values per manager/OS.
+# Prints the value for this machine: manager, then OS, then default.
+_value_for_machine() {
+  local path="$1" key
+  case "$(_yq "$path | tag")" in
+    '!!null')
+      return 0
       ;;
-    macos | windows)
-      echo "$base.os.$DOTFILES_OS"
+    '!!map')
+      for key in "$PKG_MANAGER" "$DOTFILES_OS" default; do
+        if [[ -n $key && $(_yq "$path[\"$key\"] | tag") != '!!null' ]]; then
+          _yq "$path[\"$key\"]"
+          return 0
+        fi
+      done
+      ;;
+    *)
+      _yq "$path"
       ;;
   esac
-  echo "$base.default"
 }
 
-# Print the yq path of the tier that sets <field> for <tool>, or nothing.
-# The value "default" jumps straight to the default tier.
-tool_field_tier() {
-  local tool="$1" field="$2"
-  local tier
-  while IFS= read -r tier; do
-    if [[ $(_yq "$tier.$field | tag") == '!!null' ]]; then
-      continue
-    fi
-    if [[ $(_yq "$tier.$field") == default ]]; then
-      # log debug writes to stderr, so it never ends up in the captured path.
-      log debug "$tool: $field is \"default\" in $(_tier_label "$tier"), so it comes from default"
-      echo ".packages[\"$tool\"].default"
-    else
-      echo "$tier"
-    fi
-    return 0
-  done < <(_tiers "$tool")
-}
-
-# Print the merged value of a plain field (check_cmd, package, ...).
-# Prints nothing when no tier sets it.
-tool_field() {
-  local tool="$1" field="$2"
-  local tier
-  tier="$(tool_field_tier "$tool" "$field")"
-  if [[ -z $tier || $(_yq "$tier.$field | tag") == '!!null' ]]; then
-    return 0
+# Package name on this machine: the manager's own name if one is set,
+# else the key. Empty = nothing to install here (a manual-only tool, or
+# "none" for this manager).
+tool_package() {
+  local tool="$1" base=".packages[\"$1\"]" value=""
+  if [[ -n $PKG_MANAGER && $(_yq "$base[\"$PKG_MANAGER\"] | tag") != '!!null' ]]; then
+    value="$(_yq "$base[\"$PKG_MANAGER\"]")"
+  elif [[ $(_yq "$base.manual | tag") == '!!null' ]]; then
+    value="$tool"
   fi
-  _yq "$tier.$field"
+  if [[ $value == none ]]; then
+    value=""
+  fi
+  echo "$value"
 }
 
-# Print the merged links, one "src<TAB>dest" line each. A missing src or
-# dest comes out empty, so callers can spot it.
+# Command that proves the tool is installed: command:, else the key.
+tool_command() {
+  local value
+  value="$(_value_for_machine ".packages[\"$1\"].command")"
+  echo "${value:-$1}"
+}
+
+# The manual: message (how to install by hand), or nothing.
+tool_manual() {
+  _yq ".packages[\"$1\"].manual // \"\""
+}
+
+# Links, one "src<TAB>dest" line each, with this OS's dest when the link
+# has one (windows:, macos:, linux:). Missing src or dest comes out empty.
 tool_links() {
-  local tool="$1"
-  local tier
-  tier="$(tool_field_tier "$tool" links)"
-  if [[ -z $tier ]]; then
-    return 0
-  fi
-  _yq "$tier.links[] | (.src // \"\") + \"\t\" + (.dest // \"\")"
+  _yq ".packages[\"$1\"].links // [] | .[] | (.src // \"\") + \"\t\" + (.[\"${DOTFILES_OS:-none}\"] // .dest // \"\")"
 }
 
 # "true" or "false"; anything else counts as false.
@@ -306,11 +349,96 @@ tool_enabled() {
   fi
 }
 
-# A tier path without the ".packages["tool"]." prefix, for messages.
-_tier_label() {
-  local tier="$1"
-  tier="${tier#*\"]}"
-  echo "${tier#.}"
+# Names in the default: list, one per line.
+default_list() {
+  _yq '.default // [] | .[]'
+}
+
+# Package name for a default: entry. A name that is also under packages:
+# uses that entry's names; any other name is installed as written.
+default_package() {
+  if _tool_exists "$1"; then
+    tool_package "$1"
+  else
+    echo "$1"
+  fi
+}
+
+# Print the installed version of a package, or return 1 if it isn't
+# installed. Asks the package manager, because a package name often isn't
+# a command (bind provides dig and nslookup).
+package_version() {
+  local package="$1" output
+  case "$PKG_MANAGER" in
+    pacman)
+      output="$(pacman -Q "$package" 2>/dev/null)" || return 1
+      echo "${output#* }"
+      ;;
+    apt)
+      output="$(dpkg-query -W -f='${Status} ${Version}' "$package" 2>/dev/null)" || return 1
+      case "$output" in
+        "install ok installed "*) echo "${output##* }" ;;
+        *) return 1 ;;
+      esac
+      ;;
+    dnf)
+      output="$(rpm -q --qf '%{VERSION}-%{RELEASE}' "$package" 2>/dev/null)" || return 1
+      echo "$output"
+      ;;
+    brew)
+      output="$(brew list --versions "$package" 2>/dev/null)" || return 1
+      if [[ -z $output ]]; then
+        return 1
+      fi
+      echo "${output#* }"
+      ;;
+    winget)
+      winget list -e --id "$package" >/dev/null 2>&1 || return 1
+      echo "installed"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+# Print the version the package manager would install, or nothing.
+# Used by dry runs, before anything is installed.
+package_available_version() {
+  local package="$1" output
+  case "$PKG_MANAGER" in
+    pacman)
+      output="$(pacman -Si "$package" 2>/dev/null)" || return 0
+      awk -F': ' '/^Version/ { print $2; exit }' <<<"$output"
+      ;;
+    apt)
+      output="$(apt-cache policy "$package" 2>/dev/null)" || return 0
+      awk '/Candidate:/ { if ($2 != "(none)") print $2; exit }' <<<"$output"
+      ;;
+    dnf)
+      dnf repoquery --latest-limit 1 --qf '%{version}-%{release}' "$package" 2>/dev/null | head -n 1 || true
+      ;;
+    brew)
+      output="$(brew info "$package" 2>/dev/null)" || return 0
+      # First line: "==> name: stable 1.2.3 (bottled)"
+      awk 'NR == 1 { for (i = 1; i <= NF; i++) if ($i == "stable") { print $(i + 1); exit } }' <<<"$output"
+      ;;
+    winget)
+      output="$(winget show -e --id "$package" 2>/dev/null)" || return 0
+      awk -F': ' '/^Version/ { print $2; exit }' <<<"$output"
+      ;;
+  esac
+}
+
+# "name (version)" for summaries: the installed version, or in a dry run
+# the version that would be installed.
+_with_version() {
+  local name="$1" version="$2"
+  if [[ -n $version ]]; then
+    echo "$name ($version)"
+  else
+    echo "$name"
+  fi
 }
 
 # ════════════════════════════════════════════════════════════════════════
@@ -321,7 +449,9 @@ _tier_label() {
 
 # Run a command that changes the system. Its output shows in the terminal
 # and goes into the log file line by line. Honors --dry-run.
+CHANGED=false   # set by run_cmd: something was changed (or would be, in a dry run)
 run_cmd() {
+  CHANGED=true
   if [[ $DRY_RUN == true ]]; then
     log info "dry run, would run: $*"
     return 0
@@ -342,26 +472,26 @@ _pm() {
   local action="$1" package="$2"
   local -a cmd
 
-  case "$action:$DOTFILES_OS:$DISTRO_ID" in
-    install:linux:pacman) cmd=(pacman -S --needed --noconfirm "$package") ;;
-    remove:linux:pacman)  cmd=(pacman -R --noconfirm "$package") ;;
-    install:linux:debian) cmd=(apt-get install -y "$package") ;;
-    remove:linux:debian)  cmd=(apt-get remove -y "$package") ;;
-    install:linux:fedora) cmd=(dnf install -y "$package") ;;
-    remove:linux:fedora)  cmd=(dnf remove -y "$package") ;;
-    install:macos:*)      cmd=(brew install "$package") ;;
-    remove:macos:*)       cmd=(brew uninstall "$package") ;;
-    install:windows:*)
+  case "$action:$PKG_MANAGER" in
+    install:pacman) cmd=(pacman -S --needed --noconfirm "$package") ;;
+    remove:pacman)  cmd=(pacman -R --noconfirm "$package") ;;
+    install:apt)    cmd=(apt-get install -y "$package") ;;
+    remove:apt)     cmd=(apt-get remove -y "$package") ;;
+    install:dnf)    cmd=(dnf install -y "$package") ;;
+    remove:dnf)     cmd=(dnf remove -y "$package") ;;
+    install:brew)   cmd=(brew install "$package") ;;
+    remove:brew)    cmd=(brew uninstall "$package") ;;
+    install:winget)
       cmd=(winget install -e --accept-package-agreements --accept-source-agreements --id "$package")
       ;;
-    remove:windows:*)     cmd=(winget uninstall -e --id "$package") ;;
+    remove:winget)  cmd=(winget uninstall -e --id "$package") ;;
     *)
-      log error "can't $action $package: no package manager for ${DOTFILES_OS:-this OS}${DISTRO_ID:+ ($DISTRO_ID)}"
+      log error "can't $action $package: no package manager for ${DOTFILES_OS:-this OS}"
       return 1
       ;;
   esac
 
-  if [[ $DOTFILES_OS == macos ]] && ! command -v brew >/dev/null 2>&1; then
+  if [[ $PKG_MANAGER == brew ]] && ! command -v brew >/dev/null 2>&1; then
     log error "can't $action $package: Homebrew isn't installed (https://brew.sh)"
     return 1
   fi
@@ -374,10 +504,10 @@ _pm() {
     fi
     cmd=(sudo "${cmd[@]}")
     # apt needs fresh package lists on a new machine.
-    if [[ $action == install && $DISTRO_ID == debian ]]; then
+    if [[ $action == install && $PKG_MANAGER == apt ]]; then
       run_cmd sudo apt-get update
     fi
-  elif [[ $action == install && $DISTRO_ID == debian ]]; then
+  elif [[ $action == install && $PKG_MANAGER == apt ]]; then
     run_cmd apt-get update
   fi
 
@@ -430,7 +560,7 @@ warn_unused_flags() {
   case "$cmd" in
     install | link | unlink | uninstall) return 0 ;;
   esac
-  if [[ $DRY_RUN == true && $cmd != doctor ]]; then
+  if [[ $DRY_RUN == true && $cmd != doctor && $cmd != default ]]; then
     log warn "--dry-run has no effect on '$cmd'"
   fi
   if [[ $FORCE == true ]]; then
@@ -446,7 +576,7 @@ cmd_help() {
   local topic="${1:-}"
   if [[ -n $topic ]]; then
     case "$topic" in
-      install | link | unlink | uninstall | update | status | doctor | help | version)
+      install | link | unlink | uninstall | default | update | status | doctor | help | version)
         echo "dotfiles.sh help $topic: detailed help comes in Step 13."
         return 0
         ;;
@@ -469,13 +599,14 @@ Commands:
   link [tool...]        create symlinks only (no tool = all enabled tools)
   unlink [tool...]      remove symlinks (no tool = all enabled tools)
   update                git pull, install missing packages, relink
-  status [tool]         show tools, links and default-packages
-  doctor                check git, yq, packages.yaml and OS detection; installs missing git/yq
+  default               install the default: list from config.yaml, link nothing
+  status [tool]         show tools, links and the default: list
+  doctor                check git, yq, config.yaml and OS detection; installs missing git/yq
   help [command]        show this help, or help for one command
   version               print the script version
 
 Flags:
-  -d, --dry-run         show what would happen, change nothing (install, link, unlink, uninstall, doctor)
+  -d, --dry-run         show what would happen, change nothing (install, link, unlink, uninstall, default, doctor)
   --force               no prompts, no backups (install, link, unlink, uninstall)
   -v, --verbose         show debug lines in the terminal
   Short flags combine: -dv = --dry-run --verbose
@@ -505,10 +636,10 @@ out() {
   _log_to_file "INFO" "$*"
 }
 
-# Commands that read packages.yaml need the file and yq.
-_require_manifest() {
-  if [[ -z $DOTFILES_PACKAGES_FILE || ! -f $DOTFILES_PACKAGES_FILE ]]; then
-    log error "packages.yaml not found${DOTFILES_PACKAGES_FILE:+ at $DOTFILES_PACKAGES_FILE}; run: dotfiles.sh doctor"
+# Commands that read the config need the file and yq.
+_require_config() {
+  if [[ -z $DOTFILES_CONFIG || ! -f $DOTFILES_CONFIG ]]; then
+    log error "config.yaml not found${DOTFILES_CONFIG:+ at $DOTFILES_CONFIG}; run: dotfiles.sh doctor"
     exit 1
   fi
   if ! command -v yq >/dev/null 2>&1; then
@@ -533,14 +664,9 @@ _physical() {
   fi
 }
 
-# Where a link's source lives in the repo. src "." = the whole folder.
+# Where a link's source lives: src is a path under config/.
 _src_path() {
-  local tool="$1" src="$2"
-  if [[ $src == "." ]]; then
-    echo "$DOTFILES/config/$tool"
-  else
-    echo "$DOTFILES/config/$tool/$src"
-  fi
+  echo "$DOTFILES/config/$1"
 }
 
 # State of one link:
@@ -593,22 +719,20 @@ _link_state_text() {
   esac
 }
 
-# Best-effort version (plan Section 8): first line of "<check_cmd> --version".
+# Best-effort version (plan Section 8): first line of "<command> --version".
 # </dev/null so a tool that ignores --version can't sit waiting for input.
 _tool_version() {
-  local check_cmd="$1" output
-  if output="$("$check_cmd" --version </dev/null 2>&1)" && [[ -n $output ]]; then
+  local cmd_name="$1" output
+  if output="$("$cmd_name" --version </dev/null 2>&1)" && [[ -n $output ]]; then
     echo "${output%%$'\n'*}"
   else
     echo "unknown"
   fi
 }
 
-# "true" when the tool's check_cmd is on PATH.
+# "true" when the tool's command is on PATH.
 _tool_installed() {
-  local check_cmd
-  check_cmd="$(tool_field "$1" check_cmd)"
-  if [[ -n $check_cmd ]] && command -v "$check_cmd" >/dev/null 2>&1; then
+  if command -v "$(tool_command "$1")" >/dev/null 2>&1; then
     echo true
   else
     echo false
@@ -619,7 +743,7 @@ _tool_installed() {
 _tool_linked() {
   local tool="$1" src dest state result=true
   while IFS=$'\t' read -r src dest; do
-    state="$(_link_state "$(_src_path "$tool" "$src")" "$HOME/$dest")"
+    state="$(_link_state "$(_src_path "$src")" "$HOME/$dest")"
     log debug "$tool: ~/$dest is $state"
     case "$state" in
       linked | linked-parent) ;;
@@ -643,23 +767,45 @@ _status_all() {
     linked="$(_tool_linked "$tool")"
     out "$(printf '%-16s %-8s %-10s %s' "$tool" "$(_and "$installed" "$linked")" "$installed" "$linked")"
   done < <(manifest_tools)
-  log warn "default-packages: not shown yet (Step 8)"
+  _status_default_packages
+}
+
+# The default: list, one row each, with the installed version.
+_status_default_packages() {
+  local name package version
+  out ""
+  if [[ -z $(default_list) ]]; then
+    out "Default packages: none (add names to default: in config.yaml)"
+    return 0
+  fi
+  out "Default packages (dotfiles.sh default):"
+  out "$(printf '%-16s %-16s %-10s %s' NAME PACKAGE INSTALLED VERSION)"
+  while IFS= read -r name; do
+    package="$(default_package "$name")"
+    if [[ -z $package ]]; then
+      out "$(printf '%-16s %-16s %-10s %s' "$name" - - "install by hand")"
+    elif version="$(package_version "$package")"; then
+      out "$(printf '%-16s %-16s %-10s %s' "$name" "$package" true "$version")"
+    else
+      out "$(printf '%-16s %-16s %-10s %s' "$name" "$package" false -)"
+    fi
+  done < <(default_list)
 }
 
 # Details for one tool.
 _status_tool() {
   local tool="$1"
-  local check_cmd package err_install_msg path src dest state
+  local command package manual src dest state
   local installed linked enabled why="" selected first=true
 
-  if [[ $(_yq ".packages | has(\"$tool\")") != true ]]; then
-    log error "unknown tool: $tool (in packages.yaml: $(manifest_tools | paste -sd ' ' -))"
+  if ! _tool_exists "$tool"; then
+    log error "unknown tool: $tool (in config.yaml: $(manifest_tools | paste -sd ' ' -))"
     exit 2
   fi
 
-  check_cmd="$(tool_field "$tool" check_cmd)"
-  package="$(tool_field "$tool" package)"
-  err_install_msg="$(tool_field "$tool" err_install_msg)"
+  command="$(tool_command "$tool")"
+  package="$(tool_package "$tool")"
+  manual="$(tool_manual "$tool")"
   installed="$(_tool_installed "$tool")"
   linked="$(_tool_linked "$tool")"
   enabled="$(_and "$installed" "$linked")"
@@ -674,18 +820,17 @@ _status_tool() {
     out "  enabled:    false ($why)"
   fi
   if [[ $selected != "$enabled" ]]; then
-    out "  note:       packages.yaml has enabled: $selected"
+    out "  note:       config.yaml has enabled: $selected"
   fi
   if [[ -n $package ]]; then
-    out "  package:    $package ($DOTFILES_OS${DISTRO_ID:+, $DISTRO_ID})"
+    out "  package:    $package (${PKG_MANAGER:-no package manager})"
   else
-    out "  package:    none: ${err_install_msg:-no package and no err_install_msg}"
+    out "  package:    none here${manual:+: $manual}"
   fi
-  out "  check_cmd:  ${check_cmd:-<unset>}"
+  out "  command:    $command"
   if [[ $installed == true ]]; then
-    path="$(command -v "$check_cmd")"
-    out "  installed:  $path"
-    out "  version:    $(_tool_version "$check_cmd")"
+    out "  installed:  $(command -v "$command")"
+    out "  version:    $(_tool_version "$command")"
   else
     out "  installed:  no"
   fi
@@ -695,12 +840,8 @@ _status_tool() {
       out ""
     fi
     first=false
-    state="$(_link_state "$(_src_path "$tool" "$src")" "$HOME/$dest")"
-    if [[ $src == "." ]]; then
-      out "    source:   config/$tool"
-    else
-      out "    source:   config/$tool/$src"
-    fi
+    state="$(_link_state "$(_src_path "$src")" "$HOME/$dest")"
+    out "    source:   config/$src"
     out "    symlink:  ~/$dest"
     case "$state" in
       linked | linked-parent) ;;
@@ -710,7 +851,7 @@ _status_tool() {
 }
 
 cmd_status() {
-  _require_manifest
+  _require_config
   if [[ $# -gt 1 ]]; then
     log error "status takes at most one tool (got: $*)"
     exit 2
@@ -786,13 +927,13 @@ _tilde() {
 # comments and blank lines stay (yq -i would reformat the file). yq reads
 # it back to confirm.
 set_enabled() {
-  local tool="$1" value="$2" file="$DOTFILES_PACKAGES_FILE" tmp
+  local tool="$1" value="$2" file="$DOTFILES_CONFIG" tmp
   if [[ $(tool_enabled "$tool") == "$value" ]]; then
-    log debug "$tool: packages.yaml already has enabled: $value"
+    log debug "$tool: config.yaml already has enabled: $value"
     return 0
   fi
   if [[ $DRY_RUN == true ]]; then
-    log info "dry run, would set enabled: $value for $tool in packages.yaml"
+    log info "dry run, would set enabled: $value for $tool in config.yaml"
     return 0
   fi
   tmp="$file.tmp.$$"
@@ -809,10 +950,10 @@ set_enabled() {
   ' "$file" >"$tmp"
   mv "$tmp" "$file"
   if [[ $(tool_enabled "$tool") != "$value" ]]; then
-    log error "$tool: couldn't set enabled: $value in packages.yaml (needs an 'enabled:' line indented 4 spaces under the tool)"
+    log error "$tool: couldn't set enabled: $value in config.yaml (needs an 'enabled:' line indented 4 spaces under the tool)"
     return 1
   fi
-  log info "$tool: packages.yaml now has enabled: $value"
+  log info "$tool: config.yaml now has enabled: $value"
 }
 
 # Tools to act on: the ones named, or every tool with enabled: true.
@@ -824,8 +965,8 @@ _pick_tools() {
   TOOLS=()
   if [[ $# -gt 0 ]]; then
     for tool in "$@"; do
-      if [[ $(_yq ".packages | has(\"$tool\")") != true ]]; then
-        log error "unknown tool: $tool (in packages.yaml: $(manifest_tools | paste -sd ' ' -))"
+      if ! _tool_exists "$tool"; then
+        log error "unknown tool: $tool (in config.yaml: $(manifest_tools | paste -sd ' ' -))"
         exit 2
       fi
       TOOLS+=("$tool")
@@ -837,35 +978,46 @@ _pick_tools() {
       fi
     done < <(manifest_tools)
     if [[ ${#TOOLS[@]} -eq 0 ]]; then
-      log info "$cmd: no tool has enabled: true in packages.yaml; name one: dotfiles.sh $cmd <tool>"
+      log info "$cmd: no tool has enabled: true in config.yaml; name one: dotfiles.sh $cmd <tool>"
     fi
   fi
   log debug "$cmd: tools: ${TOOLS[*]:-<none>}"
 }
 
-# Print the end-of-run summary when more than one tool was handled.
+# End-of-run summary when more than one tool was handled: only what
+# changed, and what failed. Empty lines are left out; nothing to report
+# means no summary.
 _summary() {
-  local verb="$1" good="$2" bad="$3"
-  if [[ ${#TOOLS[@]} -le 1 ]]; then
+  local verb="$1" changed="$2" failed="$3"
+  if [[ ${#TOOLS[@]} -le 1 || ( -z $changed && -z $failed ) ]]; then
     return 0
-  fi
-  if [[ $DRY_RUN == true ]]; then
-    verb="would be $verb"
   fi
   out ""
   out "Summary:"
-  out "  $verb: ${good:-none}"
-  out "  failed: ${bad:-none}"
+  if [[ -n $changed ]]; then
+    if [[ $DRY_RUN == true ]]; then
+      out "  Test: $changed"
+    else
+      out "  $verb: $changed"
+    fi
+  fi
+  if [[ -n $failed ]]; then
+    out "  failed: $failed"
+  fi
 }
 
 # Link one src/dest pair. Returns 1 when the link isn't in place afterwards.
 _link_one() {
   local tool="$1" src="$2" dest="$3"
   local src_path dest_path state shown target
-  src_path="$(_src_path "$tool" "$src")"
+  src_path="$(_src_path "$src")"
   dest_path="$HOME/$dest"
   shown="~/$dest"
 
+  if [[ -z $src || -z $dest ]]; then
+    log error "$tool: a link in config.yaml is missing src or dest"
+    return 1
+  fi
   if [[ ! -e $src_path ]]; then
     log error "$tool: source ${src_path#"$DOTFILES"/} doesn't exist"
     return 1
@@ -902,19 +1054,19 @@ _link_one() {
         log warn "$tool: --force: replacing the real file $shown, no backup"
         run_cmd rm -f "$dest_path"
       else
-        if [[ -e $dest_path.bak || -L $dest_path.bak ]]; then
-          log error "$tool: $shown is a real file, and an old backup $shown.bak is in the way; check it, delete it, then run link again"
+        if [[ -e $dest_path$BACKUP_SUFFIX || -L $dest_path$BACKUP_SUFFIX ]]; then
+          log error "$tool: $shown is a real file, and an old backup $shown$BACKUP_SUFFIX is in the way; check it, delete it, then run link again"
           return 1
         fi
         if [[ $DRY_RUN == true ]]; then
-          log info "dry run, would ask: back up $shown to $shown.bak and link it?"
-        elif ! confirm "$tool: $shown is a real file. Back it up to $shown.bak and link it?"; then
+          log info "dry run, would ask: back up $shown to $shown$BACKUP_SUFFIX and link it?"
+        elif ! confirm "$tool: $shown is a real file. Back it up to $shown$BACKUP_SUFFIX and link it?"; then
           log warn "$tool: left $shown alone"
           return 1
         fi
-        run_cmd mv "$dest_path" "$dest_path.bak"
+        run_cmd mv "$dest_path" "$dest_path$BACKUP_SUFFIX"
         if [[ $DRY_RUN != true ]]; then
-          log warn "$tool: backup made: $shown.bak (delete it once you're sure)"
+          log warn "$tool: backup made: $shown$BACKUP_SUFFIX (delete it once you're sure)"
         fi
       fi
       ;;
@@ -952,12 +1104,13 @@ _link_one() {
 }
 
 cmd_link() {
-  _require_manifest
+  _require_config
   _pick_tools link "$@"
   local tool src dest ok good="" bad=""
 
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
     ok=true
+    CHANGED=false
     while IFS=$'\t' read -r src dest; do
       if ! _link_one "$tool" "$src" "$dest"; then
         ok=false
@@ -966,9 +1119,9 @@ cmd_link() {
     if [[ $ok == true ]] && ! set_enabled "$tool" true; then
       ok=false
     fi
-    if [[ $ok == true ]]; then
+    if [[ $ok == true && $CHANGED == true ]]; then
       good="${good:+$good }$tool"
-    else
+    elif [[ $ok != true ]]; then
       bad="${bad:+$bad }$tool"
     fi
   done
@@ -983,7 +1136,7 @@ cmd_link() {
 _unlink_one() {
   local tool="$1" src="$2" dest="$3"
   local src_path dest_path state shown
-  src_path="$(_src_path "$tool" "$src")"
+  src_path="$(_src_path "$src")"
   dest_path="$HOME/$dest"
   shown="~/$dest"
   state="$(_link_state "$src_path" "$dest_path")"
@@ -992,8 +1145,8 @@ _unlink_one() {
   case "$state" in
     linked)
       run_cmd rm "$dest_path"
-      if [[ -e $dest_path.bak || -L $dest_path.bak ]]; then
-        run_cmd mv "$dest_path.bak" "$dest_path"
+      if [[ -e $dest_path$BACKUP_SUFFIX || -L $dest_path$BACKUP_SUFFIX ]]; then
+        run_cmd mv "$dest_path$BACKUP_SUFFIX" "$dest_path"
         if [[ $DRY_RUN != true ]]; then
           log success "$tool: unlinked $shown and restored the backup"
         fi
@@ -1015,12 +1168,13 @@ _unlink_one() {
 }
 
 cmd_unlink() {
-  _require_manifest
+  _require_config
   _pick_tools unlink "$@"
   local tool src dest ok good="" bad=""
 
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
     ok=true
+    CHANGED=false
     while IFS=$'\t' read -r src dest; do
       if ! _unlink_one "$tool" "$src" "$dest"; then
         ok=false
@@ -1029,9 +1183,9 @@ cmd_unlink() {
     if [[ $ok == true ]] && ! set_enabled "$tool" false; then
       ok=false
     fi
-    if [[ $ok == true ]]; then
+    if [[ $ok == true && $CHANGED == true ]]; then
       good="${good:+$good }$tool"
-    else
+    elif [[ $ok != true ]]; then
       bad="${bad:+$bad }$tool"
     fi
   done
@@ -1045,21 +1199,22 @@ cmd_unlink() {
 # ─── install / uninstall (plan Sections 7, 8, 11) ───────────────────────
 
 # Install one tool's package if it's missing. Sets INSTALL_NOTE to the
-# tool's err_install_msg when there's no package to install.
+# tool's manual: message when there's no package to install here.
 INSTALL_NOTE=""
 _install_package() {
-  local tool="$1" check_cmd package path
+  local tool="$1" cmd_name package path
   INSTALL_NOTE=""
-  check_cmd="$(tool_field "$tool" check_cmd)"
-  package="$(tool_field "$tool" package)"
+  cmd_name="$(tool_command "$tool")"
+  package="$(tool_package "$tool")"
 
-  if path="$(command -v "$check_cmd" 2>/dev/null)"; then
-    log success "$tool: already installed: $path ($(_tool_version "$check_cmd"))"
+  if path="$(command -v "$cmd_name" 2>/dev/null)"; then
+    log success "$tool: already installed: $path ($(_tool_version "$cmd_name"))"
     return 0
   fi
   if [[ -z $package ]]; then
-    INSTALL_NOTE="$(tool_field "$tool" err_install_msg)"
-    log warn "$tool: not installed, and there's no package for it here: ${INSTALL_NOTE:-no package and no err_install_msg}"
+    INSTALL_NOTE="$(tool_manual "$tool")"
+    INSTALL_NOTE="${INSTALL_NOTE:-no package for ${PKG_MANAGER:-this OS} in config.yaml}"
+    log warn "$tool: not installed, and there's no package for it here: $INSTALL_NOTE"
     return 0
   fi
 
@@ -1072,27 +1227,28 @@ _install_package() {
     return 0
   fi
   hash -r
-  if ! path="$(command -v "$check_cmd" 2>/dev/null)"; then
-    log error "$tool: $package installed, but $check_cmd still isn't on PATH"
+  if ! path="$(command -v "$cmd_name" 2>/dev/null)"; then
+    log error "$tool: $package installed, but $cmd_name still isn't on PATH"
     return 1
   fi
-  log success "$tool: installed $package: $path ($(_tool_version "$check_cmd"))"
+  log success "$tool: installed $package: $path ($(_tool_version "$cmd_name"))"
 }
 
 cmd_install() {
   if [[ $# -eq 0 ]]; then
     _not_built "interactive install" 9
   fi
-  _require_manifest
+  _require_config
   _pick_tools install "$@"
   local tool src dest ok good="" bad="" manual=""
 
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
     ok=true
+    CHANGED=false
     if ! _install_package "$tool"; then
       ok=false
     fi
-    # Link even when there was nothing to install (plan Section 5).
+    # Link even when there was nothing to install (plan Section 18).
     if [[ $ok == true ]]; then
       while IFS=$'\t' read -r src dest; do
         if ! _link_one "$tool" "$src" "$dest"; then
@@ -1108,10 +1264,12 @@ cmd_install() {
       bad="${bad:+$bad, }$tool"
     elif [[ -n $INSTALL_NOTE ]]; then
       manual="${manual:+$manual; }$tool: $INSTALL_NOTE"
+    elif [[ $CHANGED != true ]]; then
+      :   # already installed and linked: nothing to report
     elif [[ $DRY_RUN == true ]]; then
-      good="${good:+$good, }$tool"
+      good="${good:+$good, }$(_with_version "$tool" "$(package_available_version "$(tool_package "$tool")")")"
     else
-      good="${good:+$good, }$tool ($(_tool_version "$(tool_field "$tool" check_cmd)"))"
+      good="${good:+$good, }$tool ($(_tool_version "$(tool_command "$tool")"))"
     fi
   done
 
@@ -1127,16 +1285,16 @@ cmd_install() {
 # Remove one tool's package, after asking. Returns 1 when the tool should
 # stop here (declined or failed).
 _remove_package() {
-  local tool="$1" check_cmd package
-  check_cmd="$(tool_field "$tool" check_cmd)"
-  package="$(tool_field "$tool" package)"
+  local tool="$1" cmd_name package
+  cmd_name="$(tool_command "$tool")"
+  package="$(tool_package "$tool")"
 
   if [[ -z $package ]]; then
     log warn "$tool: no package to remove here; if you installed it by hand, remove it the same way"
     return 0
   fi
-  if ! command -v "$check_cmd" >/dev/null 2>&1; then
-    log info "$tool: $check_cmd isn't installed; nothing to remove"
+  if ! command -v "$cmd_name" >/dev/null 2>&1; then
+    log info "$tool: $cmd_name isn't installed; nothing to remove"
     return 0
   fi
 
@@ -1156,8 +1314,8 @@ _remove_package() {
     return 0
   fi
   hash -r
-  if command -v "$check_cmd" >/dev/null 2>&1; then
-    log warn "$tool: $package removed, but $check_cmd is still on PATH ($(command -v "$check_cmd")); it may be installed another way too"
+  if command -v "$cmd_name" >/dev/null 2>&1; then
+    log warn "$tool: $package removed, but $cmd_name is still on PATH ($(command -v "$cmd_name")); it may be installed another way too"
   else
     log success "$tool: removed package $package"
   fi
@@ -1167,12 +1325,13 @@ cmd_uninstall() {
   if [[ $# -eq 0 ]]; then
     _not_built "interactive uninstall" 9
   fi
-  _require_manifest
+  _require_config
   _pick_tools uninstall "$@"
   local tool src dest ok good="" bad=""
 
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
     ok=true
+    CHANGED=false
     if ! _remove_package "$tool"; then
       ok=false
     fi
@@ -1186,9 +1345,9 @@ cmd_uninstall() {
     if [[ $ok == true ]] && ! set_enabled "$tool" false; then
       ok=false
     fi
-    if [[ $ok == true ]]; then
+    if [[ $ok == true && $CHANGED == true ]]; then
       good="${good:+$good, }$tool"
-    else
+    elif [[ $ok != true ]]; then
       bad="${bad:+$bad, }$tool"
     fi
   done
@@ -1198,7 +1357,62 @@ cmd_uninstall() {
     exit 1
   fi
 }
-# ─── doctor (plan Section 7): checks only, changes nothing ──────────────
+
+# ─── default (plan Section 18): install the default: list, link nothing ──
+
+cmd_default() {
+  _require_config
+  if [[ -z $(default_list) ]]; then
+    log info "default: the default: list in config.yaml is empty; nothing to install"
+    return 0
+  fi
+  local name package version good="" bad="" manual="" count=0
+  while IFS= read -r name; do
+    count=$((count + 1))
+    package="$(default_package "$name")"
+    if [[ -z $package ]]; then
+      log warn "$name: no package here${name:+: $(tool_manual "$name")}"
+      manual="${manual:+$manual, }$name"
+    elif version="$(package_version "$package")"; then
+      log success "$name: already installed ($package $version)"
+    elif log info "$name: not installed, installing package $package" && pm_install "$package"; then
+      if [[ $DRY_RUN == true ]]; then
+        good="${good:+$good, }$(_with_version "$name" "$(package_available_version "$package")")"
+      elif version="$(package_version "$package")"; then
+        log success "$name: installed $package $version"
+        good="${good:+$good, }$name ($version)"
+      else
+        log error "$name: installed $package, but the package manager doesn't list it"
+        bad="${bad:+$bad, }$name"
+      fi
+    else
+      log error "$name: installing $package failed"
+      bad="${bad:+$bad, }$name"
+    fi
+  done < <(default_list)
+
+  # Only what changed and what failed; nothing to report = no summary.
+  if [[ $count -gt 1 && -n $good$bad$manual ]]; then
+    out ""
+    out "Summary:"
+    if [[ -n $good && $DRY_RUN == true ]]; then
+      out "  Test: $good"
+    elif [[ -n $good ]]; then
+      out "  installed: $good"
+    fi
+    if [[ -n $bad ]]; then
+      out "  failed: $bad"
+    fi
+    if [[ -n $manual ]]; then
+      out "  install by hand: $manual"
+    fi
+  fi
+  if [[ -n $bad ]]; then
+    exit 1
+  fi
+}
+
+# ─── doctor (plan Section 7) ────────────────────────────────────────────
 
 DOCTOR_FAILED=0
 YQ_OK=false
@@ -1215,7 +1429,7 @@ _doctor_os() {
       ;;
     linux)
       if [[ -n $DISTRO_ID ]]; then
-        _check_ok "OS: linux, $DOTFILES_DISTRO (package family: $DISTRO_ID)"
+        _check_ok "OS: linux, $DOTFILES_DISTRO (package manager: $PKG_MANAGER)"
       else
         _check_fail "OS: linux, but this distro isn't supported ($DOTFILES_DISTRO)"
       fi
@@ -1230,14 +1444,16 @@ _doctor_os() {
 # reason on stderr via log) when there's no native package for it.
 _prereq_package() {
   local tool="$1"
-  case "$tool:$DOTFILES_OS:$DISTRO_ID" in
-    git:windows:*)     echo "Git.Git" ;;
-    git:*)             echo "git" ;;
-    yq:linux:pacman)   echo "go-yq" ;;
-    yq:linux:fedora)   echo "yq" ;;   # unverified: confirm in a Fedora VM
-    yq:macos:*)        echo "yq" ;;
-    yq:windows:*)      echo "MikeFarah.yq" ;;
-    yq:linux:debian)
+  # In the script, not config.yaml: yq is needed to read the config, and
+  # git to clone the repo it lives in.
+  case "$tool:$PKG_MANAGER" in
+    git:winget)  echo "Git.Git" ;;
+    git:*)       echo "git" ;;
+    yq:pacman)   echo "go-yq" ;;
+    yq:dnf)      echo "yq" ;;   # unverified: confirm in a Fedora VM
+    yq:brew)     echo "yq" ;;
+    yq:winget)   echo "MikeFarah.yq" ;;
+    yq:apt)
       log error "yq: apt's 'yq' package is the Python one; install mikefarah/yq from https://github.com/mikefarah/yq/releases"
       ;;
   esac
@@ -1306,91 +1522,68 @@ _doctor_yq() {
   esac
 }
 
-_doctor_packages_file() {
+CONFIG_OK=false
+
+_doctor_config() {
   if [[ -z $DOTFILES ]]; then
-    _check_fail "packages.yaml: DOTFILES isn't set and the script isn't running from a clone"
+    _check_fail "config.yaml: DOTFILES isn't set and the script isn't running from a clone"
     return 0
   fi
-  if [[ ! -f $DOTFILES_PACKAGES_FILE ]]; then
-    _check_fail "packages.yaml: not found at $DOTFILES_PACKAGES_FILE"
+  if [[ ! -f $DOTFILES_CONFIG ]]; then
+    _check_fail "config.yaml: not found at $DOTFILES_CONFIG"
     return 0
   fi
   if [[ $YQ_OK != true ]]; then
-    _check_fail "packages.yaml: can't check it without mikefarah/yq"
+    _check_fail "config.yaml: can't check it without mikefarah/yq"
     return 0
   fi
-
   # 2>&1 >/dev/null: keep only the error text, throw the parsed output away.
   local err
-  if err="$(yq eval '.' "$DOTFILES_PACKAGES_FILE" 2>&1 >/dev/null)"; then
-    PACKAGES_FILE_OK=true
-    _check_ok "packages.yaml: valid YAML ($DOTFILES_PACKAGES_FILE)"
+  if err="$(yq eval '.' "$DOTFILES_CONFIG" 2>&1 >/dev/null)"; then
+    CONFIG_OK=true
+    _check_ok "config.yaml: valid YAML ($DOTFILES_CONFIG)"
   else
-    _check_fail "packages.yaml: invalid YAML: $err"
+    _check_fail "config.yaml: invalid YAML: $err"
   fi
 }
 
-# Every tool must resolve on this OS: check_cmd, plus a package or an
-# err_install_msg, and each link needs src and dest. -v shows each merged
-# field and the tier it came from.
-PACKAGES_FILE_OK=false
-
+# One tool: a package or a manual: message here, and links with src and
+# dest. -v shows what each resolves to on this machine.
 _doctor_tool() {
-  local tool="$1"
-  local problems=0 field tier value src dest
-  local check_cmd="" package="" err_install_msg=""
+  local tool="$1" problems=0 package manual src dest count=0
+  package="$(tool_package "$tool")"
+  manual="$(tool_manual "$tool")"
+  log debug "$tool: package=${package:-<none>} command=$(tool_command "$tool")${manual:+ manual=\"$manual\"}"
 
-  # One lookup per field: find the tier, then read the value from it.
-  for field in check_cmd package err_install_msg; do
-    tier="$(tool_field_tier "$tool" "$field")"
-    value=""
-    if [[ -n $tier && $(_yq "$tier.$field | tag") != '!!null' ]]; then
-      value="$(_yq "$tier.$field")"
-      log debug "$tool: $field = $value (from $(_tier_label "$tier"))"
-    else
-      log debug "$tool: $field = <unset>"
-    fi
-    case "$field" in
-      check_cmd)       check_cmd="$value" ;;
-      package)         package="$value" ;;
-      err_install_msg) err_install_msg="$value" ;;
-    esac
-  done
-
-  if [[ -z $check_cmd ]]; then
-    log error "$tool: no check_cmd"
+  if [[ -z $package && -z $manual ]]; then
+    log error "$tool: no package for ${PKG_MANAGER:-this OS} and no manual: message"
     problems=$((problems + 1))
-  fi
-  if [[ -z $package && -z $err_install_msg ]]; then
-    log error "$tool: needs a package or an err_install_msg for $DOTFILES_OS${DISTRO_ID:+ ($DISTRO_ID)}"
-    problems=$((problems + 1))
-  fi
-
-  tier="$(tool_field_tier "$tool" links)"
-  if [[ -n $tier ]]; then
-    log debug "$tool: links from $(_tier_label "$tier")"
   fi
   while IFS=$'\t' read -r src dest; do
-    log debug "$tool: link config/$tool/${src:-?} -> ~/${dest:-?}"
+    count=$((count + 1))
+    log debug "$tool: link config/${src:-?} -> ~/${dest:-?}"
     if [[ -z $src || -z $dest ]]; then
       log error "$tool: a link is missing src or dest"
       problems=$((problems + 1))
-    elif [[ ! -e $DOTFILES/config/$tool/$src ]]; then
+    elif [[ ! -e $(_src_path "$src") ]]; then
       # Only an enabled tool fails: a disabled one isn't linked yet.
       if [[ $(tool_enabled "$tool") == true ]]; then
-        log error "$tool: link source config/$tool/$src doesn't exist"
+        log error "$tool: link source config/$src doesn't exist"
         problems=$((problems + 1))
       else
-        log warn "$tool: link source config/$tool/$src doesn't exist (tool is disabled)"
+        log warn "$tool: link source config/$src doesn't exist (tool is disabled)"
       fi
     fi
   done < <(tool_links "$tool")
-
+  if [[ $count -eq 0 ]]; then
+    log error "$tool: no links (every entry under packages: needs links)"
+    problems=$((problems + 1))
+  fi
   return "$problems"
 }
 
 _doctor_tools() {
-  if [[ $PACKAGES_FILE_OK != true ]]; then
+  if [[ $CONFIG_OK != true ]]; then
     return 0
   fi
   local tool count=0 bad=0
@@ -1400,11 +1593,35 @@ _doctor_tools() {
       bad=$((bad + 1))
     fi
   done < <(manifest_tools)
-
   if [[ $bad -gt 0 ]]; then
-    _check_fail "tools: $bad of $count don't resolve on $DOTFILES_OS${DISTRO_ID:+ ($DISTRO_ID)}"
+    _check_fail "packages: $bad of $count have problems on ${PKG_MANAGER:-this OS}"
   else
-    _check_ok "tools: all $count resolve on $DOTFILES_OS${DISTRO_ID:+ ($DISTRO_ID)}"
+    _check_ok "packages: all $count resolve on ${PKG_MANAGER:-this OS}"
+  fi
+}
+
+# The default: list: which are installed. Missing ones are a warning.
+_doctor_default_packages() {
+  if [[ $CONFIG_OK != true ]]; then
+    return 0
+  fi
+  local name package version count=0 have=0 missing=""
+  while IFS= read -r name; do
+    count=$((count + 1))
+    package="$(default_package "$name")"
+    if [[ -n $package ]] && version="$(package_version "$package")"; then
+      have=$((have + 1))
+      log debug "default: $name ($package $version)"
+    else
+      missing="${missing:+$missing }$name"
+    fi
+  done < <(default_list)
+  if [[ $count -eq 0 ]]; then
+    log info "default: list is empty"
+  elif [[ -n $missing ]]; then
+    log warn "default: $have of $count installed; missing: $missing (dotfiles.sh default installs them)"
+  else
+    _check_ok "default: all $count installed"
   fi
 }
 
@@ -1412,9 +1629,10 @@ cmd_doctor() {
   _doctor_os
   _doctor_git
   _doctor_yq
-  _doctor_packages_file
+  _doctor_config
+  load_settings
   _doctor_tools
-  log warn "default-packages: not checked yet (Step 8)"
+  _doctor_default_packages
 
   if [[ $DOCTOR_FAILED -gt 0 ]]; then
     log error "doctor: $DOCTOR_FAILED check(s) failed"
@@ -1449,12 +1667,16 @@ main() {
 
   resolve_dotfiles
   detect_os
+  if [[ $cmd != doctor ]]; then
+    load_settings
+  fi
   warn_unused_flags "$cmd"
 
   case "$cmd" in
     interactive) cmd_interactive ;;
     install)   cmd_install "$@" ;;
     uninstall) cmd_uninstall "$@" ;;
+    default)   cmd_default "$@" ;;
     link)      cmd_link "$@" ;;
     unlink)    cmd_unlink "$@" ;;
     update)    cmd_update "$@" ;;

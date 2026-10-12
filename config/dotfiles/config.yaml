@@ -1,0 +1,46 @@
+# dotfiles.sh config (plan.md Section 18)
+# Repo: config/dotfiles/config.yaml, linked to ~/.config/dotfiles/config.yaml
+
+# Script settings. Commented lines show the built-in default.
+settings:
+  # log_file: ~/.local/state/dotfiles/dotfiles.log
+  # backup_suffix: .bak
+
+# Installed by "dotfiles.sh default", nothing linked (for quick machines).
+# A name that is also under packages: uses that entry's package names.
+default: []
+
+# The key is the package name. Add a manager (pacman, apt, dnf, brew,
+# winget) only where its package name is different; "none" = not there.
+#   command:  only when the command isn't the key (can also be per manager)
+#   manual:   no package manager installs it; this message says how
+#   links:    src is a path under config/, dest a path under $HOME;
+#             add windows:/macos:/linux: when that OS needs another dest
+#   enabled:  written by install/link (true) and uninstall/unlink (false)
+packages:
+  neovim:
+    enabled: false
+    command: nvim
+    winget: Neovim.Neovim
+    links:
+      - src: nvim
+        dest: .config/nvim
+        windows: AppData/Local/nvim
+
+  fd:
+    enabled: false
+    apt: fd-find
+    dnf: fd-find
+    winget: sharkdp.fd
+    links:
+      - src: fd/ignore
+        dest: .config/fd/ignore
+        windows: AppData/Roaming/fd/ignore
+
+  cspell:
+    enabled: false
+    manual: "Not auto-installed. Install by hand: npm install -g cspell"
+    links:
+      - src: cspell/cspell.json
+        dest: .config/cspell/cspell.json
+        windows: AppData/Roaming/cspell/cspell.json
