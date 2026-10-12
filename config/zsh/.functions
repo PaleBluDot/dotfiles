@@ -1,27 +1,27 @@
-# mkprj — create a new project folder under ~/github/<org>/ and open it.
+# mkprj — create a new project folder under $GITHUB_DIR/<org>/ and open it.
 #
-# Lists the folders inside ~/github (your user and orgs), asks you to pick
+# Lists the folders inside $GITHUB_DIR (your user and orgs), asks you to pick
 # one, asks for a project name, then creates the folder, cd's into it,
 # runs `git init`, and opens it with `code-insiders .`.
 #
 # Usage:
 #   mkprj
 #
-# Requires: ~/github with one folder per user/org, and `code-insiders` on PATH.
+# Requires: $GITHUB_DIR (~/Projects/github.com) with one folder per user/org, and `code-insiders` on PATH.
 ##! Need to add git init and gh creation.
 function mkprj() {
 	echo "Selected org:"
-	select org in $(exec ls ~/github)
+	select org in $(exec ls "$GITHUB_DIR")
 
 	do
 		echo "You selected $org"
 		echo "Name of the project?"
 		read project
-		mkdir -p ~/github/$org/$project
-		cd ~/github/$org/$project
+		mkdir -p "$GITHUB_DIR/$org/$project"
+		cd "$GITHUB_DIR/$org/$project"
 		git init
 		code-insiders .
-		echo "Project created in ~/github/$org/$project"
+		echo "Project created in $GITHUB_DIR/$org/$project"
 		break;
 	done
 }
@@ -185,7 +185,7 @@ function pushover() {
 
 # dotfiles-update — pull the latest dotfiles and re-apply them.
 #
-# If $DOTFILES is not set it defaults to $HOME/.config/dotfiles. Then it
+# If $DOTFILES is not set it defaults to $HOME/Projects/github.com/PaleBluDot/dotfiles. Then it
 # cd's there, checks out main, runs `git pull`, runs `fresh`, and finally
 # cd's to $HOME (it does not return you to where you started).
 #
@@ -196,7 +196,7 @@ function pushover() {
 function dotfiles-update() {
 	if [[ -z "${DOTFILES}" ]]; then
 		echo "Does not Exits. Creating dotfiles."
-		export DOTFILES="$HOME/.config/dotfiles"
+		export DOTFILES="$HOME/Projects/github.com/PaleBluDot/dotfiles"
 	fi
 
 	clear
@@ -589,51 +589,137 @@ detach() {
 # sysup — update all installed packages with the native package manager
 # for the OS you are on.
 #
-# Detects the OS with `uname`, and on Linux reads ID / ID_LIKE from
-# /etc/os-release to pick the package manager:
-#   macOS            brew update && brew upgrade
-#   Windows (Git Bash) winget upgrade --all
-#   Arch-based       sudo pacman -Syu --noconfirm
-#   Fedora-based     sudo dnf upgrade -y
-#   Debian-based     sudo apt update && sudo apt upgrade -y
+# Uses $OS_DISTRO and $OS_PKG, which .zshrc sets from osinfo when the terminal
+# starts, to pick the update command. Omarchy is checked first because it has
+# its own updater, which must be used instead of a plain pacman upgrade:
+#   omarchy  omarchy update -y
+#   brew     brew update && brew upgrade
+#   winget   winget upgrade --all
+#   pacman   sudo pacman -Syu --noconfirm
+#   dnf      sudo dnf upgrade -y
+#   apt      sudo apt update && sudo apt upgrade -y
 #
 # Usage:
 #   sysup
 #
-# Returns 1 with a message on stderr if the OS or distro is not recognized.
+# Returns 1 with a message on stderr if $OS_PKG is unset or not supported.
 # Linux needs sudo; the -y / --noconfirm flags skip the confirmation prompt.
 sysup() {
-  local distro
+  if [[ ${OS_DISTRO:-} == omarchy ]]; then
+    omarchy update -y
+    return
+  fi
 
-  case "$(uname -s)" in
-    Darwin)
-      brew update && brew upgrade
-      ;;
-    MINGW* | MSYS*)
-      winget upgrade --all --accept-package-agreements --accept-source-agreements
-      ;;
-    Linux)
-      if [[ ! -f /etc/os-release ]]; then
-        echo "sysup: /etc/os-release not found" >&2
-        return 1
-      fi
-
-      # The ( ... ) subshell keeps ID, NAME, VERSION etc. from leaking into your live shell.
-      distro=$( . /etc/os-release; echo "${ID:-} ${ID_LIKE:-}" )
-
-      case " $distro " in
-        *" arch "*)   sudo pacman -Syu --noconfirm ;;
-        *" fedora "*) sudo dnf upgrade -y ;;
-        *" debian "*) sudo apt update && sudo apt upgrade -y ;;
-        *)
-          echo "sysup: unsupported distro ($distro)" >&2
-          return 1
-          ;;
-      esac
+  case "${OS_PKG:-}" in
+    brew)   brew update && brew upgrade ;;
+    winget) winget upgrade --all --accept-package-agreements --accept-source-agreements ;;
+    pacman) sudo pacman -Syu --noconfirm ;;
+    dnf)    sudo dnf upgrade -y ;;
+    apt)    sudo apt update && sudo apt upgrade -y ;;
+    "")
+      echo "sysup: OS_PKG is not set; open a new terminal or run reload" >&2
+      return 1
       ;;
     *)
-      echo "sysup: unsupported OS ($(uname -s))" >&2
+      echo "sysup: unsupported package manager: $OS_PKG" >&2
       return 1
       ;;
   esac
 }
+# zd — smarter cd (Omarchy's bash function, ported for zsh). `cd` is aliased to it in .aliases.
+#
+# No argument goes home, a real directory is entered normally, anything else is
+# looked up with zoxide (`z`) and the directory it jumped to is printed.
+#
+# Usage:
+#   zd            # ~
+#   zd ~/Projects # normal cd
+#   zd dot        # zoxide jump to the best "dot" match
+#
+# Requires: zoxide (initialised in .zshrc). Without it, falls back to plain cd.
+zd() {
+  if (( $# == 0 )); then
+    builtin cd ~ || return
+  elif [[ -d $1 ]] || ! (( $+functions[z] )); then
+    builtin cd "$@" || return
+  else
+    if ! z "$@"; then
+      echo "Error: Directory not found"
+      return 1
+    fi
+    printf "\U000F17A9 "
+    pwd
+  fi
+}
+
+# n — open nvim: the current folder with no argument, otherwise the given files
+# (Omarchy's bash function, ported for zsh). `edit` is aliased to it in .aliases.
+#
+# Usage:
+#   n
+#   n file.txt
+n() {
+  if (( $# == 0 )); then command nvim .; else command nvim "$@"; fi
+}
+
+# edit — open a config you edit often by name, e.g. `edit starship`, `edit nvim`.
+#
+# Folders (nvim, hypr, yazi) open with the editor started inside them, so
+# LazyVim treats the folder as the project. Tab completes the names.
+# Anything that isn't a known name is opened as a normal file path.
+#
+# Usage:
+#   edit              # open $EDITOR
+#   edit starship     # ~/.config/starship/starship.toml
+#   edit list         # show every name and where it points
+#   edit notes.md     # any other file, like before
+#
+# Add a target: put a "name  path" line in _edit_targets below.
+_edit_targets=(
+  aliases    "$ZDOTDIR/.aliases"
+  functions  "$ZDOTDIR/.functions"
+  zshrc      "$ZDOTDIR/.zshrc"
+  zshenv     "$ZDOTDIR/.zshenv"
+  starship   "$HOME/.config/starship/starship.toml"
+  nvim       "$HOME/.config/nvim"
+  hypr       "$HOME/.config/hypr"
+  bindings   "$HOME/.config/hypr/bindings.lua"
+  monitors   "$HOME/.config/hypr/monitors.lua"
+  ghostty    "$HOME/.config/ghostty/config.ghostty"
+  git        "$HOME/.config/git/config"
+  ssh        "$HOME/.ssh/config"
+  tmux       "$HOME/.config/tmux/tmux.conf"
+  yazi       "$HOME/.config/yazi"
+  lazygit    "$HOME/.config/lazygit/config.yml"
+  fastfetch  "$HOME/.config/fastfetch/config.jsonc"
+  shell      "$HOME/.config/omarchy/shell.toml"
+  branding   "$HOME/.config/omarchy/branding/settings.toml"
+  links      "$DOTFILES/links.map"
+)
+
+# drop the old `alias edit=$EDITOR` if this shell still has it (reload keeps old aliases)
+unalias edit 2>/dev/null
+function edit() {
+  local -A targets=("${_edit_targets[@]}")
+  if (( $# == 0 )); then
+    command $EDITOR
+  elif [[ $1 == list ]]; then
+    local name
+    for name in ${(ko)targets}; do printf '%-10s %s\n' "$name" "${targets[$name]/#$HOME/~}"; done
+  elif [[ -n ${targets[$1]} ]]; then
+    local target=${targets[$1]}
+    if [[ -d $target ]]; then
+      (builtin cd "$target" && command $EDITOR .)
+    else
+      command $EDITOR "$target"
+    fi
+  else
+    command $EDITOR "$@"
+  fi
+}
+
+_edit() {
+  local -A targets=("${_edit_targets[@]}")
+  _alternative "names:config:(list ${(k)targets})" 'files:file:_files'
+}
+(( $+functions[compdef] )) && compdef _edit edit
