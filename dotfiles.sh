@@ -222,6 +222,98 @@ detect_os() {
 }
 
 # ════════════════════════════════════════════════════════════════════════
+# MANIFEST: config/packages.yaml (plan Section 5)
+# ════════════════════════════════════════════════════════════════════════
+
+# Run one yq query against packages.yaml.
+_yq() {
+  yq eval "$1" "$DOTFILES_PACKAGES_FILE"
+}
+
+# Every tool name in packages.yaml, one per line.
+manifest_tools() {
+  _yq '.packages | keys | .[]'
+}
+
+# The tiers to search for a tool, most specific first, as yq paths.
+# ["name"] instead of .name, so any folder name works as a key.
+_tiers() {
+  local base=".packages[\"$1\"]"
+  case "$DOTFILES_OS" in
+    linux)
+      if [[ -n $DISTRO_ID ]]; then
+        echo "$base.os.linux.$DISTRO_ID"
+      fi
+      echo "$base.os.linux"
+      ;;
+    macos | windows)
+      echo "$base.os.$DOTFILES_OS"
+      ;;
+  esac
+  echo "$base.default"
+}
+
+# Print the yq path of the tier that sets <field> for <tool>, or nothing.
+# The value "default" jumps straight to the default tier.
+tool_field_tier() {
+  local tool="$1" field="$2"
+  local tier
+  while IFS= read -r tier; do
+    if [[ $(_yq "$tier.$field | tag") == '!!null' ]]; then
+      continue
+    fi
+    if [[ $(_yq "$tier.$field") == default ]]; then
+      # log debug writes to stderr, so it never ends up in the captured path.
+      log debug "$tool: $field is \"default\" in $(_tier_label "$tier"), so it comes from default"
+      echo ".packages[\"$tool\"].default"
+    else
+      echo "$tier"
+    fi
+    return 0
+  done < <(_tiers "$tool")
+}
+
+# Print the merged value of a plain field (check_cmd, package, ...).
+# Prints nothing when no tier sets it.
+tool_field() {
+  local tool="$1" field="$2"
+  local tier
+  tier="$(tool_field_tier "$tool" "$field")"
+  if [[ -z $tier || $(_yq "$tier.$field | tag") == '!!null' ]]; then
+    return 0
+  fi
+  _yq "$tier.$field"
+}
+
+# Print the merged links, one "src<TAB>dest" line each. A missing src or
+# dest comes out empty, so callers can spot it.
+tool_links() {
+  local tool="$1"
+  local tier
+  tier="$(tool_field_tier "$tool" links)"
+  if [[ -z $tier ]]; then
+    return 0
+  fi
+  _yq "$tier.links[] | (.src // \"\") + \"\t\" + (.dest // \"\")"
+}
+
+# "true" or "false"; anything else counts as false.
+tool_enabled() {
+  if [[ $(_yq ".packages[\"$1\"].enabled") == true ]]; then
+    echo true
+  else
+    echo false
+  fi
+}
+
+# A tier path without the ".packages["tool"]." prefix, for messages.
+_tier_label() {
+  local tier="$1"
+  tier="${tier#*\"]}"
+  echo "${tier#.}"
+}
+
+# ════════════════════════════════════════════════════════════════════════
 # RUNNING COMMANDS AND INSTALLING PACKAGES
 # Bare bones, so doctor can install its prerequisites. Step 7 builds the
 # full install/uninstall on top of this.
@@ -510,9 +602,88 @@ _doctor_packages_file() {
   # 2>&1 >/dev/null: keep only the error text, throw the parsed output away.
   local err
   if err="$(yq eval '.' "$DOTFILES_PACKAGES_FILE" 2>&1 >/dev/null)"; then
+    PACKAGES_FILE_OK=true
     _check_ok "packages.yaml: valid YAML ($DOTFILES_PACKAGES_FILE)"
   else
     _check_fail "packages.yaml: invalid YAML: $err"
+  fi
+}
+
+# Every tool must resolve on this OS: check_cmd, plus a package or an
+# err_install_msg, and each link needs src and dest. -v shows each merged
+# field and the tier it came from.
+PACKAGES_FILE_OK=false
+
+_doctor_tool() {
+  local tool="$1"
+  local problems=0 field tier value src dest
+  local check_cmd="" package="" err_install_msg=""
+
+  # One lookup per field: find the tier, then read the value from it.
+  for field in check_cmd package err_install_msg; do
+    tier="$(tool_field_tier "$tool" "$field")"
+    value=""
+    if [[ -n $tier && $(_yq "$tier.$field | tag") != '!!null' ]]; then
+      value="$(_yq "$tier.$field")"
+      log debug "$tool: $field = $value (from $(_tier_label "$tier"))"
+    else
+      log debug "$tool: $field = <unset>"
+    fi
+    case "$field" in
+      check_cmd)       check_cmd="$value" ;;
+      package)         package="$value" ;;
+      err_install_msg) err_install_msg="$value" ;;
+    esac
+  done
+
+  if [[ -z $check_cmd ]]; then
+    log error "$tool: no check_cmd"
+    problems=$((problems + 1))
+  fi
+  if [[ -z $package && -z $err_install_msg ]]; then
+    log error "$tool: needs a package or an err_install_msg for $DOTFILES_OS${DISTRO_ID:+ ($DISTRO_ID)}"
+    problems=$((problems + 1))
+  fi
+
+  tier="$(tool_field_tier "$tool" links)"
+  if [[ -n $tier ]]; then
+    log debug "$tool: links from $(_tier_label "$tier")"
+  fi
+  while IFS=$'\t' read -r src dest; do
+    log debug "$tool: link config/$tool/${src:-?} -> ~/${dest:-?}"
+    if [[ -z $src || -z $dest ]]; then
+      log error "$tool: a link is missing src or dest"
+      problems=$((problems + 1))
+    elif [[ ! -e $DOTFILES/config/$tool/$src ]]; then
+      # Only an enabled tool fails: a disabled one isn't linked yet.
+      if [[ $(tool_enabled "$tool") == true ]]; then
+        log error "$tool: link source config/$tool/$src doesn't exist"
+        problems=$((problems + 1))
+      else
+        log warn "$tool: link source config/$tool/$src doesn't exist (tool is disabled)"
+      fi
+    fi
+  done < <(tool_links "$tool")
+
+  return "$problems"
+}
+
+_doctor_tools() {
+  if [[ $PACKAGES_FILE_OK != true ]]; then
+    return 0
+  fi
+  local tool count=0 bad=0
+  while IFS= read -r tool; do
+    count=$((count + 1))
+    if ! _doctor_tool "$tool"; then
+      bad=$((bad + 1))
+    fi
+  done < <(manifest_tools)
+
+  if [[ $bad -gt 0 ]]; then
+    _check_fail "tools: $bad of $count don't resolve on $DOTFILES_OS${DISTRO_ID:+ ($DISTRO_ID)}"
+  else
+    _check_ok "tools: all $count resolve on $DOTFILES_OS${DISTRO_ID:+ ($DISTRO_ID)}"
   fi
 }
 
@@ -521,6 +692,7 @@ cmd_doctor() {
   _doctor_git
   _doctor_yq
   _doctor_packages_file
+  _doctor_tools
   log warn "default-packages: not checked yet (Step 8)"
 
   if [[ $DOCTOR_FAILED -gt 0 ]]; then
