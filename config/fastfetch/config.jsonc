@@ -4,7 +4,10 @@
     "title",
     "separator",
     "os",
-    "host",
+    {
+      "type": "host",
+      "format": "{name}"
+    },
     "kernel",
     "uptime",
     "packages",
@@ -23,7 +26,11 @@
     "gpu",
     "memory",
     "swap",
-    "disk",
+    {
+      "type": "disk",
+      "showExternal": false,
+      "showReadOnly": false
+    },
     "localip",
     "battery",
     "poweradapter",
