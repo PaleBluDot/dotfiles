@@ -140,6 +140,88 @@ resolve_dotfiles() {
 }
 
 # ════════════════════════════════════════════════════════════════════════
+# OS DETECTION (plan Section 4)
+# ════════════════════════════════════════════════════════════════════════
+
+DOTFILES_OS=""      # macos | linux | windows
+DOTFILES_DISTRO=""  # display only, Linux only: "<NAME> <kernel>"
+DISTRO_ID=""        # internal, Linux only: debian | pacman | fedora
+
+# Print one field from an os-release file. The file is read, not sourced:
+# sourcing would run it as code and overwrite variables like NAME and ID.
+_os_release_field() {
+  local field="$1" file="$2"
+  local key value
+  # "|| [[ -n $key ]]" keeps the last line when the file has no final newline.
+  while IFS='=' read -r key value || [[ -n $key ]]; do
+    if [[ $key == "$field" ]]; then
+      value="${value%\"}"
+      value="${value#\"}"
+      value="${value%\'}"
+      value="${value#\'}"
+      printf '%s' "$value"
+      return 0
+    fi
+  done <"$file"
+}
+
+# Map "ID ID_LIKE..." to the internal distro ID. The first word that
+# matches wins, so ID beats ID_LIKE.
+_distro_id_from() {
+  local word
+  # $1 is unquoted on purpose: "omarchy arch" splits into two words.
+  for word in $1; do
+    case "$word" in
+      debian | ubuntu) echo "debian"; return 0 ;;
+      arch)            echo "pacman"; return 0 ;;
+      fedora)          echo "fedora"; return 0 ;;
+    esac
+  done
+}
+
+detect_linux() {
+  local file="/etc/os-release"
+  # The os-release spec: use /usr/lib/os-release when /etc has none.
+  if [[ ! -r $file ]]; then
+    file="/usr/lib/os-release"
+  fi
+  if [[ ! -r $file ]]; then
+    DOTFILES_DISTRO="unknown $(uname -r)"
+    log warn "no os-release file found; can't tell which Linux distro this is"
+    return 0
+  fi
+
+  local id id_like name
+  id="$(_os_release_field ID "$file")"
+  id_like="$(_os_release_field ID_LIKE "$file")"
+  name="$(_os_release_field NAME "$file")"
+  log debug "os-release ($file): ID=${id:-<none>} ID_LIKE=${id_like:-<none>} NAME=${name:-<none>}"
+
+  DISTRO_ID="$(_distro_id_from "$id $id_like")"
+  DOTFILES_DISTRO="${name:-${id:-unknown}} $(uname -r)"
+
+  if [[ -z $DISTRO_ID ]]; then
+    log warn "unsupported Linux distro (ID=$id, ID_LIKE=${id_like:-none}); supported: debian, arch and fedora families"
+  fi
+}
+
+detect_os() {
+  local kernel
+  kernel="$(uname -s)"
+  log debug "uname -s: $kernel"
+
+  case "$kernel" in
+    Darwin)                   DOTFILES_OS="macos" ;;
+    Linux)                    DOTFILES_OS="linux"; detect_linux ;;
+    MINGW* | MSYS* | CYGWIN*) DOTFILES_OS="windows" ;;
+    *) log warn "unsupported OS: $kernel" ;;
+  esac
+
+  export DOTFILES_OS DOTFILES_DISTRO
+  log debug "DOTFILES_OS=${DOTFILES_OS:-<unknown>} DOTFILES_DISTRO=${DOTFILES_DISTRO:-<none>} distro id=${DISTRO_ID:-<none>}"
+}
+
+# ════════════════════════════════════════════════════════════════════════
 # ARGUMENTS (plan Section 7)
 # ════════════════════════════════════════════════════════════════════════
 
@@ -265,6 +347,7 @@ main() {
   log debug "command: $cmd, arguments: ${*:-<none>}"
 
   resolve_dotfiles
+  detect_os
   warn_unused_flags "$cmd"
 
   case "$cmd" in
