@@ -2167,6 +2167,46 @@ _self_links() {
   printf '%s\t%s\n' "$DOTFILES/config/dotfiles" ".config/dotfiles"
 }
 
+# Git signs commits through 1Password's op-ssh-sign, whose path differs per
+# OS, and git's own config can't choose by OS. So dotfiles writes the path
+# for this machine into config/git/local.gitconfig (included by .gitconfig,
+# gitignored), and rewrites it when it's missing or wrong.
+_op_ssh_sign_path() {
+  local helper=""
+  case "$DOTFILES_OS" in
+    linux)   helper="/opt/1Password/op-ssh-sign" ;;
+    macos)   helper="/Applications/1Password.app/Contents/MacOS/op-ssh-sign" ;;
+    windows) helper="${LOCALAPPDATA:-$HOME/AppData/Local}/1Password/app/8/op-ssh-sign.exe" ;;
+  esac
+  if [[ -n $helper && -x $helper ]]; then
+    echo "$helper"
+  fi
+}
+
+_setup_git_signing() {
+  local helper want file="$DOTFILES/config/git/local.gitconfig"
+  helper="$(_op_ssh_sign_path)"
+  if [[ -z $helper ]]; then
+    log warn "git signing: 1Password's op-ssh-sign isn't installed here, so commits can't be signed until it is"
+    return 1
+  fi
+  want="$(printf '%s\n' \
+    "# GENERATED FILE: do not edit. dotfiles writes this for this machine's OS." \
+    "# 1Password's ssh signing helper; its path differs per OS." \
+    '[gpg "ssh"]' \
+    "	program = $helper")"
+  if [[ -f $file && $(cat "$file") == "$want" ]]; then
+    log debug "git signing: ${file#"$DOTFILES"/} is up to date"
+    return 0
+  fi
+  if [[ $DRY_RUN == true ]]; then
+    log info "dry run, would write ${file#"$DOTFILES"/} (gpg.ssh.program = $helper)"
+    return 0
+  fi
+  printf '%s\n' "$want" >"$file"
+  log success "git signing: wrote ${file#"$DOTFILES"/} (op-ssh-sign for $DOTFILES_OS)"
+}
+
 # Make (or repair) both self links. Returns 1 if one isn't in place.
 _setup_self_links() {
   local src dest ok=true
@@ -2286,6 +2326,7 @@ _first_run_setup() {
   if ! _setup_self_links; then
     log warn "first run: a self link isn't in place (see above); dotfiles.sh still works from $DOTFILES/dotfiles.sh"
   fi
+  _setup_git_signing || true
   _path_check
 }
 
@@ -2309,6 +2350,9 @@ _doctor_self_links() {
     _check_ok "self links: made (or would make, in a dry run)"
   else
     _check_fail "self links: not in place (see above)"
+  fi
+  if _setup_git_signing; then
+    _check_ok "git signing: $(_op_ssh_sign_path)"
   fi
   _path_check
 }

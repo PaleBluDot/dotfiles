@@ -22,5 +22,5 @@
 [core]
 	excludesFile = ~/.config/git/.gitignore
 [include]
-	# Per-machine settings written by link.sh (1Password's op-ssh-sign path differs per OS). Not tracked.
+	# Written by dotfiles (doctor / first run) for this machine's OS: 1Password's op-ssh-sign path. Not tracked.
 	path = local.gitconfig
