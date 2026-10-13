@@ -10,6 +10,15 @@ set -o errtrace
 readonly DOTFILES_VERSION="2.0.0"
 export DOTFILES_VERSION
 
+# ─── First run (plan Section 2) ─────────────────────────────────────────
+# Where a bare machine clones from and to. DOTFILES / DOTFILES_REPO /
+# DOTFILES_BRANCH in the environment override these (testing, other paths).
+readonly DEFAULT_DOTFILES_DIR="$HOME/Projects/github.com/PaleBluDot/dotfiles"
+readonly DEFAULT_DOTFILES_REPO="https://github.com/PaleBluDot/dotfiles.git"
+ORIG_ARGS=()   # the arguments as given, for re-running from the clone
+ORIG_PATH="$PATH"   # PATH as the user has it (the hint in _path_check checks this)
+RUNNING_FROM_FILE=false
+
 # ─── Flags (internal, never exported) ───────────────────────────────────
 DRY_RUN=false
 FORCE=false
@@ -113,6 +122,9 @@ trap '_on_error $? $LINENO "$BASH_COMMAND"' ERR
 # DOTFILES comes from the environment when set. Otherwise use the folder
 # this script lives in, following symlinks (~/.local/bin/dotfiles -> repo).
 resolve_dotfiles() {
+  if [[ -n ${BASH_SOURCE[0]:-} && -f ${BASH_SOURCE[0]} ]]; then
+    RUNNING_FROM_FILE=true
+  fi
   if [[ -n ${DOTFILES:-} ]]; then
     log debug "DOTFILES from the environment: $DOTFILES"
     if [[ ! -d $DOTFILES ]]; then
@@ -122,6 +134,7 @@ resolve_dotfiles() {
     local src="${BASH_SOURCE[0]:-}"
     local target
     if [[ -n $src && -f $src ]]; then
+      RUNNING_FROM_FILE=true
       while [[ -L $src ]]; do
         target="$(readlink "$src")"
         case "$target" in
@@ -471,6 +484,8 @@ run_cmd() {
   done
 }
 
+APT_UPDATED="${APT_UPDATED:-false}"
+
 # Install or remove one package with this OS's package manager.
 # _pm install|remove <package>
 _pm() {
@@ -508,12 +523,15 @@ _pm() {
       return 1
     fi
     cmd=(sudo "${cmd[@]}")
-    # apt needs fresh package lists on a new machine.
-    if [[ $action == install && $PKG_MANAGER == apt ]]; then
+  fi
+  # apt needs fresh package lists on a new machine; once per run is enough.
+  if [[ $action == install && $PKG_MANAGER == apt && $APT_UPDATED != true ]]; then
+    APT_UPDATED=true
+    if [[ ${cmd[0]} == sudo ]]; then
       run_cmd sudo apt-get update
+    else
+      run_cmd apt-get update
     fi
-  elif [[ $action == install && $PKG_MANAGER == apt ]]; then
-    run_cmd apt-get update
   fi
 
   run_cmd "${cmd[@]}"
@@ -1020,18 +1038,25 @@ _summary() {
   fi
 }
 
-# Link one src/dest pair. Returns 1 when the link isn't in place afterwards.
+# Link one src/dest pair from config.yaml. Returns 1 when the link isn't
+# in place afterwards.
 _link_one() {
   local tool="$1" src="$2" dest="$3"
-  local src_path dest_path state shown target
-  src_path="$(_src_path "$src")"
-  dest_path="$HOME/$dest"
-  shown="~/$dest"
-
   if [[ -z $src || -z $dest ]]; then
     log error "$tool: a link in config.yaml is missing src or dest"
     return 1
   fi
+  _link_path "$tool" "$(_src_path "$src")" "$dest"
+}
+
+# Link a full source path to a dest under $HOME, with all the conflict
+# handling (plan Section 10). Also used for dotfiles.sh's own links.
+_link_path() {
+  local tool="$1" src_path="$2" dest="$3"
+  local dest_path state shown target
+  dest_path="$HOME/$dest"
+  shown="~/$dest"
+
   if [[ ! -e $src_path ]]; then
     log error "$tool: source ${src_path#"$DOTFILES"/} doesn't exist"
     return 1
@@ -1804,6 +1829,142 @@ cmd_default() {
   fi
 }
 
+# ─── first run (plan Section 2) ─────────────────────────────────────────
+
+# The two links dotfiles.sh always makes for itself: the command, and its
+# own config folder (decided 2026-10-12).
+_self_links() {
+  local bin=".local/bin/dotfiles"
+  if [[ $DOTFILES_OS == windows ]]; then
+    bin="bin/dotfiles"
+  fi
+  printf '%s\t%s\n' "$DOTFILES/dotfiles.sh" "$bin"
+  printf '%s\t%s\n' "$DOTFILES/config/dotfiles" ".config/dotfiles"
+}
+
+# Make (or repair) both self links. Returns 1 if one isn't in place.
+_setup_self_links() {
+  local src dest ok=true
+  while IFS=$'\t' read -r src dest; do
+    if ! _link_path dotfiles "$src" "$dest"; then
+      ok=false
+    fi
+  done < <(_self_links)
+  [[ $ok == true ]]
+}
+
+# Say how to put ~/.local/bin on PATH when it isn't. Changes no files.
+# Once per run (first run and doctor both ask).
+PATH_CHECKED=false
+_path_check() {
+  if [[ $PATH_CHECKED == true ]]; then
+    return 0
+  fi
+  PATH_CHECKED=true
+  case ":$ORIG_PATH:" in
+    *":$HOME/.local/bin:"*)
+      log debug "~/.local/bin is on PATH"
+      return 0
+      ;;
+  esac
+  local file
+  case "${SHELL##*/}" in
+    zsh) file="~/.zshenv" ;;
+    bash)
+      if [[ $DOTFILES_OS == macos ]]; then
+        file="~/.bash_profile"
+      else
+        file="~/.bashrc"
+      fi
+      ;;
+    *) file="your shell's startup file" ;;
+  esac
+  log warn "~/.local/bin isn't on PATH, so the 'dotfiles' command won't be found. Add this line to $file, then open a new terminal:"
+  ui '  export PATH="$HOME/.local/bin:$PATH"'
+}
+
+# Running from curl | bash: get git, clone the repo, then run the cloned
+# copy instead of this one in memory (plan Section 2).
+_bootstrap() {
+  local branch="${DOTFILES_BRANCH:-main}" repo="${DOTFILES_REPO:-$DEFAULT_DOTFILES_REPO}"
+  DOTFILES="${DOTFILES:-$DEFAULT_DOTFILES_DIR}"
+  log info "first run: not running from a clone; using $DOTFILES"
+
+  if [[ -d $DOTFILES/.git ]]; then
+    log info "found an existing clone at $DOTFILES"
+  else
+    if ! command -v git >/dev/null 2>&1; then
+      _doctor_install git || true
+      if [[ $DRY_RUN != true ]] && ! command -v git >/dev/null 2>&1; then
+        log error "first run: git is needed to clone the repo and couldn't be installed"
+        exit 1
+      fi
+    fi
+    if [[ -e $DOTFILES && -n $(ls -A "$DOTFILES" 2>/dev/null) ]]; then
+      log error "first run: $DOTFILES exists, isn't empty, and isn't a git clone; move it or set DOTFILES to another folder"
+      exit 1
+    fi
+    run_cmd mkdir -p "$(dirname "$DOTFILES")"
+    if ! run_cmd git clone --branch "$branch" "$repo" "$DOTFILES"; then
+      log error "first run: cloning $repo ($branch) failed"
+      exit 1
+    fi
+  fi
+
+  if [[ $DRY_RUN == true ]]; then
+    log info "dry run: would continue with $DOTFILES/dotfiles.sh"
+    exit 0
+  fi
+  log info "first run: continuing with the cloned copy, $DOTFILES/dotfiles.sh"
+  export DOTFILES
+  export DOTFILES_FIRST_RUN=1
+  export APT_UPDATED   # the cloned copy doesn't refresh apt's lists again
+  PATH="$ORIG_PATH"    # hand over the user's PATH, not this run's
+  # exec replaces this process: what runs from here on is the file on disk.
+  exec bash "$DOTFILES/dotfiles.sh" ${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}
+}
+
+# First run, now from the clone: yq, the self links, the PATH hint. Then
+# the requested command runs as usual (interactive install by default).
+_first_run_setup() {
+  unset DOTFILES_FIRST_RUN
+  log info "first run: setting up dotfiles.sh"
+  _doctor_yq
+  if [[ $YQ_OK != true ]]; then
+    log error "first run: yq is needed to read config.yaml; fix the yq problem above, then run: $DOTFILES/dotfiles.sh"
+    exit 1
+  fi
+  load_settings
+  if ! _setup_self_links; then
+    log warn "first run: a self link isn't in place (see above); dotfiles.sh still works from $DOTFILES/dotfiles.sh"
+  fi
+  _path_check
+}
+
+# doctor: the self links and PATH.
+_doctor_self_links() {
+  if [[ -z $DOTFILES ]]; then
+    return 0
+  fi
+  local src dest state missing=false
+  while IFS=$'\t' read -r src dest; do
+    state="$(_link_state "$src" "$HOME/$dest")"
+    log debug "self link ~/$dest is $state"
+    if [[ $state != linked ]]; then
+      missing=true
+    fi
+  done < <(_self_links)
+
+  if [[ $missing != true ]]; then
+    _check_ok "self links: ~/.local/bin/dotfiles and ~/.config/dotfiles"
+  elif _setup_self_links; then
+    _check_ok "self links: made (or would make, in a dry run)"
+  else
+    _check_fail "self links: not in place (see above)"
+  fi
+  _path_check
+}
+
 # ─── doctor (plan Section 7) ────────────────────────────────────────────
 
 DOCTOR_FAILED=0
@@ -1845,15 +2006,80 @@ _prereq_package() {
     yq:dnf)      echo "yq" ;;   # unverified: confirm in a Fedora VM
     yq:brew)     echo "yq" ;;
     yq:winget)   echo "MikeFarah.yq" ;;
-    yq:apt)
-      log error "yq: apt's 'yq' package is the Python one; install mikefarah/yq from https://github.com/mikefarah/yq/releases"
+    # yq:apt has no package: apt's yq is the Python one (see _install_yq_release).
+  esac
+}
+
+# Debian/Ubuntu: apt's yq is the Python one, so get mikefarah/yq from its
+# GitHub release into ~/.local/bin, checking the published SHA-256 first.
+# The one exception to "native package managers only" (decided 2026-10-12).
+_install_yq_release() {
+  local arch tag base tmp pos expected actual
+  case "$(uname -m)" in
+    x86_64)          arch="amd64" ;;
+    aarch64 | arm64) arch="arm64" ;;
+    armv7l)          arch="arm" ;;
+    i?86)            arch="386" ;;
+    *)
+      log error "yq: no release binary for $(uname -m); install mikefarah/yq by hand"
+      return 1
       ;;
   esac
+  if ! command -v curl >/dev/null 2>&1; then
+    pm_install curl || return 1
+    hash -r
+  fi
+  CHANGED=true
+  if [[ $DRY_RUN == true ]]; then
+    log info "dry run, would download yq_linux_$arch from https://github.com/mikefarah/yq/releases/latest into ~/.local/bin, after checking its SHA-256"
+    return 0
+  fi
+
+  # Pin one release: "latest" redirects to .../tag/vX.Y.Z.
+  if ! tag="$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/mikefarah/yq/releases/latest)"; then
+    log error "yq: couldn't reach GitHub to find the latest release"
+    return 1
+  fi
+  tag="${tag##*/}"
+  base="https://github.com/mikefarah/yq/releases/download/$tag"
+  tmp="$(mktemp -d)"
+  log info "yq: downloading $tag (yq_linux_$arch) from GitHub"
+  if ! curl -fsSL -o "$tmp/yq" "$base/yq_linux_$arch" ||
+    ! curl -fsSL -o "$tmp/checksums" "$base/checksums" ||
+    ! curl -fsSL -o "$tmp/order" "$base/checksums_hashes_order"; then
+    log error "yq: download failed"
+    rm -rf "$tmp"
+    return 1
+  fi
+
+  # checksums: "<file> <hash> <hash> ..." in the order that
+  # checksums_hashes_order lists; field 1 is the file name.
+  pos="$(grep -n -x 'SHA-256' "$tmp/order" | cut -d: -f1)"
+  expected="$(awk -v file="yq_linux_$arch" -v n="$((${pos:-0} + 1))" '$1 == file { print $n }' "$tmp/checksums")"
+  actual="$(sha256sum "$tmp/yq" | cut -d' ' -f1)"
+  if [[ -z $expected || $expected != "$actual" ]]; then
+    log error "yq: SHA-256 doesn't match (expected ${expected:-none}, got $actual); not installing it"
+    rm -rf "$tmp"
+    return 1
+  fi
+  log success "yq: SHA-256 matches ($actual)"
+
+  mkdir -p "$HOME/.local/bin"
+  mv "$tmp/yq" "$HOME/.local/bin/yq"
+  chmod 755 "$HOME/.local/bin/yq"
+  rm -rf "$tmp"
+  log success "yq: installed $tag to ~/.local/bin/yq"
 }
 
 # Install a missing prerequisite, then look for it again.
 _doctor_install() {
   local tool="$1" package
+  if [[ $tool == yq && $PKG_MANAGER == apt ]]; then
+    log info "yq: not installed; apt's yq is a different tool, so getting it from GitHub"
+    _install_yq_release || return 1
+    hash -r
+    return 0
+  fi
   package="$(_prereq_package "$tool")"
   if [[ -z $package ]]; then
     return 1
@@ -2023,6 +2249,7 @@ cmd_doctor() {
   _doctor_yq
   _doctor_config
   load_settings
+  _doctor_self_links
   _doctor_tools
   _doctor_default_packages
 
@@ -2038,6 +2265,13 @@ cmd_doctor() {
 # ════════════════════════════════════════════════════════════════════════
 
 main() {
+  ORIG_ARGS=("$@")
+  # This run always looks in ~/.local/bin too: dotfiles.sh puts its own
+  # command (and yq on Debian/Ubuntu) there. Only for this process.
+  case ":$PATH:" in
+    *":$HOME/.local/bin:"*) ;;
+    *) PATH="$HOME/.local/bin:$PATH" ;;
+  esac
   init_log
   _log_to_file "DEBUG" "──── run start: dotfiles.sh $DOTFILES_VERSION, args: $*"
 
@@ -2057,9 +2291,23 @@ main() {
   LOG_CMD="$cmd"
   log debug "command: $cmd, arguments: ${*:-<none>}"
 
+  # Run as yourself: dotfiles.sh calls sudo by itself, only for the package
+  # manager. Under sudo, the clone, links and config would belong to root.
+  # (A real root login or a container has no SUDO_USER and is fine.)
+  if [[ $EUID -eq 0 && -n ${SUDO_USER:-} ]]; then
+    log error "don't run dotfiles.sh with sudo; run it as $SUDO_USER. It asks for sudo by itself when a package needs installing."
+    exit 1
+  fi
+
   resolve_dotfiles
   detect_os
-  if [[ $cmd != doctor ]]; then
+  # From curl | bash there is no file on disk: clone first (plan Section 2).
+  if [[ $RUNNING_FROM_FILE != true ]]; then
+    _bootstrap
+  fi
+  if [[ ${DOTFILES_FIRST_RUN:-} == 1 ]]; then
+    _first_run_setup
+  elif [[ $cmd != doctor ]]; then
     load_settings
   fi
   warn_unused_flags "$cmd"
