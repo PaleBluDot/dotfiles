@@ -11,9 +11,10 @@ readonly DOTFILES_VERSION="2.0.0"
 export DOTFILES_VERSION
 
 # ─── First run (plan Section 2) ─────────────────────────────────────────
-# Where a bare machine clones from and to. DOTFILES / DOTFILES_REPO /
-# DOTFILES_BRANCH in the environment override these (testing, other paths).
-readonly DEFAULT_DOTFILES_DIR="$HOME/Projects/github.com/PaleBluDot/dotfiles"
+# A bare machine's first run asks where to clone; this is only the suggested
+# answer. DOTFILES / DOTFILES_REPO / DOTFILES_BRANCH in the environment skip
+# the question or override the source (testing, other paths).
+readonly SUGGESTED_DOTFILES_DIR="$HOME/Projects/github.com/PaleBluDot/dotfiles"
 readonly DEFAULT_DOTFILES_REPO="https://github.com/PaleBluDot/dotfiles.git"
 ORIG_ARGS=()   # the arguments as given, for re-running from the clone
 ORIG_PATH="$PATH"   # PATH as the user has it (the hint in _path_check checks this)
@@ -127,7 +128,8 @@ resolve_dotfiles() {
   fi
   if [[ -n ${DOTFILES:-} ]]; then
     log debug "DOTFILES from the environment: $DOTFILES"
-    if [[ ! -d $DOTFILES ]]; then
+    # On a first run (curl | bash) the clone doesn't exist yet: no warning.
+    if [[ $RUNNING_FROM_FILE == true && ! -d $DOTFILES ]]; then
       log warn "DOTFILES is set to $DOTFILES, but that folder doesn't exist"
     fi
   else
@@ -2213,7 +2215,24 @@ _path_check() {
 # copy instead of this one in memory (plan Section 2).
 _bootstrap() {
   local branch="${DOTFILES_BRANCH:-main}" repo="${DOTFILES_REPO:-$DEFAULT_DOTFILES_REPO}"
-  DOTFILES="${DOTFILES:-$DEFAULT_DOTFILES_DIR}"
+  if [[ -z ${DOTFILES:-} ]]; then
+    local answer=""
+    if [[ $DRY_RUN == true ]]; then
+      log info "dry run, would ask where to clone (suggestion: $(_tilde "$SUGGESTED_DOTFILES_DIR"))"
+    elif { true </dev/tty; } 2>/dev/null; then
+      printf 'Clone the dotfiles repo to [%s]: ' "$(_tilde "$SUGGESTED_DOTFILES_DIR")" >/dev/tty
+      read -r answer </dev/tty || true
+      _log_to_file "INFO" "asked: clone to -> ${answer:-<Enter>}"
+    else
+      log error "first run: no terminal to ask where to clone; run it as: DOTFILES=<path> curl ... | bash"
+      exit 1
+    fi
+    answer="${answer/#\~/$HOME}"            # a typed ~ means $HOME
+    DOTFILES="${answer:-$SUGGESTED_DOTFILES_DIR}"
+    if [[ $DOTFILES != /* ]]; then
+      DOTFILES="$PWD/$DOTFILES"               # a relative path is from here
+    fi
+  fi
   log info "first run: not running from a clone; using $DOTFILES"
 
   if [[ -d $DOTFILES/.git ]]; then

@@ -185,7 +185,7 @@ function pushover() {
 
 # dotfiles-update — pull the latest dotfiles and re-apply them.
 #
-# If $DOTFILES is not set it defaults to $HOME/Projects/github.com/PaleBluDot/dotfiles. Then it
+# Needs $DOTFILES (set by .zshenv from the ~/.config/dotfiles link). Then it
 # cd's there, checks out main, runs `git pull`, runs `fresh`, and finally
 # cd's to $HOME (it does not return you to where you started).
 #
@@ -195,8 +195,8 @@ function pushover() {
 # Requires: the `fresh` dotfiles manager on PATH.
 function dotfiles-update() {
 	if [[ -z "${DOTFILES}" ]]; then
-		echo "Does not Exits. Creating dotfiles."
-		export DOTFILES="$HOME/Projects/github.com/PaleBluDot/dotfiles"
+		echo "dotfiles-update: DOTFILES isn't set (is ~/.config/dotfiles linked? run: dotfiles doctor)" >&2
+		return 1
 	fi
 
 	clear
