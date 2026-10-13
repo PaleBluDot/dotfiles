@@ -582,18 +582,25 @@ parse_args() {
   done
 }
 
-# --dry-run means something for these five commands, --force for four.
+# Warn about flags that do nothing for this command (matches the help).
 warn_unused_flags() {
   local cmd="$1"
   case "$cmd" in
-    install | link | unlink | uninstall | interactive) return 0 ;;
+    install | uninstall | link | unlink | default | update | doctor | interactive) ;;
+    *)
+      if [[ $DRY_RUN == true ]]; then
+        log warn "--dry-run has no effect on '$cmd'"
+      fi
+      ;;
   esac
-  if [[ $DRY_RUN == true && $cmd != doctor && $cmd != default && $cmd != update ]]; then
-    log warn "--dry-run has no effect on '$cmd'"
-  fi
-  if [[ $FORCE == true ]]; then
-    log warn "--force has no effect on '$cmd'"
-  fi
+  case "$cmd" in
+    install | uninstall | link | interactive) ;;
+    *)
+      if [[ $FORCE == true ]]; then
+        log warn "--force has no effect on '$cmd'"
+      fi
+      ;;
+  esac
 }
 
 # ════════════════════════════════════════════════════════════════════════
@@ -602,44 +609,216 @@ warn_unused_flags() {
 
 cmd_help() {
   local topic="${1:-}"
-  if [[ -n $topic ]]; then
-    case "$topic" in
-      install | link | unlink | uninstall | default | update | status | doctor | help | version)
-        echo "dotfiles.sh help $topic: detailed help comes in Step 13."
-        return 0
-        ;;
-      *)
-        log error "no help for unknown command: $topic"
-        exit 2
-        ;;
-    esac
-  fi
+  case "$topic" in
+    "") _help_main ;;
+    install)
+      cat <<'EOF'
+dotfiles install [tool...] [-d] [-v] [--force]
 
+Install tools and link their configs.
+
+  dotfiles install            interactive (same as plain "dotfiles"):
+                              screen 1: the default: list; Enter installs every missing one
+                              screen 2: packages:, [x] = enabled; Enter continues,
+                              numbers switch tools on/off. On = install + link,
+                              switched off = unlink (the program stays installed)
+  dotfiles install neovim fd  those tools: install the package if its command is
+                              missing, link every config, set enabled: true
+
+Picking in lists: 1 3 5, 2-4, a = all, Enter = continue.
+A real file in the way is backed up to <file>.bak after you say y.
+
+  -d  show what would happen, change nothing
+  -v  show every step (interactive mode is quiet otherwise)
+  --force  no questions, no backups: replace whatever is in the way
+
+Examples:
+  dotfiles install -dv neovim
+  dotfiles
+EOF
+      ;;
+    uninstall)
+      cat <<'EOF'
+dotfiles uninstall [tool...] [-d] [-v] [--force]
+
+Remove tools: the package, then the config links (backups are put back),
+then enabled: false.
+
+  dotfiles uninstall          interactive: pick from the enabled tools
+  dotfiles uninstall cowsay   that tool
+
+Asks "remove package X? [y/N]" for each package; n leaves everything as is.
+Removes the package only (pacman -R, apt-get remove, ...), never its
+dependencies. A tool with only a manual: install is just unlinked.
+
+  -d  show what would happen, change nothing
+  -v  show every step
+  --force  don't ask before removing packages
+
+Example:
+  dotfiles uninstall -dv cowsay
+EOF
+      ;;
+    link)
+      cat <<'EOF'
+dotfiles link [tool...] [-d] [-v] [--force]
+
+Create the config symlinks only; installs nothing. No tool = every tool with
+enabled: true in config.yaml. Sets enabled: true when all links are in place.
+
+What's in the way:
+  nothing                   link it
+  already our link          "already linked"
+  a real file               ask, back it up to <file>.bak, link it
+  a real folder             leave it alone (warn)
+  a link to somewhere else  ask, replace it
+
+Never touches anything inside the repo (through a linked folder).
+
+  -d  show what would happen, change nothing
+  -v  show every step
+  --force  no questions, no backups: replace files and folders
+
+Example:
+  dotfiles link -dv neovim
+EOF
+      ;;
+    unlink)
+      cat <<'EOF'
+dotfiles unlink [tool...] [-d] [-v]
+
+Remove the config symlinks and put any <file>.bak back. No tool = every tool
+with enabled: true. Sets enabled: false. Leaves anything that isn't its own
+link alone, and never uninstalls the program.
+
+  -d  show what would happen, change nothing
+  -v  show every step
+
+Example:
+  dotfiles unlink -dv neovim
+EOF
+      ;;
+    default)
+      cat <<'EOF'
+dotfiles default [-d] [-v]
+
+Install every package in the default: list of config.yaml, link nothing.
+For machines that only need the basics (test VMs). A name that is also
+under packages: uses that entry's package names; any other name is
+installed as written. Already installed packages are skipped.
+
+  -d  show what would be installed (with versions), change nothing
+  -v  show every step
+
+Example:
+  dotfiles default -dv
+EOF
+      ;;
+    update)
+      cat <<'EOF'
+dotfiles update [-d] [-v]
+
+Get the latest repo changes and bring this machine in line with them:
+  1. git fetch, and list the incoming commits
+  2. git pull --rebase --autostash (your local changes are set aside and
+     put back; a conflict stops with how to continue or undo)
+  3. install anything missing for enabled tools (never upgrades), relink
+
+  -d  fetch and show what's incoming, pull nothing, change nothing
+  -v  show every step
+
+Example:
+  dotfiles update -dv
+EOF
+      ;;
+    status)
+      cat <<'EOF'
+dotfiles status [tool] [-v]
+
+  dotfiles status          every tool: ENABLED, INSTALLED, LINKED (true/false),
+                           then the default: list with installed versions
+  dotfiles status neovim   one tool: package, command, where it's installed,
+                           version, and each link (source, symlink, problem)
+
+ENABLED here means installed and linked on this machine. When config.yaml's
+enabled: says otherwise, status adds a note. Changes nothing.
+
+Example:
+  dotfiles status neovim
+EOF
+      ;;
+    doctor)
+      cat <<'EOF'
+dotfiles doctor [-d] [-v]
+
+Check that everything dotfiles needs is in place, and fix what it can:
+  OS and package manager, git, yq (installs either when missing; on
+  Debian/Ubuntu yq comes from its GitHub release, checksum-verified),
+  config.yaml, the dotfiles command and config links, PATH, every tool in
+  config.yaml, and the default: list.
+
+Exit code 1 when a check fails.
+
+  -d  show what it would install or link, change nothing
+  -v  show what every tool resolves to on this machine
+
+Example:
+  dotfiles doctor -dv
+EOF
+      ;;
+    help)
+      cat <<'EOF'
+dotfiles help [command]
+
+Show the overview, or help for one command:
+  install, uninstall, link, unlink, default, update, status, doctor, help, version
+EOF
+      ;;
+    version)
+      cat <<'EOF'
+dotfiles version
+
+Print this script's version (DOTFILES_VERSION), which is separate from the
+repo's release versions.
+EOF
+      ;;
+    *)
+      log error "no help for unknown command: $topic (see: dotfiles help)"
+      exit 2
+      ;;
+  esac
+}
+
+_help_main() {
   cat <<EOF
-dotfiles.sh $DOTFILES_VERSION
+dotfiles $DOTFILES_VERSION: install, link and manage the tools in this repo
 
-Usage: dotfiles.sh [command] [tool...] [flags]
-       dotfiles.sh            with no command: interactive install
+Usage: dotfiles [command] [tool...] [flags]
+       dotfiles                 interactive install
 
 Commands:
-  install [tool...]     install packages and link their configs (no tool = interactive)
-  uninstall [tool...]   remove packages and unlink their configs (no tool = interactive)
-  link [tool...]        create symlinks only (no tool = all enabled tools)
-  unlink [tool...]      remove symlinks (no tool = all enabled tools)
-  update                git pull, install missing packages, relink
-  default               install the default: list from config.yaml, link nothing
-  status [tool]         show tools, links and the default: list
-  doctor                check git, yq, config.yaml and OS detection; installs missing git/yq
-  help [command]        show this help, or help for one command
-  version               print the script version
+  install [tool...]     install tools and link their configs (no tool = interactive)
+  uninstall [tool...]   remove tools and unlink their configs (no tool = interactive)
+  link [tool...]        create config symlinks only (no tool = enabled tools)
+  unlink [tool...]      remove config symlinks (no tool = enabled tools)
+  default               install the default: list, link nothing
+  update                pull the repo, install what's missing, relink
+  status [tool]         what's installed and linked
+  doctor                check (and fix) what dotfiles needs
+  help [command]        this overview, or help for one command
+  version               print the version
 
-Flags:
-  -d, --dry-run         show what would happen, change nothing (install, link, unlink, uninstall, default, update, doctor)
-  --force               no prompts, no backups (install, link, unlink, uninstall)
-  -v, --verbose         show debug lines in the terminal
-  Short flags combine: -dv = --dry-run --verbose
+Flags (work anywhere on the line):
+  -d, --dry-run         show what would happen, change nothing
+  -v, --verbose         show every step
+  --force               no questions, no backups (install, uninstall, link)
+  Short flags combine: -dv
 
-Log file: ${LOG_FILE:-<not available>}
+Files:
+  config:  ${DOTFILES_CONFIG:-<not found>}
+  log:     ${LOG_FILE:-<not available>}
+
+More: dotfiles help <command>
 EOF
 }
 
