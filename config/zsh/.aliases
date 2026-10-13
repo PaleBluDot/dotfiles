@@ -91,7 +91,7 @@ alias sudp="sudo"
 # @@@ NAVIGATION
 # !------------------------------------
 alias cd='zd'
-alias dotfiles="cd $DOTFILES"
+alias dots="cd $DOTFILES"
 alias github="cd $GITHUB_DIR"
 alias sshd="cd /etc/ssh"
 
