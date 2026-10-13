@@ -565,7 +565,7 @@ warn_unused_flags() {
   case "$cmd" in
     install | link | unlink | uninstall | interactive) return 0 ;;
   esac
-  if [[ $DRY_RUN == true && $cmd != doctor && $cmd != default ]]; then
+  if [[ $DRY_RUN == true && $cmd != doctor && $cmd != default && $cmd != update ]]; then
     log warn "--dry-run has no effect on '$cmd'"
   fi
   if [[ $FORCE == true ]]; then
@@ -611,7 +611,7 @@ Commands:
   version               print the script version
 
 Flags:
-  -d, --dry-run         show what would happen, change nothing (install, link, unlink, uninstall, default, doctor)
+  -d, --dry-run         show what would happen, change nothing (install, link, unlink, uninstall, default, update, doctor)
   --force               no prompts, no backups (install, link, unlink, uninstall)
   -v, --verbose         show debug lines in the terminal
   Short flags combine: -dv = --dry-run --verbose
@@ -632,7 +632,7 @@ _not_built() {
   exit 1
 }
 cmd_interactive() { _interactive_install; }
-cmd_update()    { _not_built update 10; }
+
 # ─── status (plan Sections 7 and 8) ─────────────────────────────────────
 
 # Program output (tables, details): stdout, and a copy in the log file.
@@ -1643,6 +1643,89 @@ _interactive_uninstall() {
     fi
   done
   if [[ $failed == true ]]; then
+    exit 1
+  fi
+}
+
+# ─── update (plan Section 7) ────────────────────────────────────────────
+
+# Fetch, show what's coming in, then pull --rebase --autostash. A dry run
+# fetches (changes no files) and stops before pulling.
+_update_pull() {
+  local upstream output incoming
+  if ! upstream="$(git -C "$DOTFILES" rev-parse --abbrev-ref '@{u}' 2>/dev/null)"; then
+    log error "the current branch has no upstream to pull from; set one with: git -C \"$DOTFILES\" branch --set-upstream-to origin/<branch>"
+    return 1
+  fi
+
+  log info "fetching $upstream"
+  if ! output="$(git -C "$DOTFILES" fetch 2>&1)"; then
+    log error "git fetch failed: $output"
+    return 1
+  fi
+  if [[ -n $output ]]; then
+    _log_to_file "DEBUG" "  > $output"
+  fi
+
+  # HEAD..@{u} = commits on the upstream that aren't here yet.
+  incoming="$(git -C "$DOTFILES" log --oneline 'HEAD..@{u}')"
+  if [[ -z $incoming ]]; then
+    log success "repo: up to date with $upstream"
+    return 0
+  fi
+  out "Incoming from $upstream:"
+  while IFS= read -r output; do
+    out "  $output"
+  done <<<"$incoming"
+
+  if [[ $DRY_RUN == true ]]; then
+    log info "dry run: the installs and links below use config.yaml as it is now; the pull may change it"
+  fi
+  if ! run_cmd git -C "$DOTFILES" pull --rebase --autostash; then
+    log error "git pull failed. Check: git -C \"$DOTFILES\" status. If a rebase is in progress, fix the files, then git rebase --continue (or git rebase --abort to undo)."
+    return 1
+  fi
+  if [[ $DRY_RUN != true ]]; then
+    log success "repo: pulled from $upstream"
+  fi
+}
+
+cmd_update() {
+  _require_config
+  if ! command -v git >/dev/null 2>&1; then
+    log error "git isn't installed; run: dotfiles.sh doctor"
+    exit 1
+  fi
+  if ! git -C "$DOTFILES" rev-parse --git-dir >/dev/null 2>&1; then
+    log error "$DOTFILES isn't a git repo; nothing to pull"
+    exit 1
+  fi
+  if ! _update_pull; then
+    exit 1
+  fi
+
+  # Install what's missing (no upgrades) and relink every enabled package.
+  local tool good="" bad=""
+  TOOLS=()
+  while IFS= read -r tool; do
+    if [[ $(tool_enabled "$tool") == true ]]; then
+      TOOLS+=("$tool")
+    fi
+  done < <(manifest_tools)
+  if [[ ${#TOOLS[@]} -eq 0 ]]; then
+    log info "update: no package has enabled: true; nothing to install or link"
+    return 0
+  fi
+  for tool in "${TOOLS[@]}"; do
+    CHANGED=false
+    if ! _install_tool "$tool"; then
+      bad="${bad:+$bad, }$tool"
+    elif [[ $CHANGED == true ]]; then
+      good="${good:+$good, }$(_tool_with_version "$tool")"
+    fi
+  done
+  _summary "installed or linked" "$good" "$bad"
+  if [[ -n $bad ]]; then
     exit 1
   fi
 }
