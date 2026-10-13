@@ -1336,7 +1336,12 @@ _inject_path() {
     return 1
   fi
   chmod 600 "$tmp"
-  if [[ -f $dest_path && ! -L $dest_path ]] && cmp -s "$tmp" "$dest_path"; then
+
+  # Up to date = same content under the 4-line header (the header's time is
+  # when the content last changed, so it isn't compared).
+  local first="# GENERATED FILE: do not edit. Changes here are overwritten."
+  if [[ -f $dest_path && ! -L $dest_path && $(head -n 1 "$dest_path") == "$first" ]] &&
+    tail -n +5 "$dest_path" | cmp -s - "$tmp"; then
     rm -f "$tmp"
     CHANGED=false
     log success "$tool: already up to date: $shown (filled in from 1Password)"
@@ -1345,7 +1350,16 @@ _inject_path() {
   if [[ -L $dest_path ]]; then
     log info "$tool: replacing the symlink $shown with the filled-in file"
   fi
-  mv -f "$tmp" "$dest_path"
+  {
+    printf '%s\n' "$first" \
+      "# Source: $(_tilde "$src_path") (op:// references filled in by op inject)" \
+      "# Edit the source, then run: dotfiles link $tool" \
+      "# Generated: $(_timestamp)"
+    cat "$tmp"
+  } >"$tmp.full"
+  chmod 600 "$tmp.full"
+  rm -f "$tmp"
+  mv -f "$tmp.full" "$dest_path"
   log success "$tool: filled $shown from ${src_path#"$DOTFILES"/} (owner-only)"
 }
 
