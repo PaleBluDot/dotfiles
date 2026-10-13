@@ -44,6 +44,11 @@ export ZSH_COMPDUMP=""
 export LESSHISTFILE=-
 export NODE_REPL_HISTORY=""
 
+# PAGER
+# Neovim as manpager
+# -----------------------
+export MANPAGER="nvim +Man!"
+
 # PATH
 # -----------------------
 export PATH="$DOTFILES/bin:$HOME/bin:$HOME/.config/npm/bin:$GOPATH/bin:${GOROOT:+$GOROOT/bin:}$HOME/.docker/bin:$PATH"
