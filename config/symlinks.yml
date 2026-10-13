@@ -105,6 +105,11 @@ warp:
   symlinks:
     starburst.yml: ~/.warp/starburst.yml
 
+wezterm:
+  enabled: true
+  symlinks:
+    wezterm.lua: ~/.config/wezterm/wezterm.lua
+
 zsh:
   enabled: true
   symlinks:

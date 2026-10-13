@@ -1,15 +1,27 @@
 "$schema" = 'https://starship.rs/config-schema.json'
 
+# color scheme
+# yellow #cef542
+# blue #0a63c9
+# red #d40f51
+# organge #db490b
+# pink #c91e7a
+# purple #9a348e
+# green #417e37
+# aqua #06969a
+# teal #33658a
+
 format = """
-[](#9A348E)\
+[](#cef542)\
 $os\
+[](fg:#cef542 bg:#0a63c9)\
 $username\
-[](bg:#d40f51 fg:#9A348E)\
-$directory\
-[](fg:#d40f51 bg:#417E37)\
+[](fg:#0a63c9 bg:#c91e7a)\
+${custom.directory}\
+[](fg:#c91e7a bg:#9a348e)\
 $git_branch\
 $git_status\
-[](fg:#417E37 bg:#cef542)\
+[](fg:#9a348e bg:#417e37)\
 $c\
 $elixir\
 $elm\
@@ -22,125 +34,177 @@ $nodejs\
 $nim\
 $rust\
 $scala\
-[](fg:#cef542 bg:#06969A)\
+[](fg:#417e37 bg:#06969a)\
 $docker_context\
-[](fg:#06969A bg:#33658A)\
+[](fg:#06969a bg:#33658a)\
 $time\
-[ ](fg:#33658A)\
+[ ](fg:#33658a)\
 """
 
 # Disable the blank line at the start of the prompt
 # add_newline = false
 
+# An alternative to the username module which displays a symbol that
+# represents the current operating system
+[os]
+style = "bg:#cef542 fg:#151515"
+format = "[ $symbol $path ]($style)"
+disabled = false # Disabled by default
+
+[os.symbols]
+Arch = "󰣇"
+Debian = ""
+FreeBSD = ""
+Linux = ""
+Macos = ""
+Windows = ""
+
 # You can also replace your username with a neat symbol like   or disable this
 # and use the os module below
 [username]
 show_always = true
-style_user = "bg:#9A348E"
-style_root = "bg:#9A348E"
-format = '[$user ]($style)'
+# symbol = ""
+style_user = "bg:#0a63c9"
+style_root = "bg:#db490b"
+format = '[ $user ]($style)'
 disabled = false
 
-# An alternative to the username module which displays a symbol that
-# represents the current operating system
-[os]
-style = "bg:#9A348E"
-disabled = true # Disabled by default
-
 [directory]
-style = "bg:#d40f51"
-format = "[ $path ]($style)"
+style = "bold bg:#c91e7a"
+# home_symbol = ""
+format = "[ 󰉋 $path ]($style)"
 truncation_length = 3
 truncation_symbol = "…/"
 
+# Replaces $directory in the format above. Inside a github.com/<org>/<repo>
+# folder it shows the GitHub icon + repo name (plus any subfolder you're in).
+# Everywhere else it shows a normal short path.
+[custom.directory]
+description = "GitHub icon + repo name inside github.com/<org>/<repo>, else the path"
+when = true
+shell = ["bash", "--noprofile", "--norc"]
+command = '''
+case "$PWD" in
+  */github.com/*/*)
+    rest=${PWD#*/github.com/}
+    org=${rest%%/*}
+    rest=${rest#*/}
+    repo=${rest%%/*}
+    sub=""
+    if [ "$rest" != "$repo" ]; then
+      sub="/${rest#*/}"
+      # keep only the last 2 subfolders: /…/b/c
+      if [ "$(printf '%s' "$sub" | tr -cd '/' | wc -c)" -gt 2 ]; then
+        sub="/…/$(basename "$(dirname "$sub")")/$(basename "$sub")"
+      fi
+    fi
+    # \357\220\210 is the GitHub icon (Nerd Font U+F408) as UTF-8 bytes.
+    # No clickable link: starship can't mark OSC 8 links as zero-width for zsh,
+    # which throws off the cursor position.
+    printf '\357\220\210 %s%s' "$repo" "$sub"
+    ;;
+  *)
+    path=${PWD/#$HOME/\~}
+    # same as the directory module: last 3 folders, "…/" when cut
+    if [ "$(printf '%s' "$path" | tr -cd '/' | wc -c)" -gt 3 ]; then
+      path="…/$(printf '%s' "$path" | rev | cut -d/ -f1-3 | rev)"
+    fi
+    printf '󰉋 %s' "$path"
+    ;;
+esac
+'''
+style = "bold bg:#c91e7a"
+format = "[ $output ]($style)"
+
 # Here is how you can shorten some long paths by text replacement
 # similar to mapped_locations in Oh My Posh:
-[directory.substitutions]
-"Documents" = "󰈙 "
-"Downloads" = " "
-"Music" = " "
-"Pictures" = " "
-
-[c]
-symbol = " "
-style = "bg:#cef542 fg:#1a1a1a"
-format = '[ $symbol ($version) ]($style)'
-
-[cpp]
-symbol = " "
-style = "bg:#cef542 fg:#1a1a1a"
-format = '[ $symbol ($version) ]($style)'
-
-[docker_context]
-symbol = " "
-style = "bg:#06969A"
-format = '[ $symbol $context ]($style)'
-
-[elixir]
-symbol = " "
-style = "bg:#cef542 fg:#1a1a1a"
-format = '[ $symbol ($version) ]($style)'
-
-[elm]
-symbol = " "
-style = "bg:#cef542 fg:#1a1a1a"
-format = '[ $symbol ($version) ]($style)'
+# [directory.substitutions]
+# "Documents" = "󰈙"
+# "Downloads" = ""
+# "Music" = ""
+# "Pictures" = ""
+# "aclu-emails" = "󱃜"
 
 [git_branch]
-symbol = ""
-style = "bg:#417E37"
+symbol = "󰊢"
+style = "bold bg:#9a348e"
 format = '[ $symbol $branch ]($style)'
 
 [git_status]
-style = "bg:#417E37"
+style = "bold bg:#9a348e"
 format = '[$all_status$ahead_behind ]($style)'
 
+[c]
+symbol = ""
+style = "bold bg:#417e37"
+format = '[ $symbol ($version) ]($style)'
+
+[cpp]
+symbol = ""
+style = "bold bg:#417e37"
+format = '[ $symbol ($version) ]($style)'
+
+[elixir]
+symbol = ""
+style = "bold bg:#417e37"
+format = '[ $symbol ($version) ]($style)'
+
+[elm]
+symbol = ""
+style = "bold bg:#417e37"
+format = '[ $symbol ($version) ]($style)'
+
 [golang]
-symbol = " "
-style = "bg:#cef542 fg:#1a1a1a"
+symbol = "󰟓"
+style = "bold bg:#417e37"
 format = '[ $symbol ($version) ]($style)'
 
 [gradle]
-style = "bg:#cef542 fg:#1a1a1a"
+style = "bold bg:#417e37"
 format = '[ $symbol ($version) ]($style)'
 
 [haskell]
 symbol = " "
-style = "bg:#cef542 fg:#1a1a1a"
+style = "bold bg:#417e37"
 format = '[ $symbol ($version) ]($style)'
 
 [java]
 symbol = " "
-style = "bg:#cef542 fg:#1a1a1a"
+style = "bold bg:#417e37"
 format = '[ $symbol ($version) ]($style)'
 
 [julia]
 symbol = " "
-style = "bg:#cef542 fg:#1a1a1a"
+style = "bold bg:#417e37"
 format = '[ $symbol ($version) ]($style)'
 
 [nodejs]
-symbol = ""
-style = "bg:#cef542 fg:#1a1a1a"
+symbol = "󰎙"
+style = "bold bg:#417e37"
 format = '[ $symbol ($version) ]($style)'
 
 [nim]
-symbol = "󰆥 "
-style = "bg:#cef542 fg:#1a1a1a"
+symbol = "󰆥"
+style = "bold bg:#417e37"
 format = '[ $symbol ($version) ]($style)'
 
 [rust]
-symbol = ""
-style = "bg:#cef542 fg:#1a1a1a"
+symbol = ""
+style = " bold bg:#417e37"
 format = '[ $symbol ($version) ]($style)'
 
 [scala]
 symbol = " "
-style = "bg:#cef542 fg:#1a1a1a"
+style = "bold bg:#417e37"
 format = '[ $symbol ($version) ]($style)'
 
+[docker_context]
+symbol = "󰡨"
+style = "bold bg:#06969a"
+format = '[ $symbol $context ]($style)'
+
 [time]
-disabled = false
-time_format = "%R" # Hour:Minute Format
-style = "bg:#33658A"
-format = '[ ♥ $time ]($style)'
+disabled = true
+time_format = "%R"
+style = "bold bg:#33658a"
+format = '[  $time ]($style)'

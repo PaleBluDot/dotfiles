@@ -1,0 +1,4 @@
+# Git reads ~/.config/git/config (XDG); the shared settings live in .gitconfig
+# so the same file can also be linked as ~/.gitconfig on other machines.
+[include]
+	path = .gitconfig

@@ -1,0 +1,217 @@
+# dotfiles.sh config (plan.md Section 18)
+# Repo: config/dotfiles/config.yaml, linked to ~/.config/dotfiles/config.yaml
+
+# Script settings. Commented lines show the built-in default.
+settings:
+  # log_file: ~/.local/state/dotfiles/dotfiles.log
+  # backup_suffix: .bak
+
+# Installed by "dotfiles.sh default", nothing linked (for quick machines).
+# A name that is also under packages: uses that entry's package names.
+default: []
+
+# The key is the config/ folder name. Add a manager (pacman, apt, dnf,
+# brew, winget) where its package name differs from the key; "none" = not there.
+#   command:  only when the command isn't the key (can also be per manager)
+#   manual:   no package manager installs it; this message says how
+#   links:    src is a path under config/, dest a path under $HOME;
+#             add windows:/macos:/linux: when that OS needs another dest
+#   enabled:  written by install/link (true) and uninstall/unlink (false)
+#   inject:   on a link: the file holds op:// references; dest gets a copy
+#             filled in by op inject (owner-only) instead of a symlink
+packages:
+  bash:
+    enabled: true
+    links:
+      - src: bash
+        dest: .config/bash
+
+  bat:
+    enabled: true
+    links:
+      - src: bat
+        dest: .config/bat
+
+  btop:
+    enabled: true
+    links:
+      - src: btop
+        dest: .config/btop
+
+  chromium-flags.conf:
+    enabled: true
+    pacman: chromium
+    command: chromium
+    links:
+      - src: chromium-flags.conf
+        dest: .config/chromium-flags.conf
+
+  cspell:
+    enabled: true
+    manual: "Not auto-installed. Install by hand: npm install -g cspell"
+    links:
+      - src: cspell
+        dest: .config/cspell
+
+  espanso:
+    enabled: true
+    manual: "AUR package: omarchy pkg aur add espanso-wayland"
+    links:
+      - src: espanso
+        dest: .config/espanso
+
+  fastfetch:
+    enabled: true
+    links:
+      - src: fastfetch
+        dest: .config/fastfetch
+
+  fd:
+    enabled: false
+    apt: fd-find
+    dnf: fd-find
+    winget: sharkdp.fd
+    links:
+      - src: fd/ignore
+        dest: .config/fd/ignore
+
+  fontconfig:
+    enabled: true
+    command: fc-list
+    links:
+      - src: fontconfig
+        dest: .config/fontconfig
+
+  ghostty:
+    enabled: true
+    links:
+      - src: ghostty
+        dest: .config/ghostty
+
+  git:
+    enabled: true
+    links:
+      - src: git
+        dest: .config/git
+
+  gobuster:
+    enabled: true
+    links:
+      - src: gobuster
+        dest: .config/gobuster
+
+  hypr:
+    enabled: true
+    pacman: hyprland
+    command: Hyprland
+    links:
+      - src: hypr
+        dest: .config/hypr
+
+  hyprland-preview-share-picker:
+    enabled: true
+    links:
+      - src: hyprland-preview-share-picker
+        dest: .config/hyprland-preview-share-picker
+
+  lazygit:
+    enabled: true
+    links:
+      - src: lazygit
+        dest: .config/lazygit
+
+  nano:
+    enabled: true
+    links:
+      - src: nano
+        dest: .config/nano
+
+  nvim:
+    enabled: true
+    pacman: neovim
+    winget: Neovim.Neovim
+    links:
+      - src: nvim
+        dest: .config/nvim
+
+  npm:
+    enabled: true
+    manual: "Comes with Node.js, installed by mise"
+    links:
+      - src: npm
+        dest: .config/npm
+
+  omarchy:
+    enabled: true
+    links:
+      - src: omarchy
+        dest: .config/omarchy
+
+  ssh:
+    enabled: true
+    pacman: openssh
+    links:
+      - src: ssh/config
+        dest: .ssh/config
+        inject: true # holds op:// references; written filled-in, not linked
+
+  starship:
+    enabled: true
+    links:
+      - src: starship
+        dest: .config/starship
+
+  thefuck:
+    enabled: true
+    links:
+      - src: thefuck
+        dest: .config/thefuck
+
+  tmux:
+    enabled: true
+    links:
+      - src: tmux
+        dest: .config/tmux
+
+  vim:
+    enabled: true
+    links:
+      - src: vim
+        dest: .config/vim
+
+  vscode:
+    enabled: true
+    pacman: visual-studio-code-bin
+    command: code
+    links:
+      - src: vscode
+        dest: .config/vscode
+
+  wezterm:
+    enabled: true
+    links:
+      - src: wezterm
+        dest: .config/wezterm
+
+  xdg-terminals.list:
+    enabled: true
+    pacman: xdg-terminal-exec
+    command: xdg-terminal-exec
+    links:
+      - src: xdg-terminals.list
+        dest: .config/xdg-terminals.list
+
+
+  yazi:
+    enabled: true
+    links:
+      - src: yazi
+        dest: .config/yazi
+
+  zsh:
+    enabled: true
+    links:
+      - src: zsh
+        dest: .config/zsh
+      - src: zsh/.zshenv
+        dest: .zshenv

@@ -1,173 +1,98 @@
 # !------------------------------------
-# @@@ LINUX
+# @@@ SHELL
 # !------------------------------------
-# Force terminal to recognize changes to .zshrc
 if [[ -n "$ZSH_VERSION" ]]
 then
-	alias refresh="source ~/.zshrc"
+	alias reload='source "${ZDOTDIR:-$HOME}/.zshrc"'
 else
-	alias refresh="source ~/.bashrc"
+	alias reload="source ~/.bashrc"
 fi
 
-alias fresh="refresh"
-alias aliasUpdate="fresh 2>&1 && c"
-
-# Clear terminal
 alias c="clear"
-
-alias ls='eza --icons --group-directories-last'
-
-alias ll="ls -lha"
-
-# Ask before removing files
-alias rm="rm -i"
-
-# Update and Upgrade
-alias uu='sudo apt update && sudo apt upgrade -y'
-
-# Create a user
-alias adduser='sudo adduser $1'
-
-# Remove a user
-alias deluser='sudo deluser --remove-home $1'
-
-# Create a group
-alias addgroup='sudo usermod -aG $1 $2'
-
-# Remove a group
-alias delgroup='sudo usermod -G $1 $2'
-
-# Search history. Example usage: `histg git` to recent commands that use git
-alias histg="history | grep"
-
-# Remove Package
-alias rmdpkg='sudo apt-get --purge remove $1'
-
-# Make all files in ~/scripts executable
-alias xbin='chmod +x ~/bin/*'
-
-# Copy SSH Key to remote server
-alias sshcopy="ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 22 $1"
-
-# Short for calling goBuster
-alias gd="gobuster -w ~/.config/gobuster.txt"
-
-# Rename ~/.bash_aliases to ~/.aliases
-alias alre="sed -i 's/~\/.bash_aliases/~\/.aliases/g' ~/.bashrc"
-
-# wget without history
-alias wget='wget --no-hsts'
+alias cl="clear"
+alias fenv='source "$ZDOTDIR/.zshenv"'
+alias fresh="source $ZDOTDIR/.zshrc; clear"
+alias aliasUpdate="fresh 2>&1 && c"
+alias histg="history | fzf"
+alias findAlias="alias | fzf"
+alias tobash="chsh $USER -s /bin/bash && echo 'Log out and log back in for change to take effect.'"
+alias tozsh="chsh $USER -s /bin/zsh && echo 'Log out and log back in for change to take effect.'"
 
 
 # !------------------------------------
-# @@@ CHANGE DIRECTORIES
+# @@@ CODING AGENTS
 # !------------------------------------
-# PaleBluDot
-alias dotfiles="cd $DOTFILES"
-alias home="cd ~/"
-alias github="cd $GITHUB_DIR"
-alias cspell-dictionaries="cd ~/Github/PaleBluDot/cspell-dictionaries"
-alias lint-config="cd ~/Github/PaleBluDot/lint-config"
-alias psd="cd ~/Github/PaleBluDot/website"
-alias aclu-emails="cd ~/Github/PaleBluDot/aclu-emails"
-alias playground="cd /Users/psanchez/Library/CloudStorage/OneDrive-Personal/Dev/demos/jsExplorer"
-
-# taste-ink
-alias tasteink="cd ~/Github/taste-ink/tasteink.studio"
-
-# american-technion-society
-alias ats="cd ~/Github/American-Technion-Society/purple"
-alias publications="cd ~/Github/American-Technion-Society/publications"
-
-# aclu-national
-alias builder="cd ~/Github/ACLU-National/email-builder"
-
-
-alias sshd="cd /etc/ssh"
-
-alias findAlias="alias | grep \"$1\""
+alias cc='claude'
+alias cx='codex'
+alias co='copilot'
+alias hm='hermes'
+alias oc='opencode'
+alias a="omarchy-agent --inline"
+alias ic='tdl c'
+alias icx='tdl c cx'
+alias ix='tdl cx'
 
 
 # !------------------------------------
 # @@@ FILE EDITS
 # !------------------------------------
-# Edit aliases
-alias edit="$EDITOR ~/.config/dotfiles/config/zsh/.aliases"
-
+# alias edit="$EDITOR"   # replaced by the edit() function in .functions
+alias ea="$EDITOR $DOTFILES/config/zsh/.aliases"
+alias ef="$EDITOR $DOTFILES/config/zsh/.functions"
+alias ee="$EDITOR $DOTFILES/config/zsh/.zshenv"
+alias vi="nvim"
+alias vim="nvim"
 alias base="$EDITOR ~/Library/CloudStorage/OneDrive-Personal/Documents/Espanso/match/base.yml"
-
-# Configure Static IP
-alias netcfg='sudo nano /etc/netplan/50-cloud-init.yaml'
-
-# Configure Hostname
-alias cloudcfg='sudo nano /etc/cloud/cloud.cfg'
-
-# See Groups
-alias group='cat /etc/group'
-
+alias netcfg="sudo $EDITOR /etc/netplan/50-cloud-init.yaml"
+alias cloudcfg="sudo $EDITOR /etc/cloud/cloud.cfg"
 
 
 # !------------------------------------
-# @@@ Manipulations
+# @@@ FILES
 # !------------------------------------
-alias comlist='cat test.html | tr "\n" "," > comma-list.txt'
-
+alias ls="eza --icons --group-directories-last"
+alias ll="ls -lh"
+alias la="ls -lah"
+alias lt="ls --tree"
+alias l.='ls -la ../'
+alias l..='ls -la ../../'
+alias l...='ls -la ../../../'
+alias cp="cp -i"
+alias mv="mv -i"
+alias rm="rm -i"
+alias mkdir="mkdir -p"
+alias df="df -h"
+alias du="du -h"
+alias free="free -h"
+alias xbin="chmod +x ~/bin/*"
+alias decompress='tar -xzf'
+alias ff='fzf --preview '\''bat --style=numbers --color=always {}'\'''
+alias eff='$EDITOR "$(ff)"'
 
 
 # !------------------------------------
 # @@@ GIT
 # !------------------------------------
 alias gs="git status"
-alias s="git status -s"
-alias gbs="git status -bs"
-alias clone="git clone"
-alias gnit="git init"
+alias gss="git status -s"
+alias gsb="git status -bs"
+alias gc="git clone"
+alias gi="git init"
 alias gcm="git commit -m"
-alias amend="git commit --amend --no-edit"
+alias gam="git commit --amend --no-edit"
 alias ga="git add"
 alias gaa="git add ."
-alias push="git push"
-alias pushup="git push -u origin main"
-alias pull="git pull"
-alias nb="git checkout -b"
-alias switch="git switch"
+alias gp="git push"
+alias gpu='git push -u origin HEAD'
+alias gpl="git pull"
+alias gco="git checkout -b"
+alias gsw="git switch"
+alias gwatch='watch -c "git -c color.status=always status"'
+alias gwatchdots='watch -c "git -C $DOTFILES -c color.status=always status"'
+alias taildots='tail -f "${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/dotfiles.log"'
 alias save="gaa && gcm \"chore: save point\""
 alias incom="gaa && gcm \"initial commit\""
 alias cached="git rm -r --cached"
-
-
-# !------------------------------------
-# @@@ NPM
-# !------------------------------------
-alias toi="npm init --scope=@taste-ink --init-author-email=23495830+PaleBluDot@users.noreply.github.com -y"
-alias npmi="npm init"
-alias npmiy="npm init -y"
-alias build="npm run build"
-alias dev="npm run dev"
-alias start="npm run start"
-alias commit="npm run commit"
-alias clean-node="rm -rf ./node_modules && rm -rf package-lock.json"
-
-
-# !------------------------------------
-# @@@ NETWORKING
-# !------------------------------------
-# Get your current IP
-alias myip="curl http://ipecho.net/plain; echo"
-# alias localip="ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'"
-alias ping="ping -c 3"
-
-
-# !------------------------------------
-# @@@ OS SPECIFIC
-# !------------------------------------
-# Open VSCode Insiders
-alias code="code-insiders"
-
-# Use teach user data
-alias teach="code-insiders --extensions-dir ~/code_profiles/teach/exts --user-data-dir ~/code_profiles/teach/data"
-
-alias brew-installs="brew list > .config/brew.txt"
 
 
 # !------------------------------------
@@ -176,3 +101,101 @@ alias brew-installs="brew list > .config/brew.txt"
 alias get="git"
 alias got="git"
 alias sudp="sudo"
+
+
+# !------------------------------------
+# @@@ NAVIGATION
+# !------------------------------------
+alias cd='zd'
+alias ..='cd ..'
+alias ...='cd ../..'
+alias .3='cd ../../..'
+alias 3..='cd ../../..'
+alias dots="cd $DOTFILES"
+alias github="cd $GITHUB_DIR"
+alias sshd="cd /etc/ssh"
+
+
+# !------------------------------------
+# @@@ NETWORKING
+# !------------------------------------
+alias pubip='curl -fsS https://ifconfig.me; echo'
+alias locip='ip -4 route get 1.1.1.1 2>/dev/null | awk '\''{for (i = 1; i < NF; i++) if ($i == "src") print $(i + 1)}'\'''
+alias ping="ping -c3"
+alias sshcopy="ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 22"
+
+
+# !------------------------------------
+# @@@ NPM
+# !------------------------------------
+alias toi="npm init --scope=@taste-ink --init-author-email=23495830+PaleBluDot@users.noreply.github.com -y"
+alias npmi="npm init"
+alias npmiy="npm init -y"
+alias npmb="npm run build"
+alias npmd="npm run dev"
+alias npms="npm run start"
+alias npmc="npm run commit"
+alias clean-node="rm -rf ./node_modules && rm -rf package-lock.json"
+
+
+# !------------------------------------
+# @@@ PACKAGES
+# !------------------------------------
+alias rmdpkg="sudo apt-get --purge remove"
+alias brew-installs="brew list > ~/.config/brew.txt"
+alias mup='MISE_MINIMUM_RELEASE_AGE=0 mise up'
+
+
+# !------------------------------------
+# @@@ SHORTCUTS
+# !------------------------------------
+alias h="herdr"
+alias d="docker"
+alias g="git"
+alias r="rails"
+
+
+# !------------------------------------
+# @@@ TMUX
+# !------------------------------------
+alias tm="tmux attach -t main || tmux new -s main"
+alias tn="tmux new -s"
+alias ta="tmux attach -t"
+alias td="tmux detach"
+alias tl="tmux ls"
+alias tk="tmux kill-session -t"
+alias tka="tmux kill-server"
+alias trn="tmux rename-session -t"
+alias ts="tmux switch-client -t"
+
+
+# !------------------------------------
+# @@@ TOOLS
+# !------------------------------------
+alias gd="gobuster -w ~/.config/gobuster.txt"
+alias comlist='tr "\n" "," < test.html > comma-list.txt'
+alias wget="wget --no-hsts"
+alias jctl='journalctl -p 3 -xb'
+alias sctl='systemctl'
+alias sctlu='systemctl --user'
+alias bigfont="setfont ter-132b"
+alias regfont="setfont default8x16"
+alias grep='grep --color=auto'
+alias diff='diff --color=auto'
+
+
+# !------------------------------------
+# @@@ USERS & GROUPS
+# !------------------------------------
+alias adduser="sudo adduser"
+alias deluser="sudo deluser --remove-home"
+alias addgroup="sudo usermod -aG"
+alias delgroup="sudo gpasswd -d"
+alias group="cat /etc/group"
+
+
+# !------------------------------------
+# @@@ VS CODE
+# !------------------------------------
+alias code="code-insiders"
+alias teach="code --extensions-dir ~/code_profiles/teach/exts --user-data-dir ~/code_profiles/teach/data"

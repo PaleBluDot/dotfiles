@@ -1,18 +1,86 @@
+# Host entries 1Password generates (SSH bookmarks), if any.
+Include ~/.ssh/1Password/config
+
+# All keys live in 1Password; its agent approves every use. Agent path differs per OS.
+Match exec "test \"$(uname)\" = Darwin"
+    IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+
 Host *
-	IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+    IdentityAgent ~/.1password/agent.sock
+    # Each machine's public key is ~/.ssh/<hostname>.pub; %L is the short
+    # hostname. Only that key is offered.
+    IdentitiesOnly yes
+    IdentityFile ~/.ssh/%L.pub
+    SetEnv TERM=xterm-256color
 
+# Network
 Host pfsense
-	HostName {{ op://lab/pfsense/hostname }}
-	User {{ op://lab/pfsense/username }}
+    HostName {{ op://lab/pfsense/hostname }}
+    User {{ op://lab/pfsense/username }}
 
-Host pve
-	HostName {{ op://lab/pve/hostname }}
-	User {{ op://lab/pve/username }}
 
+# Servers
 Host helix
-	HostName {{ op://lab/helix/hostname }}
-	User {{ op://lab/helix/username }}
+    HostName {{ op://lab/helix/hostname }}
+    User {{ op://lab/helix/username }}
 
 Host blazar
-	HostName {{ op://lab/blazar/hostname }}
-	User {{ op://lab/blazar/username }}
+    HostName {{ op://lab/blazar/hostname }}
+    User {{ op://lab/blazar/username }}
+
+Host atlas
+    HostName {{ op://lab/atlas/hostname }}
+    User {{ op://lab/atlas/username }}
+
+
+# Devices
+Host s23u
+    HostName {{ op://lab/s23u/hostname }}
+    User {{ op://lab/s23u/username }}
+    Port {{ op://lab/s23u/port }}
+
+Host uconsole
+    HostName {{ op://lab/uconsole/hostname }}
+    User {{ op://lab/uconsole/username }}
+
+Host hackberry
+    HostName {{ op://lab/hackberry/hostname }}
+    User {{ op://lab/hackberry/username }}
+
+
+# VMs
+Host svr-ubuntu
+    HostName {{ op://lab/svr-ubuntu/hostname }}
+    User {{ op://lab/svr-ubuntu/username }}
+
+Host svr-arch
+    HostName {{ op://lab/svr-arch/hostname }}
+    User {{ op://lab/svr-arch/username }}
+
+Host svr-debian
+    HostName {{ op://lab/svr-debian/hostname }}
+    User {{ op://lab/svr-debian/username }}
+
+Host svr-kali
+    HostName {{ op://lab/svr-kali/hostname }}
+    User {{ op://lab/svr-kali/username }}
+
+Host svr-omarchy
+    HostName {{ op://lab/svr-omarchy/hostname }}
+    User {{ op://lab/svr-omarchy/username }}
+
+
+# Test
+Host svr-ubuntu-2204
+    HostName {{ op://lab/svr-ubuntu-2204/hostname }}
+    User {{ op://lab/svr-ubuntu-2204/username }}
+
+Host svr-centos-7
+    HostName {{ op://lab/svr-centos-7/hostname }}
+    User {{ op://lab/svr-centos-7/username }}
+
+
+# Tailnet
+Host tn-bluetrix
+    HostName {{ op://lab/tn-bluetrix/hostname }}
+    User {{ op://lab/tn-bluetrix/username }}
