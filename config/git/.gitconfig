@@ -1,8 +1,8 @@
 [user]
 	name = Pavel Sanchez
 	email = 23495830+PaleBluDot@users.noreply.github.com
-	# No signingkey here: each machine has exactly one public key in ~/.ssh,
-	# exposed as ~/.ssh/identity.pub, and 1Password signs with the matching private key.
+	# No signingkey here: each machine's public key is ~/.ssh/<hostname>.pub,
+	# and 1Password signs with the matching private key.
 [init]
 	defaultBranch = main
 [filter "lfs"]
@@ -13,8 +13,8 @@
 [gpg]
 	format = ssh
 [gpg "ssh"]
-	# Used when user.signingkey is unset: sign with this machine's only key.
-	defaultKeyCommand = sh -c 'echo key::$(cat ~/.ssh/identity.pub)'
+	# Used when user.signingkey is unset: sign with this machine's key, ~/.ssh/<hostname>.pub.
+	defaultKeyCommand = sh -c 'echo key::$(cat ~/.ssh/$(hostname -s).pub)'
 [commit]
 	gpgsign = true
 [tag]
