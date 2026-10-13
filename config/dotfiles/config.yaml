@@ -201,11 +201,6 @@ packages:
       - src: xdg-terminals.list
         dest: .config/xdg-terminals.list
 
-  yay:
-    enabled: true
-    links:
-      - src: yay
-        dest: .config/yay
 
   yazi:
     enabled: true
