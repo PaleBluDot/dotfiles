@@ -32,11 +32,9 @@ if TYPE_CHECKING:
 
 # ===== FILL THESE VARIABLES =====
 plex_base_url = "$PLEX_BASE_URL"
-plex_api_token = "$PLEX_API_TOKEN"
+plex_api_token = ""
 overseerr_base_url = "$OVERSEERR_BASE_URL"
-overseerr_api_token = (
-    "$OVERSEERR_API_TOKEN"
-)
+overseerr_api_token = ""
 # ================================
 
 # Environmental Variables
