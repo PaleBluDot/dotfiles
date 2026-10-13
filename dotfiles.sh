@@ -976,12 +976,18 @@ _and() {
 
 # One line per tool.
 _status_all() {
-  local tool installed linked
-  out "$(printf '%-16s %-8s %-10s %s' TOOL ENABLED INSTALLED LINKED)"
+  local tool installed linked width=4
+  # The first column is as wide as the longest tool name.
+  while IFS= read -r tool; do
+    if [[ ${#tool} -gt $width ]]; then
+      width=${#tool}
+    fi
+  done < <(manifest_tools)
+  out "$(printf '%-*s  %-8s %-10s %s' "$width" TOOL ENABLED INSTALLED LINKED)"
   while IFS= read -r tool; do
     installed="$(_tool_installed "$tool")"
     linked="$(_tool_linked "$tool")"
-    out "$(printf '%-16s %-8s %-10s %s' "$tool" "$(_and "$installed" "$linked")" "$installed" "$linked")"
+    out "$(printf '%-*s  %-8s %-10s %s' "$width" "$tool" "$(_and "$installed" "$linked")" "$installed" "$linked")"
   done < <(manifest_tools)
   _status_default_packages
 }
