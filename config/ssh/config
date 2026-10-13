@@ -7,10 +7,10 @@ Match exec "test \"$(uname)\" = Darwin"
 
 Host *
     IdentityAgent ~/.1password/agent.sock
-    # Each machine keeps exactly one public key, exposed as ~/.ssh/identity.pub
-    # (link.sh points it at the single *.pub). Only that key is offered.
+    # Each machine's public key is ~/.ssh/<hostname>.pub; %L is the short
+    # hostname. Only that key is offered.
     IdentitiesOnly yes
-    IdentityFile ~/.ssh/identity.pub
+    IdentityFile ~/.ssh/%L.pub
     SetEnv TERM=xterm-256color
 
 # Network
