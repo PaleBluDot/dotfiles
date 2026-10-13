@@ -512,8 +512,11 @@ _pm() {
   case "$action:$PKG_MANAGER" in
     install:pacman) cmd=(pacman -S --needed --noconfirm "$package") ;;
     remove:pacman)  cmd=(pacman -R --noconfirm "$package") ;;
-    install:apt)    cmd=(apt-get install -y "$package") ;;
-    remove:apt)     cmd=(apt-get remove -y "$package") ;;
+    # apt (not apt-get), as used by hand on Debian/Ubuntu. The -o option turns
+    # off apt's "no stable CLI interface" warning, printed when its output is
+    # piped (run_cmd pipes it into the log).
+    install:apt)    cmd=(apt -o Apt::Cmd::Disable-Script-Warning=true install -y "$package") ;;
+    remove:apt)     cmd=(apt -o Apt::Cmd::Disable-Script-Warning=true remove -y "$package") ;;
     install:dnf)    cmd=(dnf install -y "$package") ;;
     remove:dnf)     cmd=(dnf remove -y "$package") ;;
     install:brew)   cmd=(brew install "$package") ;;
@@ -545,9 +548,9 @@ _pm() {
   if [[ $action == install && $PKG_MANAGER == apt && $APT_UPDATED != true ]]; then
     APT_UPDATED=true
     if [[ ${cmd[0]} == sudo ]]; then
-      run_cmd sudo apt-get update
+      run_cmd sudo apt -o Apt::Cmd::Disable-Script-Warning=true update
     else
-      run_cmd apt-get update
+      run_cmd apt -o Apt::Cmd::Disable-Script-Warning=true update
     fi
   fi
 
@@ -660,7 +663,7 @@ then enabled: false.
   dotfiles uninstall cowsay   that tool
 
 Asks "remove package X? [y/N]" for each package; n leaves everything as is.
-Removes the package only (pacman -R, apt-get remove, ...), never its
+Removes the package only (pacman -R, apt remove, ...), never its
 dependencies. A tool with only a manual: install is just unlinked.
 
   -d  show what would happen, change nothing
