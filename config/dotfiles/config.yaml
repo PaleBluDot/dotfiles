@@ -10,8 +10,8 @@ settings:
 # A name that is also under packages: uses that entry's package names.
 default: []
 
-# The key is the package name. Add a manager (pacman, apt, dnf, brew,
-# winget) only where its package name is different; "none" = not there.
+# The key is the config/ folder name. Add a manager (pacman, apt, dnf,
+# brew, winget) where its package name differs from the key; "none" = not there.
 #   command:  only when the command isn't the key (can also be per manager)
 #   manual:   no package manager installs it; this message says how
 #   links:    src is a path under config/, dest a path under $HOME;
@@ -38,8 +38,10 @@ packages:
       - src: btop
         dest: .config/btop
 
-  chromium:
+  chromium-flags.conf:
     enabled: true
+    pacman: chromium
+    command: chromium
     links:
       - src: chromium-flags.conf
         dest: .config/chromium-flags.conf
@@ -98,8 +100,9 @@ packages:
       - src: gobuster
         dest: .config/gobuster
 
-  hyprland:
+  hypr:
     enabled: true
+    pacman: hyprland
     command: Hyprland
     links:
       - src: hypr
@@ -123,9 +126,9 @@ packages:
       - src: nano
         dest: .config/nano
 
-  neovim:
+  nvim:
     enabled: true
-    command: nvim
+    pacman: neovim
     winget: Neovim.Neovim
     links:
       - src: nvim
@@ -144,9 +147,9 @@ packages:
       - src: omarchy
         dest: .config/omarchy
 
-  openssh:
+  ssh:
     enabled: true
-    command: ssh
+    pacman: openssh
     links:
       - src: ssh/config
         dest: .ssh/config
@@ -176,8 +179,9 @@ packages:
       - src: vim
         dest: .config/vim
 
-  visual-studio-code-bin:
+  vscode:
     enabled: true
+    pacman: visual-studio-code-bin
     command: code
     links:
       - src: vscode
@@ -189,8 +193,10 @@ packages:
       - src: wezterm
         dest: .config/wezterm
 
-  xdg-terminal-exec:
+  xdg-terminals.list:
     enabled: true
+    pacman: xdg-terminal-exec
+    command: xdg-terminal-exec
     links:
       - src: xdg-terminals.list
         dest: .config/xdg-terminals.list
