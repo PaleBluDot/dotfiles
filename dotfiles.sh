@@ -361,6 +361,16 @@ tool_links() {
   _yq ".packages[\"$1\"].links // [] | .[] | (.src // \"\") + \"\t\" + (.[\"${DOTFILES_OS:-none}\"] // .dest // \"\")"
 }
 
+# "true" when the link with this src has inject: true: the repo file holds
+# op:// references, and dest gets a filled-in copy instead of a symlink.
+tool_link_inject() {
+  if [[ $(_yq ".packages[\"$1\"].links // [] | .[] | select(.src == \"$2\") | .inject // false" | head -n 1) == true ]]; then
+    echo true
+  else
+    echo false
+  fi
+}
+
 # "true" or "false"; anything else counts as false.
 tool_enabled() {
   if [[ $(_yq ".packages[\"$1\"].enabled") == true ]]; then
@@ -922,9 +932,29 @@ _link_state() {
   fi
 }
 
+# State of one config.yaml link. An inject link is a filled-in file, not a
+# symlink: "injected" when it's there, "symlink" when an old link is still
+# in its place.
+_tool_link_state() {
+  local tool="$1" src="$2" dest="$3" dest_path="$HOME/$3"
+  if [[ $(tool_link_inject "$tool" "$src") != true ]]; then
+    _link_state "$(_src_path "$src")" "$dest_path"
+  elif [[ -L $dest_path ]]; then
+    echo "symlink"
+  elif [[ -f $dest_path ]]; then
+    echo "injected"
+  elif [[ -e $dest_path ]]; then
+    echo "folder"
+  else
+    echo "missing"
+  fi
+}
+
 # A link state in words.
 _link_state_text() {
   case "$1" in
+    injected)      echo "filled in from 1Password" ;;
+    symlink)       echo "still a symlink; dotfiles link fills it in from 1Password" ;;
     linked)        echo "linked" ;;
     linked-parent) echo "linked (through a linked parent folder)" ;;
     elsewhere)     echo "links somewhere else: $(readlink "$2")" ;;
@@ -973,10 +1003,10 @@ _tool_installed() {
 _tool_linked() {
   local tool="$1" src dest state result=true
   while IFS=$'\t' read -r src dest; do
-    state="$(_link_state "$(_src_path "$src")" "$HOME/$dest")"
+    state="$(_tool_link_state "$tool" "$src" "$dest")"
     log debug "$tool: ~/$dest is $state"
     case "$state" in
-      linked | linked-parent) ;;
+      linked | linked-parent | injected) ;;
       *) result=false ;;
     esac
   done < <(tool_links "$tool")
@@ -1076,11 +1106,15 @@ _status_tool() {
       out ""
     fi
     first=false
-    state="$(_link_state "$(_src_path "$src")" "$HOME/$dest")"
+    state="$(_tool_link_state "$tool" "$src" "$dest")"
     out "    source:   config/$src"
-    out "    symlink:  ~/$dest"
+    if [[ $(tool_link_inject "$tool" "$src") == true ]]; then
+      out "    filled:   ~/$dest  (op inject)"
+    else
+      out "    symlink:  ~/$dest"
+    fi
     case "$state" in
-      linked | linked-parent) ;;
+      linked | linked-parent | injected) ;;
       *) out "    problem:  $(_link_state_text "$state" "$HOME/$dest")" ;;
     esac
   done < <(tool_links "$tool")
@@ -1257,7 +1291,62 @@ _link_one() {
     log error "$tool: a link in config.yaml is missing src or dest"
     return 1
   fi
-  _link_path "$tool" "$(_src_path "$src")" "$dest"
+  if [[ $(tool_link_inject "$tool" "$src") == true ]]; then
+    _inject_path "$tool" "$(_src_path "$src")" "$dest"
+  else
+    _link_path "$tool" "$(_src_path "$src")" "$dest"
+  fi
+}
+
+# Fill a repo file's op:// references with op inject and write the result
+# to dest, outside the repo, owner-only. The result is written next to dest
+# and renamed into place, so an old symlink is replaced, never written
+# through (that would put the real values into the repo).
+_inject_path() {
+  local tool="$1" src_path="$2" dest="$3"
+  local dest_path="$HOME/$3" shown="~/$3" tmp err
+  if [[ ! -f $src_path ]]; then
+    log error "$tool: source ${src_path#"$DOTFILES"/} doesn't exist"
+    return 1
+  fi
+  if ! command -v op >/dev/null 2>&1; then
+    log warn "$tool: $shown needs the 1Password CLI (op) to fill in its op:// references; skipped"
+    return 1
+  fi
+  if _inside_repo "$(dirname "$dest_path")"; then
+    log error "$tool: $shown is inside the repo; not writing secrets there"
+    return 1
+  fi
+  if [[ -d $dest_path && ! -L $dest_path ]]; then
+    log warn "$tool: $shown is a real folder; left it alone"
+    return 1
+  fi
+  CHANGED=true
+  if [[ $DRY_RUN == true ]]; then
+    log info "dry run, would fill $shown from ${src_path#"$DOTFILES"/} with op inject (owner-only)"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$dest_path")"
+  tmp="$(mktemp "$(dirname "$dest_path")/.dotfiles-inject.XXXXXX")"
+  log info "running: op inject -i ${src_path#"$DOTFILES"/} -o $shown"
+  if ! err="$(op inject -f -i "$src_path" -o "$tmp" 2>&1 >/dev/null)"; then
+    rm -f "$tmp"
+    log error "$tool: op inject failed for $shown (is 1Password unlocked?): $err"
+    return 1
+  fi
+  chmod 600 "$tmp"
+  if [[ -f $dest_path && ! -L $dest_path ]] && cmp -s "$tmp" "$dest_path"; then
+    rm -f "$tmp"
+    CHANGED=false
+    log success "$tool: already up to date: $shown (filled in from 1Password)"
+    return 0
+  fi
+  if [[ -L $dest_path ]]; then
+    log info "$tool: replacing the symlink $shown with the filled-in file"
+  fi
+  mv -f "$tmp" "$dest_path"
+  log success "$tool: filled $shown from ${src_path#"$DOTFILES"/} (owner-only)"
 }
 
 # Link a full source path to a dest under $HOME, with all the conflict
@@ -1392,10 +1481,16 @@ _unlink_one() {
   src_path="$(_src_path "$src")"
   dest_path="$HOME/$dest"
   shown="~/$dest"
-  state="$(_link_state "$src_path" "$dest_path")"
+  state="$(_tool_link_state "$tool" "$src" "$dest")"
   log debug "$tool: $shown is $state"
 
   case "$state" in
+    injected | symlink)
+      run_cmd rm "$dest_path"
+      if [[ $DRY_RUN != true ]]; then
+        log success "$tool: removed $shown (dotfiles link fills it in again)"
+      fi
+      ;;
     linked)
       run_cmd rm "$dest_path"
       if [[ -e $dest_path$BACKUP_SUFFIX || -L $dest_path$BACKUP_SUFFIX ]]; then
