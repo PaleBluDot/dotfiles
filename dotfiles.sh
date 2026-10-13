@@ -239,7 +239,12 @@ detect_os() {
   case "$kernel" in
     Darwin)                   DOTFILES_OS="macos" ;;
     Linux)                    DOTFILES_OS="linux"; detect_linux ;;
-    MINGW* | MSYS* | CYGWIN*) DOTFILES_OS="windows" ;;
+    MINGW* | MSYS* | CYGWIN*)
+      DOTFILES_OS="windows"
+      # Git Bash's ln -s silently copies when it can't make a symlink.
+      # nativestrict makes it fail instead, so a link is a link or an error.
+      export MSYS="winsymlinks:nativestrict${MSYS:+ $MSYS}"
+      ;;
     *) log warn "unsupported OS: $kernel" ;;
   esac
 
@@ -1853,17 +1858,23 @@ _setup_self_links() {
   [[ $ok == true ]]
 }
 
-# Say how to put ~/.local/bin on PATH when it isn't. Changes no files.
-# Once per run (first run and doctor both ask).
+# Say how to put the command's folder on PATH when it isn't: ~/.local/bin,
+# or ~/bin on Windows (Git Bash puts ~/bin on PATH by itself). Changes no
+# files. Once per run (first run and doctor both ask).
 PATH_CHECKED=false
 _path_check() {
   if [[ $PATH_CHECKED == true ]]; then
     return 0
   fi
   PATH_CHECKED=true
+  local bin_dir="$HOME/.local/bin" shown="~/.local/bin"
+  if [[ $DOTFILES_OS == windows ]]; then
+    bin_dir="$HOME/bin"
+    shown="~/bin"
+  fi
   case ":$ORIG_PATH:" in
-    *":$HOME/.local/bin:"*)
-      log debug "~/.local/bin is on PATH"
+    *":$bin_dir:"*)
+      log debug "$shown is on PATH"
       return 0
       ;;
   esac
@@ -1879,8 +1890,8 @@ _path_check() {
       ;;
     *) file="your shell's startup file" ;;
   esac
-  log warn "~/.local/bin isn't on PATH, so the 'dotfiles' command won't be found. Add this line to $file, then open a new terminal:"
-  ui '  export PATH="$HOME/.local/bin:$PATH"'
+  log warn "$shown isn't on PATH, so the 'dotfiles' command won't be found. Add this line to $file, then open a new terminal:"
+  ui "  export PATH=\"\$HOME/${shown#\~/}:\$PATH\""
 }
 
 # Running from curl | bash: get git, clone the repo, then run the cloned
@@ -1956,7 +1967,7 @@ _doctor_self_links() {
   done < <(_self_links)
 
   if [[ $missing != true ]]; then
-    _check_ok "self links: ~/.local/bin/dotfiles and ~/.config/dotfiles"
+    _check_ok "self links: $(_self_links | cut -f2 | sed 's|^|~/|' | paste -sd ' ' - | sed 's/ / and /')"
   elif _setup_self_links; then
     _check_ok "self links: made (or would make, in a dry run)"
   else
