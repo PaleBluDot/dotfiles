@@ -1174,9 +1174,16 @@ set_enabled() {
   fi
   tmp="$file.tmp.$$"
   # In the block under "  <tool>:", replace the first "    enabled: ...".
-  awk -v prefix="  $tool:" -v value="$value" '
+  # A tool without an enabled: line gets one, right under its name.
+  local has_line=false
+  if [[ $(_yq ".packages[\"$tool\"] | has(\"enabled\")") == true ]]; then
+    has_line=true
+  fi
+  awk -v prefix="  $tool:" -v value="$value" -v add="$has_line" '
     substr($0, 1, length(prefix)) == prefix && substr($0, length(prefix) + 1) ~ /^[[:space:]]*(#.*)?$/ {
-      in_tool = 1; print; next
+      in_tool = 1; print
+      if (add != "true") { print "    enabled: " value; done = 1 }
+      next
     }
     in_tool && /^  [^ #]/ { in_tool = 0 }
     in_tool && !done && /^    enabled:/ {
@@ -1186,7 +1193,7 @@ set_enabled() {
   ' "$file" >"$tmp"
   mv "$tmp" "$file"
   if [[ $(tool_enabled "$tool") != "$value" ]]; then
-    log error "$tool: couldn't set enabled: $value in config.yaml (needs an 'enabled:' line indented 4 spaces under the tool)"
+    log error "$tool: couldn't set enabled: $value in config.yaml (is the tool's name indented 2 spaces under packages:?)"
     return 1
   fi
   log info "$tool: config.yaml now has enabled: $value"
