@@ -17,6 +17,8 @@ default: []
 #   links:    src is a path under config/, dest a path under $HOME;
 #             add windows:/macos:/linux: when that OS needs another dest
 #   enabled:  written by install/link (true) and uninstall/unlink (false)
+#   inject:   on a link: the file holds op:// references; dest gets a copy
+#             filled in by op inject (owner-only) instead of a symlink
 packages:
   bash:
     enabled: true
@@ -148,6 +150,7 @@ packages:
     links:
       - src: ssh/config
         dest: .ssh/config
+        inject: true # holds op:// references; written filled-in, not linked
 
   starship:
     enabled: true
