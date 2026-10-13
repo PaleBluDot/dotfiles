@@ -687,14 +687,13 @@ _edit_targets=(
   monitors   "$HOME/.config/hypr/monitors.lua"
   ghostty    "$HOME/.config/ghostty/config.ghostty"
   git        "$HOME/.config/git/config"
-  ssh        "$HOME/.ssh/config"
+  ssh        "$DOTFILES/config/ssh/config"
   tmux       "$HOME/.config/tmux/tmux.conf"
   yazi       "$HOME/.config/yazi"
   lazygit    "$HOME/.config/lazygit/config.yml"
   fastfetch  "$HOME/.config/fastfetch/config.jsonc"
   shell      "$HOME/.config/omarchy/shell.toml"
   branding   "$HOME/.config/omarchy/branding/settings.toml"
-  links      "$DOTFILES/links.map"
 )
 
 # drop the old `alias edit=$EDITOR` if this shell still has it (reload keeps old aliases)
