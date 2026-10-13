@@ -29,6 +29,9 @@ config/git/local.gitconfig
 # App data adopted by mistake: caches, sessions, tokens. Never commit.
 config/Claude/
 
+# espanso matches with personal and work contact details (local only)
+config/espanso/match/private.yml
+
 # Python bytecode cache
 __pycache__/
 
