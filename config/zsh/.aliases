@@ -10,11 +10,13 @@ fi
 
 alias c="clear"
 alias cl="clear"
-alias fenv="source ~/.zshenv"
+alias fenv='source "$ZDOTDIR/.zshenv"'
 alias fresh="source $ZDOTDIR/.zshrc; clear"
 alias aliasUpdate="fresh 2>&1 && c"
 alias histg="history | fzf"
 alias findAlias="alias | fzf"
+alias tobash="chsh $USER -s /bin/bash && echo 'Log out and log back in for change to take effect.'"
+alias tozsh="chsh $USER -s /bin/zsh && echo 'Log out and log back in for change to take effect.'"
 
 
 # !------------------------------------
@@ -38,6 +40,8 @@ alias ix='tdl cx'
 alias ea="$EDITOR $DOTFILES/config/zsh/.aliases"
 alias ef="$EDITOR $DOTFILES/config/zsh/.functions"
 alias ee="$EDITOR $DOTFILES/config/zsh/.zshenv"
+alias vi="nvim"
+alias vim="nvim"
 alias base="$EDITOR ~/Library/CloudStorage/OneDrive-Personal/Documents/Espanso/match/base.yml"
 alias netcfg="sudo $EDITOR /etc/netplan/50-cloud-init.yaml"
 alias cloudcfg="sudo $EDITOR /etc/cloud/cloud.cfg"
@@ -50,7 +54,16 @@ alias ls="eza --icons --group-directories-last"
 alias ll="ls -lh"
 alias la="ls -lah"
 alias lt="ls --tree"
+alias l.='ls -la ../'
+alias l..='ls -la ../../'
+alias l...='ls -la ../../../'
+alias cp="cp -i"
+alias mv="mv -i"
 alias rm="rm -i"
+alias mkdir="mkdir -p"
+alias df="df -h"
+alias du="du -h"
+alias free="free -h"
 alias xbin="chmod +x ~/bin/*"
 alias decompress='tar -xzf'
 alias ff='fzf --preview '\''bat --style=numbers --color=always {}'\'''
@@ -70,10 +83,13 @@ alias gam="git commit --amend --no-edit"
 alias ga="git add"
 alias gaa="git add ."
 alias gp="git push"
-alias gpu="git push -u origin main"
+alias gpu='git push -u origin HEAD'
 alias gpl="git pull"
 alias gco="git checkout -b"
 alias gsw="git switch"
+alias gwatch='watch -c "git -c color.status=always status"'
+alias gwatchdots='watch -c "git -C $DOTFILES -c color.status=always status"'
+alias taildots='tail -f "${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/dotfiles.log"'
 alias save="gaa && gcm \"chore: save point\""
 alias incom="gaa && gcm \"initial commit\""
 alias cached="git rm -r --cached"
@@ -91,6 +107,10 @@ alias sudp="sudo"
 # @@@ NAVIGATION
 # !------------------------------------
 alias cd='zd'
+alias ..='cd ..'
+alias ...='cd ../..'
+alias .3='cd ../../..'
+alias 3..='cd ../../..'
 alias dots="cd $DOTFILES"
 alias github="cd $GITHUB_DIR"
 alias sshd="cd /etc/ssh"
@@ -99,8 +119,8 @@ alias sshd="cd /etc/ssh"
 # !------------------------------------
 # @@@ NETWORKING
 # !------------------------------------
-alias pubip="curl http://ipecho.net/plain; echo"
-alias locip='ip -4 addr show eth0 | grep -oP "(?<=inet\s)\d+(\.\d+){3}"'
+alias pubip='curl -fsS https://ifconfig.me; echo'
+alias locip='ip -4 route get 1.1.1.1 2>/dev/null | awk '\''{for (i = 1; i < NF; i++) if ($i == "src") print $(i + 1)}'\'''
 alias ping="ping -c3"
 alias sshcopy="ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 22"
 
@@ -153,8 +173,15 @@ alias ts="tmux switch-client -t"
 # @@@ TOOLS
 # !------------------------------------
 alias gd="gobuster -w ~/.config/gobuster.txt"
-alias comlist="cat test.html | tr "\n" "," > comma-list.txt"
+alias comlist='tr "\n" "," < test.html > comma-list.txt'
 alias wget="wget --no-hsts"
+alias jctl='journalctl -p 3 -xb'
+alias sctl='systemctl'
+alias sctlu='systemctl --user'
+alias bigfont="setfont ter-132b"
+alias regfont="setfont default8x16"
+alias grep='grep --color=auto'
+alias diff='diff --color=auto'
 
 
 # !------------------------------------
@@ -163,7 +190,7 @@ alias wget="wget --no-hsts"
 alias adduser="sudo adduser"
 alias deluser="sudo deluser --remove-home"
 alias addgroup="sudo usermod -aG"
-alias delgroup="sudo usermod -G"
+alias delgroup="sudo gpasswd -d"
 alias group="cat /etc/group"
 
 
