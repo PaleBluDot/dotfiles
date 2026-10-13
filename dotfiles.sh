@@ -935,7 +935,21 @@ _link_state_text() {
   esac
 }
 
-# Best-effort version (plan Section 8): first line of "<command> --version".
+# Installed version of a tool. Asks the package manager when the tool has a
+# package, which never starts the program: some programs don't know
+# --version and open a window instead (xdg-terminal-exec opens a
+# terminal). Tools without a package fall back to "<command> --version".
+_tool_installed_version() {
+  local tool="$1" package version
+  package="$(tool_package "$tool")"
+  if [[ -n $package ]] && version="$(package_version "$package")"; then
+    echo "$version"
+    return 0
+  fi
+  _tool_version "$(tool_command "$tool")"
+}
+
+# Fallback version (plan Section 8): first line of "<command> --version".
 # </dev/null so a tool that ignores --version can't sit waiting for input.
 _tool_version() {
   local cmd_name="$1" output
@@ -1052,7 +1066,7 @@ _status_tool() {
   out "  command:    $command"
   if [[ $installed == true ]]; then
     out "  installed:  $(command -v "$command")"
-    out "  version:    $(_tool_version "$command")"
+    out "  version:    $(_tool_installed_version "$tool")"
   else
     out "  installed:  no"
   fi
@@ -1443,7 +1457,7 @@ _install_package() {
   package="$(tool_package "$tool")"
 
   if path="$(command -v "$cmd_name" 2>/dev/null)"; then
-    log success "$tool: already installed: $path ($(_tool_version "$cmd_name"))"
+    log success "$tool: already installed: $path ($(_tool_installed_version "$tool"))"
     return 0
   fi
   if [[ -z $package ]]; then
@@ -1466,7 +1480,7 @@ _install_package() {
     log error "$tool: $package installed, but $cmd_name still isn't on PATH"
     return 1
   fi
-  log success "$tool: installed $package: $path ($(_tool_version "$cmd_name"))"
+  log success "$tool: installed $package: $path ($(_tool_installed_version "$tool"))"
 }
 
 # Install, link and set enabled: true for one tool. Returns 1 on failure.
@@ -1484,7 +1498,7 @@ _install_tool() {
 _tool_with_version() {
   local tool="$1"
   if [[ $(_tool_installed "$tool") == true ]]; then
-    _with_version "$tool" "$(_tool_version "$(tool_command "$tool")")"
+    _with_version "$tool" "$(_tool_installed_version "$tool")"
   elif [[ $DRY_RUN == true ]]; then
     _with_version "$tool" "$(package_available_version "$(tool_package "$tool")")"
   else
@@ -1785,7 +1799,7 @@ _screen_packages() {
       elif [[ $DRY_RUN == true ]]; then
         ui "  Test: $(_tool_with_version "$name")"
       else
-        ui "  $name: installed and linked ($(_tool_version "$(tool_command "$name")"))"
+        ui "  $name: installed and linked ($(_tool_installed_version "$name"))"
       fi
     elif [[ ${before[i]} == true ]]; then
       if ! _unlink_tool "$name"; then
