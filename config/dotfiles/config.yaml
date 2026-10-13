@@ -18,14 +18,49 @@ default: []
 #             add windows:/macos:/linux: when that OS needs another dest
 #   enabled:  written by install/link (true) and uninstall/unlink (false)
 packages:
-  neovim:
-    enabled: false
-    command: nvim
-    winget: Neovim.Neovim
+  bash:
+    enabled: true
     links:
-      - src: nvim
-        dest: .config/nvim
-        windows: AppData/Local/nvim
+      - src: bash
+        dest: .config/bash
+
+  bat:
+    enabled: true
+    links:
+      - src: bat
+        dest: .config/bat
+
+  btop:
+    enabled: true
+    links:
+      - src: btop
+        dest: .config/btop
+
+  chromium:
+    enabled: true
+    links:
+      - src: chromium-flags.conf
+        dest: .config/chromium-flags.conf
+
+  cspell:
+    enabled: true
+    manual: "Not auto-installed. Install by hand: npm install -g cspell"
+    links:
+      - src: cspell
+        dest: .config/cspell
+
+  espanso:
+    enabled: true
+    manual: "AUR package: omarchy pkg aur add espanso-wayland"
+    links:
+      - src: espanso
+        dest: .config/espanso
+
+  fastfetch:
+    enabled: true
+    links:
+      - src: fastfetch
+        dest: .config/fastfetch
 
   fd:
     enabled: false
@@ -35,12 +70,144 @@ packages:
     links:
       - src: fd/ignore
         dest: .config/fd/ignore
-        windows: AppData/Roaming/fd/ignore
 
-  cspell:
-    enabled: false
-    manual: "Not auto-installed. Install by hand: npm install -g cspell"
+  fontconfig:
+    enabled: true
+    command: fc-list
     links:
-      - src: cspell/cspell.json
-        dest: .config/cspell/cspell.json
-        windows: AppData/Roaming/cspell/cspell.json
+      - src: fontconfig
+        dest: .config/fontconfig
+
+  ghostty:
+    enabled: true
+    links:
+      - src: ghostty
+        dest: .config/ghostty
+
+  git:
+    enabled: true
+    links:
+      - src: git
+        dest: .config/git
+
+  gobuster:
+    enabled: true
+    links:
+      - src: gobuster
+        dest: .config/gobuster
+
+  hyprland:
+    enabled: true
+    command: Hyprland
+    links:
+      - src: hypr
+        dest: .config/hypr
+
+  hyprland-preview-share-picker:
+    enabled: true
+    links:
+      - src: hyprland-preview-share-picker
+        dest: .config/hyprland-preview-share-picker
+
+  lazygit:
+    enabled: true
+    links:
+      - src: lazygit
+        dest: .config/lazygit
+
+  nano:
+    enabled: true
+    links:
+      - src: nano
+        dest: .config/nano
+
+  neovim:
+    enabled: true
+    command: nvim
+    winget: Neovim.Neovim
+    links:
+      - src: nvim
+        dest: .config/nvim
+
+  npm:
+    enabled: true
+    manual: "Comes with Node.js, installed by mise"
+    links:
+      - src: npm
+        dest: .config/npm
+
+  omarchy:
+    enabled: true
+    links:
+      - src: omarchy
+        dest: .config/omarchy
+
+  openssh:
+    enabled: true
+    command: ssh
+    links:
+      - src: ssh/config
+        dest: .ssh/config
+
+  starship:
+    enabled: true
+    links:
+      - src: starship
+        dest: .config/starship
+
+  thefuck:
+    enabled: true
+    links:
+      - src: thefuck
+        dest: .config/thefuck
+
+  tmux:
+    enabled: true
+    links:
+      - src: tmux
+        dest: .config/tmux
+
+  vim:
+    enabled: true
+    links:
+      - src: vim
+        dest: .config/vim
+
+  visual-studio-code-bin:
+    enabled: true
+    command: code
+    links:
+      - src: vscode
+        dest: .config/vscode
+
+  wezterm:
+    enabled: true
+    links:
+      - src: wezterm
+        dest: .config/wezterm
+
+  xdg-terminal-exec:
+    enabled: true
+    links:
+      - src: xdg-terminals.list
+        dest: .config/xdg-terminals.list
+
+  yay:
+    enabled: true
+    links:
+      - src: yay
+        dest: .config/yay
+
+  yazi:
+    enabled: true
+    links:
+      - src: yazi
+        dest: .config/yazi
+
+  zsh:
+    enabled: true
+    links:
+      - src: zsh
+        dest: .config/zsh
+      - src: zsh/.zshenv
+        dest: .zshenv
