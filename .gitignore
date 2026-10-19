@@ -32,6 +32,9 @@ config/Claude/
 # espanso matches with personal and work contact details (local only)
 config/espanso/match/private.yml
 
+# gh login state, written per machine by gh auth login (token lives in the keyring)
+config/gh/hosts.yml
+
 # Python bytecode cache
 __pycache__/
 

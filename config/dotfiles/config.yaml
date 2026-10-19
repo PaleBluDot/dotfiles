@@ -23,8 +23,8 @@ packages:
   bash:
     enabled: true
     links:
-      - src: bash
-        dest: .config/bash
+      - src: bash/.bashrc
+        dest: .bashrc
 
   bat:
     enabled: true
@@ -94,6 +94,13 @@ packages:
       - src: git
         dest: .config/git
 
+  gh:
+    enabled: true
+    manual: "Installed by mise (see config/mise/config.toml)"
+    links:
+      - src: gh/config.yml
+        dest: .config/gh/config.yml
+
   gobuster:
     enabled: true
     links:
@@ -119,6 +126,13 @@ packages:
     links:
       - src: lazygit
         dest: .config/lazygit
+
+  mise:
+    enabled: true
+    pacman: mise-bin
+    links:
+      - src: mise/config.toml
+        dest: .config/mise/config.toml
 
   nano:
     enabled: true
@@ -184,8 +198,10 @@ packages:
     pacman: visual-studio-code-bin
     command: code
     links:
-      - src: vscode
-        dest: .config/vscode
+      - src: vscode/settings.json
+        dest: .config/Code/User/settings.json
+        macos: Library/Application Support/Code/User/settings.json
+        windows: AppData/Roaming/Code/User/settings.json
 
   wezterm:
     enabled: true
