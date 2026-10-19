@@ -1,4 +1,6 @@
 {
+	"workbench.colorTheme": "Omarchy",
+	"update.mode": "none",
 	"files.exclude": {
 		"**/.*_history": true,
 		"**/.1password": true,

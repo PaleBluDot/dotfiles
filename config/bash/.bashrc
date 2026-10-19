@@ -2,6 +2,12 @@
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
 
+# Omarchy machines: its environment (OMARCHY_PATH + PATH), needed even for
+# non-interactive shells. Skipped on every other machine.
+if [[ -r /usr/share/omarchy/default/bash/env-bootstrap ]]; then
+    source /usr/share/omarchy/default/bash/env-bootstrap
+fi
+
 # If not running interactively, don't do anything
 case $- in
     *i*) ;;
@@ -109,6 +115,18 @@ if ! shopt -oq posix; then
 fi
 
 
+# Omarchy machines: its default aliases, functions and prompt. Loaded after
+# the generic defaults above so Omarchy's win, and before your own below so
+# yours win.
+if [[ -n ${OMARCHY_PATH:-} && -r $OMARCHY_PATH/default/bash/rc ]]; then
+    source "$OMARCHY_PATH/default/bash/rc"
+fi
+
+# PATH additions (were in Omarchy's own ~/.bashrc): composer's global tools,
+# and ~/.local/bin (put there by some installers).
+export PATH="$HOME/.config/composer/vendor/bin:$PATH"
+case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac
+
 # Alias definitions.
 # You may want to put all your additions into a separate file like
 # ~/.bash_aliases, instead of adding them here directly.
@@ -152,4 +170,4 @@ detach() {
 
 # Intro message shown on terminal
 source welcome.sh
-neofetch
+command -v neofetch >/dev/null && neofetch
