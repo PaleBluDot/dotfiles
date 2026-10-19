@@ -22,18 +22,23 @@ default: []
 packages:
   bash:
     enabled: true
+    winget: none
     links:
       - src: bash/.bashrc
         dest: .bashrc
 
   bat:
     enabled: true
+    winget: sharkdp.bat
+    command:
+      apt: batcat
     links:
       - src: bat
         dest: .config/bat
 
   btop:
     enabled: true
+    winget: aristocratos.btop4win
     links:
       - src: btop
         dest: .config/btop
@@ -41,6 +46,10 @@ packages:
   chromium-flags.conf:
     enabled: true
     pacman: chromium
+    apt: chromium
+    dnf: chromium
+    brew: none
+    winget: none
     command: chromium
     links:
       - src: chromium-flags.conf
@@ -62,6 +71,7 @@ packages:
 
   fastfetch:
     enabled: true
+    winget: Fastfetch-cli.Fastfetch
     links:
       - src: fastfetch
         dest: .config/fastfetch
@@ -71,12 +81,15 @@ packages:
     apt: fd-find
     dnf: fd-find
     winget: sharkdp.fd
+    command:
+      apt: fdfind
     links:
       - src: fd/ignore
         dest: .config/fd/ignore
 
   fontconfig:
     enabled: true
+    winget: none
     command: fc-list
     links:
       - src: fontconfig
@@ -84,12 +97,16 @@ packages:
 
   ghostty:
     enabled: true
+    apt: none
+    dnf: none
+    winget: none
     links:
       - src: ghostty
         dest: .config/ghostty
 
   git:
     enabled: true
+    winget: Git.Git
     links:
       - src: git
         dest: .config/git
@@ -103,6 +120,7 @@ packages:
 
   gobuster:
     enabled: true
+    winget: none
     links:
       - src: gobuster
         dest: .config/gobuster
@@ -110,6 +128,10 @@ packages:
   hypr:
     enabled: true
     pacman: hyprland
+    apt: none
+    dnf: none
+    brew: none
+    winget: none
     command: Hyprland
     links:
       - src: hypr
@@ -117,12 +139,18 @@ packages:
 
   hyprland-preview-share-picker:
     enabled: true
+    apt: none
+    dnf: none
+    brew: none
+    winget: none
     links:
       - src: hyprland-preview-share-picker
         dest: .config/hyprland-preview-share-picker
 
   lazygit:
     enabled: true
+    dnf: none
+    winget: JesseDuffield.lazygit
     links:
       - src: lazygit
         dest: .config/lazygit
@@ -130,12 +158,16 @@ packages:
   mise:
     enabled: true
     pacman: mise-bin
+    apt: none
+    dnf: none
+    winget: jdx.mise
     links:
       - src: mise/config.toml
         dest: .config/mise/config.toml
 
   nano:
     enabled: true
+    winget: GNU.Nano
     links:
       - src: nano
         dest: .config/nano
@@ -143,6 +175,9 @@ packages:
   nvim:
     enabled: true
     pacman: neovim
+    apt: neovim
+    dnf: neovim
+    brew: neovim
     winget: Neovim.Neovim
     links:
       - src: nvim
@@ -157,6 +192,10 @@ packages:
 
   omarchy:
     enabled: true
+    apt: none
+    dnf: none
+    brew: none
+    winget: none
     links:
       - src: omarchy
         dest: .config/omarchy
@@ -164,6 +203,10 @@ packages:
   ssh:
     enabled: true
     pacman: openssh
+    apt: openssh-client
+    dnf: openssh-clients
+    brew: none
+    winget: none
     links:
       - src: ssh/config
         dest: .ssh/config
@@ -171,24 +214,30 @@ packages:
 
   starship:
     enabled: true
+    dnf: none
+    winget: Starship.Starship
     links:
       - src: starship
         dest: .config/starship
 
   thefuck:
     enabled: true
+    winget: none
     links:
       - src: thefuck
         dest: .config/thefuck
 
   tmux:
     enabled: true
+    winget: none
     links:
       - src: tmux
         dest: .config/tmux
 
   vim:
     enabled: true
+    dnf: vim-enhanced
+    winget: vim.vim
     links:
       - src: vim
         dest: .config/vim
@@ -196,6 +245,10 @@ packages:
   vscode:
     enabled: true
     pacman: visual-studio-code-bin
+    apt: none
+    dnf: none
+    brew: visual-studio-code
+    winget: Microsoft.VisualStudioCode
     command: code
     links:
       - src: vscode/settings.json
@@ -205,6 +258,9 @@ packages:
 
   wezterm:
     enabled: true
+    apt: none
+    dnf: none
+    winget: wez.wezterm
     links:
       - src: wezterm
         dest: .config/wezterm
@@ -212,6 +268,10 @@ packages:
   xdg-terminals.list:
     enabled: true
     pacman: xdg-terminal-exec
+    apt: xdg-terminal-exec
+    dnf: xdg-terminal-exec
+    brew: none
+    winget: none
     command: xdg-terminal-exec
     links:
       - src: xdg-terminals.list
@@ -220,12 +280,16 @@ packages:
 
   yazi:
     enabled: true
+    apt: none
+    dnf: none
+    winget: sxyazi.yazi
     links:
       - src: yazi
         dest: .config/yazi
 
   zsh:
     enabled: true
+    winget: none
     links:
       - src: zsh
         dest: .config/zsh
