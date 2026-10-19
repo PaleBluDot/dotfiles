@@ -35,13 +35,23 @@ export STARSHIP_CONFIG="$HOME/.config/starship/starship.toml"
 # GOROOT only for a manual Go install (macOS); mise-managed Go sets its own,
 # and a GOROOT pointing at a missing folder breaks it
 [[ -d /usr/local/go ]] && export GOROOT=/usr/local/go
-export GOPATH="$HOME/.config/go"
+export GOPATH="$XDG_DATA_HOME/go"
 export NVM_DIR="$HOME/.config/nvm"
 
-# COMPLETION CACHE
+# KEEP $HOME CLEAN
+# Tools that would otherwise put caches and data straight into $HOME
 # -----------------------
-# export ZSH_COMPDUMP="$ZSH/cache/.zcompdump-$HOST"
-export ZSH_COMPDUMP=""
+export npm_config_cache="$XDG_CACHE_HOME/npm"
+export CARGO_HOME="$XDG_DATA_HOME/cargo"
+export DOTNET_CLI_HOME="$XDG_DATA_HOME/dotnet"
+export CUDA_CACHE_PATH="$XDG_CACHE_HOME/nv"
+export GNUPGHOME="$XDG_DATA_HOME/gnupg"
+
+# COMPLETION CACHE
+# Out of the repo (ZDOTDIR is config/zsh) and into the cache folder
+# -----------------------
+[[ -d $XDG_CACHE_HOME/zsh ]] || mkdir -p "$XDG_CACHE_HOME/zsh"
+export ZSH_COMPDUMP="$XDG_CACHE_HOME/zsh/.zcompdump-$HOST"
 
 # HISTORY SUPPRESSION
 # Disable history for noisy tools
