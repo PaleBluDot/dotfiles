@@ -653,7 +653,7 @@ parse_args() {
 warn_unused_flags() {
   local cmd="$1"
   case "$cmd" in
-    link | unlink | default | update | doctor | interactive) ;;
+    link | unlink | default | update | wipe | doctor | interactive) ;;
     *)
       if [[ $DRY_RUN == true ]]; then
         log warn "--dry-run has no effect on '$cmd'"
@@ -767,6 +767,32 @@ Example:
   dotfiles default -dv
 EOF
       ;;
+    wipe)
+      cat <<'EOF'
+dotfiles wipe [-d] [-v]
+
+Undo everything dotfiles set up on this machine, to test it again from
+scratch:
+  - every tool in config.yaml: remove its links and system copies (backups
+    are put back), and for enabled tools its package (unless locked: true)
+  - then dotfiles' own links (~/.local/bin/dotfiles, ~/.config/dotfiles)
+
+Kept: locked packages, and everything in the repo: no file in it is
+changed or removed (config.yaml keeps its enabled: flags, so
+"dotfiles.sh link" sets up the same tools again). The log stays too.
+A package others depend on (e.g. Omarchy's) can't be removed: wipe reports
+it and carries on.
+
+Shows the list first, then asks you to type the hostname. Asks for sudo
+when a tool has system files.
+
+  -d  show the list and what would run, change nothing
+  -v  show every step
+
+Example:
+  dotfiles wipe -d
+EOF
+      ;;
     update)
       cat <<'EOF'
 dotfiles update [-d] [-v]
@@ -824,7 +850,7 @@ EOF
 dotfiles help [command]
 
 Show the overview, or help for one command:
-  link, unlink, interactive, default, update, status, doctor, help, version
+  link, unlink, interactive, default, update, wipe, status, doctor, help, version
 EOF
       ;;
     version)
@@ -854,6 +880,7 @@ Commands:
   unlink [tool...]      remove tools and their links (no tool = pick from a list)
   default               install the default: list, link nothing
   update                pull the repo, install what's missing, relink
+  wipe                  undo everything dotfiles set up here (for re-testing)
   status [tool]         what's installed and linked
   doctor                check (and fix) what dotfiles needs
   help [command]        this overview, or help for one command
@@ -1864,7 +1891,7 @@ _unlink_configs() {
       ok=false
     fi
   done
-  if [[ $ok == true ]] && ! set_enabled "$tool" false; then
+  if [[ $ok == true && $KEEP_ENABLED != true ]] && ! set_enabled "$tool" false; then
     ok=false
   fi
   [[ $ok == true ]]
@@ -2275,6 +2302,108 @@ _interactive_unlink() {
   done
   if [[ $failed == true ]]; then
     exit 1
+  fi
+}
+
+# ─── wipe: undo everything dotfiles set up on this machine ──────────────
+
+# true = unlink leaves config.yaml's enabled: flags as they are (wipe).
+KEEP_ENABLED=false
+
+# What wipe will do, before it asks. Fills WIPE_REMOVE (packages to remove).
+WIPE_REMOVE=""
+_wipe_preview() {
+  local tool package keep="" count=0
+  WIPE_REMOVE=""
+  while IFS= read -r tool; do
+    count=$((count + 1))
+    package="$(tool_package "$tool")"
+    if [[ $(tool_locked "$tool") == true ]]; then
+      keep="${keep:+$keep }$tool"
+    elif [[ $(tool_enabled "$tool") == true && -n $package && $(_tool_installed "$tool") == true ]]; then
+      WIPE_REMOVE="${WIPE_REMOVE:+$WIPE_REMOVE, }$tool ($package)"
+    fi
+  done < <(manifest_tools)
+  ui ""
+  ui "Wipe: undo everything dotfiles set up on this machine"
+  ui "  unlink:  all $count tools in config.yaml (links and system copies; backups go back)"
+  ui "  remove:  packages of enabled tools: ${WIPE_REMOVE:-none}"
+  ui "  keep:    locked packages: ${keep:-none}"
+  ui "  remove:  dotfiles' own links: ~/.local/bin/dotfiles, ~/.config/dotfiles"
+  ui "  keep:    everything in the repo (config.yaml unchanged), the log"
+  ui ""
+}
+
+# Last step: dotfiles' own links (config.yaml is read through
+# ~/.config/dotfiles, so this runs after every tool). Nothing in the repo is
+# touched.
+_wipe_self() {
+  local src dest
+  while IFS=$'\t' read -r src dest; do
+    if [[ $(_link_state "$src" "$HOME/$dest") == linked ]]; then
+      run_cmd rm "$HOME/$dest"
+      if [[ $DRY_RUN != true ]]; then
+        log success "dotfiles: removed ~/$dest"
+      fi
+    fi
+  done < <(_self_links)
+}
+
+cmd_wipe() {
+  _require_config
+  if [[ $# -gt 0 ]]; then
+    log error "wipe takes no tool names (it undoes everything; unlink takes tools)"
+    exit 2
+  fi
+  local -a tools=()
+  local tool host answer failed=""
+  while IFS= read -r tool; do
+    tools+=("$tool")
+  done < <(manifest_tools)
+  _wipe_preview
+
+  if [[ $DRY_RUN != true ]]; then
+    host="$(uname -n)"   # uname (coreutils): minimal systems lack hostname
+    host="${host%%.*}"
+    if ! { true </dev/tty; } 2>/dev/null; then
+      log error "wipe asks you to type the hostname to confirm, and there's no terminal; nothing changed"
+      exit 1
+    fi
+    printf 'This removes the packages and links above. Type the hostname (%s) to continue: ' "$host" >/dev/tty
+    read -r answer </dev/tty || answer=""
+    if [[ $answer != "$host" ]]; then
+      log warn "wipe: hostname didn't match; nothing changed"
+      exit 1
+    fi
+    _log_to_file "INFO" "wipe confirmed"
+  fi
+  _require_sudo ${tools[@]+"${tools[@]}"}
+
+  KEEP_ENABLED=true
+  for tool in ${tools[@]+"${tools[@]}"}; do
+    CHANGED=false
+    # Packages only for enabled tools (dotfiles didn't install the others).
+    # Keep going when a package can't be removed (pacman refuses packages
+    # others depend on): the links still come out.
+    if [[ $(tool_enabled "$tool") == true ]] && ! _remove_package "$tool"; then
+      failed="${failed:+$failed, }$tool (package)"
+    fi
+    if ! _unlink_configs "$tool"; then
+      failed="${failed:+$failed, }$tool (links)"
+    fi
+  done
+  _wipe_self
+
+  out ""
+  if [[ -n $failed ]]; then
+    out "wipe: done, with problems: $failed"
+    out "      (packages others depend on stay installed; see the messages above)"
+    exit 1
+  fi
+  if [[ $DRY_RUN == true ]]; then
+    out "wipe: dry run, nothing changed"
+  else
+    out "wipe: done. Set up again with: $DOTFILES/dotfiles.sh link"
   fi
 }
 
@@ -3001,6 +3130,7 @@ main() {
     link)      cmd_link "$@" ;;
     unlink)    cmd_unlink "$@" ;;
     update)    cmd_update "$@" ;;
+    wipe)      cmd_wipe "$@" ;;
     status)    cmd_status "$@" ;;
     doctor)    cmd_doctor "$@" ;;
     help)      cmd_help "$@" ;;
