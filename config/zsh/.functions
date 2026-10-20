@@ -183,31 +183,6 @@ function pushover() {
   https://api.pushover.net/1/messages.json
 }
 
-# dotfiles-update — pull the latest dotfiles and re-apply them.
-#
-# Needs $DOTFILES (set by .zshenv from the ~/.config/dotfiles link). Then it
-# cd's there, checks out main, runs `git pull`, runs `fresh`, and finally
-# cd's to $HOME (it does not return you to where you started).
-#
-# Usage:
-#   dotfiles-update
-#
-# Requires: the `fresh` dotfiles manager on PATH.
-function dotfiles-update() {
-	if [[ -z "${DOTFILES}" ]]; then
-		echo "dotfiles-update: DOTFILES isn't set (is ~/.config/dotfiles linked? run: dotfiles doctor)" >&2
-		return 1
-	fi
-
-	clear
-	cd $DOTFILES
-	git checkout main
-	git pull
-	clear
-	fresh
-	cd $HOME
-}
-
 # checkGit — report whether the current git repo has uncommitted changes.
 #
 # Counts the lines of `git status --porcelain` and prints a green line when
