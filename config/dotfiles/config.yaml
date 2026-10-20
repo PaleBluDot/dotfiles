@@ -22,6 +22,11 @@ default: []
 #             when missing; an existing clone is never touched
 #   inject:   on a link: the file holds op:// references; dest gets a copy
 #             filled in by op inject (owner-only) instead of a symlink
+#   copy:     on a link: a system file. dest is a full path (/etc/..., /usr/...)
+#             that gets a root-owned copy, never a symlink; $HOME and $USER in
+#             the file are filled in for you. Linking the tool needs sudo.
+#   enable:   on a copied systemd unit: systemctl enable --now it
+#   os:       on a link: only use it on that OS (linux, macos, windows)
 packages:
   bash:
     enabled: true

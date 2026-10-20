@@ -359,8 +359,52 @@ tool_manual() {
 
 # Links, one "src<TAB>dest" line each, with this OS's dest when the link
 # has one (windows:, macos:, linux:). Missing src or dest comes out empty.
+# A link with os: is only used on that OS (os: linux for system files).
 tool_links() {
-  _yq ".packages[\"$1\"].links // [] | .[] | (.src // \"\") + \"\t\" + (.[\"${DOTFILES_OS:-none}\"] // .dest // \"\")"
+  _yq ".packages[\"$1\"].links // [] | .[] | select((.os // \"\") == \"\" or .os == \"${DOTFILES_OS:-none}\") | (.src // \"\") + \"\t\" + (.[\"${DOTFILES_OS:-none}\"] // .dest // \"\")"
+}
+
+# One true/false field of the link with this src (inject, copy, enable).
+_link_flag() {
+  if [[ $(_yq ".packages[\"$1\"].links // [] | .[] | select(.src == \"$2\") | .[\"$3\"] // false" | head -n 1) == true ]]; then
+    echo true
+  else
+    echo false
+  fi
+}
+
+# copy: true = a system file: dest is an absolute path that gets a
+# root-owned copy, never a symlink (root must not run files you can edit).
+tool_link_copy() { _link_flag "$1" "$2" copy; }
+
+# enable: true on a copied systemd unit = systemctl enable --now it.
+tool_link_enable() { _link_flag "$1" "$2" enable; }
+
+# "true" when the tool has system files on this OS (needs sudo to link).
+tool_has_system() {
+  local src dest
+  while IFS=$'\t' read -r src dest; do
+    if [[ $(tool_link_copy "$1" "$src") == true ]]; then
+      echo true
+      return 0
+    fi
+  done < <(tool_links "$1")
+  echo false
+}
+
+# A link dest as a full path, and as shown in messages: under $HOME
+# unless it's absolute (system files).
+_dest_path() {
+  case "$1" in
+    /*) echo "$1" ;;
+    *) echo "$HOME/$1" ;;
+  esac
+}
+_dest_shown() {
+  case "$1" in
+    /*) echo "$1" ;;
+    *) echo "~/$1" ;;
+  esac
 }
 
 # "true" when the link with this src has inject: true: the repo file holds
@@ -370,13 +414,7 @@ tool_clones() {
   _yq ".packages[\"$1\"].clone // [] | .[] | (.repo // \"\") + \"\t\" + (.dest // \"\")"
 }
 
-tool_link_inject() {
-  if [[ $(_yq ".packages[\"$1\"].links // [] | .[] | select(.src == \"$2\") | .inject // false" | head -n 1) == true ]]; then
-    echo true
-  else
-    echo false
-  fi
-}
+tool_link_inject() { _link_flag "$1" "$2" inject; }
 
 # "true" or "false"; anything else counts as false.
 tool_enabled() {
@@ -659,7 +697,13 @@ What's in the way of a link:
 
 Never touches anything inside the repo (through a linked folder).
 
-  -d  show what would happen, change nothing
+System files (links with copy: true, e.g. omarchy, limine) get a
+root-owned copy instead of a symlink, so linking those tools asks for your
+sudo password first; refused = nothing changes. A copy that differs from
+the repo is replaced after you say y (the old one is kept in
+/var/lib/dotfiles/backup).
+
+  -d  show what would happen, change nothing (doesn't ask for sudo)
   -v  show every step
   --force  no questions, no backups: replace files and folders
 
@@ -933,8 +977,11 @@ _link_state() {
 # symlink: "injected" when it's there, "symlink" when an old link is still
 # in its place.
 _tool_link_state() {
-  local tool="$1" src="$2" dest="$3" dest_path="$HOME/$3"
-  if [[ $(tool_link_inject "$tool" "$src") != true ]]; then
+  local tool="$1" src="$2" dest="$3" dest_path
+  dest_path="$(_dest_path "$3")"
+  if [[ $(tool_link_copy "$tool" "$src") == true ]]; then
+    _copy_state "$(_src_path "$src")" "$dest_path"
+  elif [[ $(tool_link_inject "$tool" "$src") != true ]]; then
     _link_state "$(_src_path "$src")" "$dest_path"
   elif [[ -L $dest_path ]]; then
     echo "symlink"
@@ -947,9 +994,39 @@ _tool_link_state() {
   fi
 }
 
+# The repo's version of a system file with the literal text $HOME and
+# $USER filled in for this user. The repo holds no home path or user name;
+# the installed copy needs the real ones (it runs as root, where $HOME is
+# /root, and systemd unit lines don't expand variables).
+_render_copy() {
+  sed -e "s|\$HOME|$HOME|g" -e "s|\$USER|$(id -un)|g" "$1"
+}
+
+# State of a system file (copy: true):
+#   copied   dest is a regular file with the repo's content
+#   differs  something else is there (changed by hand, or a symlink)
+#   folder   a folder is in the way
+#   missing  nothing at dest
+_copy_state() {
+  local src_path="$1" dest_path="$2"
+  if [[ -d $dest_path && ! -L $dest_path ]]; then
+    echo "folder"
+  elif [[ -f $dest_path && ! -L $dest_path ]] &&
+    # sha256sum (coreutils) rather than cmp: minimal systems lack diffutils
+    [[ $(_render_copy "$src_path" | sha256sum) == "$(sha256sum <"$dest_path")" ]]; then
+    echo "copied"
+  elif [[ -e $dest_path || -L $dest_path ]]; then
+    echo "differs"
+  else
+    echo "missing"
+  fi
+}
+
 # A link state in words.
 _link_state_text() {
   case "$1" in
+    copied)        echo "copied (root-owned)" ;;
+    differs)       echo "differs from the repo; dotfiles link copies it again" ;;
     injected)      echo "filled in from 1Password" ;;
     symlink)       echo "still a symlink; dotfiles link fills it in from 1Password" ;;
     linked)        echo "linked" ;;
@@ -1003,7 +1080,7 @@ _tool_linked() {
     state="$(_tool_link_state "$tool" "$src" "$dest")"
     log debug "$tool: ~/$dest is $state"
     case "$state" in
-      linked | linked-parent | injected) ;;
+      linked | linked-parent | injected | copied) ;;
       *) result=false ;;
     esac
   done < <(tool_links "$tool")
@@ -1105,14 +1182,16 @@ _status_tool() {
     first=false
     state="$(_tool_link_state "$tool" "$src" "$dest")"
     out "    source:   config/$src"
-    if [[ $(tool_link_inject "$tool" "$src") == true ]]; then
+    if [[ $(tool_link_copy "$tool" "$src") == true ]]; then
+      out "    copy:     $dest  (root-owned)"
+    elif [[ $(tool_link_inject "$tool" "$src") == true ]]; then
       out "    filled:   ~/$dest  (op inject)"
     else
       out "    symlink:  ~/$dest"
     fi
     case "$state" in
-      linked | linked-parent | injected) ;;
-      *) out "    problem:  $(_link_state_text "$state" "$HOME/$dest")" ;;
+      linked | linked-parent | injected | copied) ;;
+      *) out "    problem:  $(_link_state_text "$state" "$(_dest_path "$dest")")" ;;
     esac
   done < <(tool_links "$tool")
 }
@@ -1233,6 +1312,44 @@ set_enabled() {
 # Tools to act on: the ones named, or every tool with enabled: true.
 # Sets TOOLS. Unknown names stop the run before anything changes.
 TOOLS=()
+# Tools with system files (copy: true links) need root for them. Before
+# changing anything, ask for the sudo password (sudo -v); refused = stop,
+# nothing changed. Later sudo calls in this run don't ask again. A dry run
+# changes nothing, so it doesn't ask.
+_require_sudo() {
+  local tool need=""
+  if [[ $DRY_RUN == true || $EUID -eq 0 ]]; then
+    return 0
+  fi
+  for tool in "$@"; do
+    if [[ $(tool_has_system "$tool") == true ]]; then
+      need="${need:+$need, }$tool"
+    fi
+  done
+  if [[ -z $need ]]; then
+    return 0
+  fi
+  if ! command -v sudo >/dev/null 2>&1; then
+    log error "$need installs system files and needs root, but sudo isn't installed; nothing changed"
+    exit 1
+  fi
+  log info "$need installs system files; sudo needs your password"
+  if ! sudo -v; then
+    log error "$need installs system files and sudo was refused; nothing changed"
+    exit 1
+  fi
+}
+
+# Every tool with enabled: true, one per line.
+_enabled_tools() {
+  local tool
+  while IFS= read -r tool; do
+    if [[ $(tool_enabled "$tool") == true ]]; then
+      echo "$tool"
+    fi
+  done < <(manifest_tools)
+}
+
 _pick_tools() {
   local cmd="$1" tool
   shift
@@ -1288,10 +1405,156 @@ _link_one() {
     log error "$tool: a link in config.yaml is missing src or dest"
     return 1
   fi
-  if [[ $(tool_link_inject "$tool" "$src") == true ]]; then
+  if [[ $(tool_link_copy "$tool" "$src") == true ]]; then
+    _copy_path "$tool" "$src" "$dest"
+  elif [[ $dest == /* ]]; then
+    log error "$tool: $dest is a system path; mark that link copy: true in config.yaml"
+    return 1
+  elif [[ $(tool_link_inject "$tool" "$src") == true ]]; then
     _inject_path "$tool" "$(_src_path "$src")" "$dest"
   else
     _link_path "$tool" "$(_src_path "$src")" "$dest"
+  fi
+}
+
+# Run a command as root: directly when already root (a container), else
+# through sudo (dotfiles was started with sudo, so it doesn't ask again).
+_root_cmd() {
+  if [[ $EUID -eq 0 ]]; then
+    run_cmd "$@"
+  else
+    run_cmd sudo "$@"
+  fi
+}
+
+# Where a system file that was in the way is kept, so unlink can put it
+# back. Not next to it: a .bak in a hooks folder would still be run.
+SYSTEM_BACKUP_DIR="/var/lib/dotfiles/backup"
+
+# For a copied systemd unit: reload systemd when the file was just copied
+# ($4 = copied), and enable the unit when the link says enable: true and it
+# isn't yet. Containers have no running systemd: warn, don't fail.
+_systemd_after_copy() {
+  local tool="$1" src="$2" dest_path="$3" copied="${4:-false}" unit
+  case "$dest_path" in
+    /etc/systemd/*) ;;
+    *) return 0 ;;
+  esac
+  if ! command -v systemctl >/dev/null 2>&1; then
+    return 0
+  fi
+  unit="$(basename "$dest_path")"
+  if [[ $copied == true ]] && ! _root_cmd systemctl daemon-reload; then
+    log warn "$tool: systemctl daemon-reload failed (no running systemd?)"
+    return 0
+  fi
+  if [[ $(tool_link_enable "$tool" "$src") == true ]] && ! systemctl is-enabled --quiet "$unit" 2>/dev/null; then
+    if _root_cmd systemctl enable --now "$unit"; then
+      log success "$tool: enabled $unit"
+    else
+      log warn "$tool: couldn't enable $unit"
+    fi
+  fi
+}
+
+# Put a root-owned copy of a system file in place (copy: true). Asks
+# before replacing a different file; the old one goes to
+# $SYSTEM_BACKUP_DIR. Returns 1 when the copy isn't in place afterwards.
+_copy_path() {
+  local tool="$1" src="$2" dest_path="$3"
+  local src_path state mode tmp
+  src_path="$(_src_path "$src")"
+  if [[ ! -f $src_path ]]; then
+    log error "$tool: source config/$src doesn't exist"
+    return 1
+  fi
+  state="$(_copy_state "$src_path" "$dest_path")"
+  log debug "$tool: $dest_path is $state"
+
+  case "$state" in
+    copied)
+      log success "$tool: already in place: $dest_path (root-owned copy)"
+      _systemd_after_copy "$tool" "$src" "$dest_path"
+      return 0
+      ;;
+    folder)
+      log warn "$tool: $dest_path is a folder; left it alone"
+      return 1
+      ;;
+    differs)
+      if [[ $FORCE != true ]]; then
+        if [[ $DRY_RUN == true ]]; then
+          log info "dry run, would ask: $dest_path differs from the repo. Replace it?"
+        elif ! confirm "$tool: $dest_path differs from the repo. Replace it (the old one is kept in $SYSTEM_BACKUP_DIR)?"; then
+          log warn "$tool: left $dest_path alone"
+          return 1
+        fi
+      fi
+      if [[ ! -e $SYSTEM_BACKUP_DIR$dest_path ]]; then
+        _root_cmd mkdir -p "$(dirname "$SYSTEM_BACKUP_DIR$dest_path")"
+        _root_cmd cp -P "$dest_path" "$SYSTEM_BACKUP_DIR$dest_path"
+      fi
+      ;;
+  esac
+
+  CHANGED=true
+  mode=644
+  if [[ -x $src_path ]]; then
+    mode=755
+  fi
+  if [[ $DRY_RUN == true ]]; then
+    log info "dry run, would copy config/$src to $dest_path (root-owned, $mode)"
+    _systemd_after_copy "$tool" "$src" "$dest_path" true
+    return 0
+  fi
+  tmp="$(mktemp)"
+  _render_copy "$src_path" >"$tmp"
+  _root_cmd mkdir -p "$(dirname "$dest_path")"
+  if [[ -L $dest_path ]]; then
+    _root_cmd rm -f "$dest_path"
+  fi
+  if ! _root_cmd install -o 0 -g 0 -m "$mode" "$tmp" "$dest_path"; then
+    rm -f "$tmp"
+    log error "$tool: copying $dest_path failed"
+    return 1
+  fi
+  rm -f "$tmp"
+  log success "$tool: copied $dest_path (root-owned, $mode)"
+  _systemd_after_copy "$tool" "$src" "$dest_path" true
+}
+
+# Remove a system file that is still the repo's copy, and put back what
+# was there before. A changed file is left alone.
+_uncopy_path() {
+  local tool="$1" src="$2" dest_path="$3" state unit
+  state="$(_copy_state "$(_src_path "$src")" "$dest_path")"
+  case "$state" in
+    missing)
+      log info "$tool: $dest_path isn't there; nothing to do"
+      return 0
+      ;;
+    copied) ;;
+    *)
+      log warn "$tool: $dest_path differs from the repo ($(_link_state_text "$state")); left it alone"
+      return 0
+      ;;
+  esac
+  unit="$(basename "$dest_path")"
+  if [[ $dest_path == /etc/systemd/* && $(tool_link_enable "$tool" "$src") == true ]] &&
+    command -v systemctl >/dev/null 2>&1; then
+    _root_cmd systemctl disable --now "$unit" || log warn "$tool: couldn't disable $unit"
+  fi
+  _root_cmd rm "$dest_path"
+  if [[ -e $SYSTEM_BACKUP_DIR$dest_path || -L $SYSTEM_BACKUP_DIR$dest_path ]]; then
+    _root_cmd mv "$SYSTEM_BACKUP_DIR$dest_path" "$dest_path"
+    if [[ $DRY_RUN != true ]]; then
+      log success "$tool: removed $dest_path and put the old one back"
+    fi
+  elif [[ $DRY_RUN != true ]]; then
+    log success "$tool: removed $dest_path"
+  fi
+  if [[ $dest_path == /etc/systemd/* ]] && command -v systemctl >/dev/null 2>&1; then
+    _root_cmd systemctl daemon-reload || true
   fi
 }
 
@@ -1520,6 +1783,7 @@ _link_configs() {
 cmd_link() {
   _require_config
   _pick_tools link "$@"
+  _require_sudo ${TOOLS[@]+"${TOOLS[@]}"}
   local tool good="" bad="" manual=""
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
     CHANGED=false
@@ -1544,6 +1808,10 @@ cmd_link() {
 _unlink_one() {
   local tool="$1" src="$2" dest="$3"
   local src_path dest_path state shown
+  if [[ $(tool_link_copy "$tool" "$src") == true ]]; then
+    _uncopy_path "$tool" "$src" "$dest"
+    return
+  fi
   src_path="$(_src_path "$src")"
   dest_path="$HOME/$dest"
   shown="~/$dest"
@@ -1605,6 +1873,7 @@ cmd_unlink() {
   fi
   _require_config
   _pick_tools unlink "$@"
+  _require_sudo ${TOOLS[@]+"${TOOLS[@]}"}
   local tool good="" bad=""
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
     CHANGED=false
@@ -1939,6 +2208,8 @@ _screen_packages() {
 # dotfiles with no command.
 _interactive_link() {
   _require_config
+  # shellcheck disable=SC2046
+  _require_sudo $(manifest_tools)
   _require_tty
   QUIET=true
   INTERACTIVE_FAILED=false
@@ -1952,6 +2223,8 @@ _interactive_link() {
 # dotfiles unlink with no tool: pick from the enabled packages.
 _interactive_unlink() {
   _require_config
+  # shellcheck disable=SC2046
+  _require_sudo $(_enabled_tools)
   _require_tty
   QUIET=true
   local -a names=()
@@ -2051,6 +2324,8 @@ cmd_update() {
     log error "$DOTFILES isn't a git repo; nothing to pull"
     exit 1
   fi
+  # shellcheck disable=SC2046
+  _require_sudo $(_enabled_tools)
   if ! _update_pull; then
     exit 1
   fi
@@ -2571,6 +2846,12 @@ _doctor_tool() {
     if [[ -z $src || -z $dest ]]; then
       log error "$tool: a link is missing src or dest"
       problems=$((problems + 1))
+    elif [[ $(tool_link_copy "$tool" "$src") == true && $dest != /* ]]; then
+      log error "$tool: config/$src has copy: true, so its dest must be a full system path (got: $dest)"
+      problems=$((problems + 1))
+    elif [[ $dest == /* && $(tool_link_copy "$tool" "$src") != true ]]; then
+      log error "$tool: $dest is a system path; mark that link copy: true"
+      problems=$((problems + 1))
     elif [[ ! -e $(_src_path "$src") ]]; then
       # Only an enabled tool fails: a disabled one isn't linked yet.
       if [[ $(tool_enabled "$tool") == true ]]; then
@@ -2658,6 +2939,17 @@ cmd_doctor() {
 
 main() {
   ORIG_ARGS=("$@")
+  # No need to start dotfiles with sudo: it asks for sudo itself when a
+  # tool has system files. Started with sudo anyway: run as the user who ran
+  # it, so the clone, links, config.yaml and log stay theirs (sudo doesn't
+  # ask again). A real root login or a container has no SUDO_USER.
+  if [[ $EUID -eq 0 && -n ${SUDO_USER:-} && $SUDO_USER != root ]]; then
+    if [[ -n ${BASH_SOURCE[0]:-} && -f ${BASH_SOURCE[0]} ]]; then
+      exec sudo -u "$SUDO_USER" -H bash "${BASH_SOURCE[0]}" "$@"
+    fi
+    echo "[ERROR] don't run the first run with sudo; run it as $SUDO_USER (curl ... | bash). It asks for sudo by itself when needed." >&2
+    exit 1
+  fi
   # This run always looks in ~/.local/bin too: dotfiles.sh puts its own
   # command (and yq on Debian/Ubuntu) there. Only for this process.
   case ":$PATH:" in
@@ -2682,14 +2974,6 @@ main() {
   fi
   LOG_CMD="$cmd"
   log debug "command: $cmd, arguments: ${*:-<none>}"
-
-  # Run as yourself: dotfiles.sh calls sudo by itself, only for the package
-  # manager. Under sudo, the clone, links and config would belong to root.
-  # (A real root login or a container has no SUDO_USER and is fine.)
-  if [[ $EUID -eq 0 && -n ${SUDO_USER:-} ]]; then
-    log error "don't run dotfiles.sh with sudo; run it as $SUDO_USER. It asks for sudo by itself when a package needs installing."
-    exit 1
-  fi
 
   resolve_dotfiles
   detect_os
