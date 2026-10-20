@@ -32,6 +32,7 @@ dotfiles link [tool…]     install tools and link their configs (no tool = all 
 dotfiles unlink [tool…]   remove tools and their links (no tool = pick from a list)
 dotfiles default          install the default: list, link nothing
 dotfiles update           pull the repo, install what's missing, relink
+dotfiles wipe             undo everything dotfiles set up here (to test again)
 dotfiles status [tool]
 dotfiles doctor           check (and fix) what dotfiles needs
 dotfiles help [command]
