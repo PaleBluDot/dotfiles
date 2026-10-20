@@ -55,7 +55,25 @@ function Invoke-DotfilesBootstrap {
         Write-Host "[WARN] Turn it on: Settings > System > For developers > Developer Mode. Then run this again."
     }
 
-    # 4. Hand over: dotfiles.sh's first run clones the repo, links itself
+    # 4. ~/.local/bin on the Windows user PATH, where dotfiles.sh links its
+    #    command. A script can't change its parent shell's PATH, but this
+    #    Windows setting is inherited by every new terminal (Git Bash,
+    #    PowerShell, cmd). $env:Path covers this run too.
+    $localBin = Join-Path $env:USERPROFILE '.local\bin'
+    New-Item -ItemType Directory -Force -Path $localBin | Out-Null
+    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $entries = @($userPath -split ';' | Where-Object { $_ })
+    if ($entries -contains $localBin) {
+        Write-Host "[SUCCESS] PATH: $localBin is on your user PATH"
+    } else {
+        [Environment]::SetEnvironmentVariable('Path', (($entries + $localBin) -join ';'), 'User')
+        Write-Host "[SUCCESS] PATH: added $localBin to your user PATH (new terminals pick it up)"
+    }
+    if (($env:Path -split ';') -notcontains $localBin) {
+        $env:Path = "$env:Path;$localBin"
+    }
+
+    # 5. Hand over: dotfiles.sh's first run clones the repo, links itself
     #    into ~/.local/bin and runs the interactive setup. -l = login shell, so
     #    Git Bash sets up its PATH (curl, git). DOTFILES / DOTFILES_BRANCH
     #    carry over as environment variables.
