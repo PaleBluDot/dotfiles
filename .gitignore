@@ -54,3 +54,5 @@ config/superfile/theme/
 config/composer/auth.json
 config/composer/vendor/
 config/composer/composer.lock
+config/composer/.htaccess
+config/composer/config.json
