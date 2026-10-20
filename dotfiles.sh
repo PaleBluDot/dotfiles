@@ -2361,6 +2361,7 @@ _doctor_self_links() {
 # ─── doctor (plan Section 7) ────────────────────────────────────────────
 
 DOCTOR_FAILED=0
+DOCTOR_LINKS_ONLY=0   # tools with none on this manager (doctor counts them)
 YQ_OK=false
 
 _check_ok()   { log success "$1"; }
@@ -2566,9 +2567,11 @@ _doctor_tool() {
   manual="$(tool_manual "$tool")"
   log debug "$tool: package=${package:-<none>} command=$(tool_command "$tool")${manual:+ manual=\"$manual\"}"
 
+  # A missing manager name falls back to the key, so an empty package here
+  # is a deliberate none: the tool is linked, nothing is installed.
   if [[ -z $package && -z $manual ]]; then
-    log error "$tool: no package for ${PKG_MANAGER:-this OS} and no manual: message"
-    problems=$((problems + 1))
+    log info "$tool: not available on ${PKG_MANAGER:-this OS} (none); links only"
+    DOCTOR_LINKS_ONLY=$((DOCTOR_LINKS_ONLY + 1))
   fi
   while IFS=$'\t' read -r src dest; do
     count=$((count + 1))
@@ -2597,17 +2600,21 @@ _doctor_tools() {
   if [[ $CONFIG_OK != true ]]; then
     return 0
   fi
-  local tool count=0 bad=0
+  local tool count=0 bad=0 note=""
+  DOCTOR_LINKS_ONLY=0
   while IFS= read -r tool; do
     count=$((count + 1))
     if ! _doctor_tool "$tool"; then
       bad=$((bad + 1))
     fi
   done < <(manifest_tools)
+  if [[ $DOCTOR_LINKS_ONLY -gt 0 ]]; then
+    note=" ($DOCTOR_LINKS_ONLY links only)"
+  fi
   if [[ $bad -gt 0 ]]; then
-    _check_fail "packages: $bad of $count have problems on ${PKG_MANAGER:-this OS}"
+    _check_fail "packages: $bad of $count have problems on ${PKG_MANAGER:-this OS}$note"
   else
-    _check_ok "packages: all $count resolve on ${PKG_MANAGER:-this OS}"
+    _check_ok "packages: all $count resolve on ${PKG_MANAGER:-this OS}$note"
   fi
 }
 
