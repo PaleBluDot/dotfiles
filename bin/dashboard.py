@@ -6,9 +6,8 @@ Requirements: pip install psutil --break-system-packages
 """
 
 import tkinter as tk
-from tkinter import font
 import psutil
-import subprocess
+import subprocess  # nosec B404: fixed commands only, no user input
 import threading
 import time
 from collections import deque
@@ -53,12 +52,12 @@ def bytes_to_human(n):
 
 def get_power_profile():
     try:
-        return subprocess.check_output(
+        return subprocess.check_output(  # nosec B603 B607: fixed command, no user input
             ["powerprofilesctl", "get"], stderr=subprocess.DEVNULL
         ).decode().strip()
     except Exception:
         try:
-            return subprocess.check_output(
+            return subprocess.check_output(  # nosec B603 B607: fixed command, no user input
                 ["cat", "/sys/firmware/acpi/platform_profile"],
                 stderr=subprocess.DEVNULL
             ).decode().strip()
@@ -244,12 +243,11 @@ class SettingsWindow(tk.Toplevel):
 
     def _recolor(self, widget, t):
         cls = widget.winfo_class()
-        if cls in ("Frame",):
-            try: widget.config(bg=t["BG"])
-            except: pass
-        elif cls == "Label":
-            try: widget.config(bg=t["BG"])
-            except: pass
+        if cls in ("Frame", "Label"):
+            try:
+                widget.config(bg=t["BG"])
+            except tk.TclError:
+                pass  # widget doesn't take a background color
         for child in widget.winfo_children():
             self._recolor(child, t)
 
@@ -610,7 +608,6 @@ class Dashboard(tk.Tk):
     # ── UI Update ─────────────────────────────────────────────────────────────
 
     def _update_ui(self, d):
-        t = self.theme
         self._clock_lbl.config(text=time.strftime("%H:%M:%S"))
 
         pct = d["cpu_pct"]

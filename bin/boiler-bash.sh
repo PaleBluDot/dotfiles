@@ -35,6 +35,7 @@ set -euo pipefail
 # Script metadata
 # ------------------------------------------------------------------------------
 readonly SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+# shellcheck disable=SC2034  # template: scripts made from it use SCRIPT_DIR
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly VERSION="0.3.0"
 

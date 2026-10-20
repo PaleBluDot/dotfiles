@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Print GitHub status for the bar widget as JSON, using the gh CLI."""
-import json, os, re, shutil, subprocess, sys
+import json, os, re, shutil, subprocess
 from concurrent.futures import ThreadPoolExecutor
 
 LIMIT = 10

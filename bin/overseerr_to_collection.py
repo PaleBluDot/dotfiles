@@ -25,23 +25,20 @@ Examples:
 """
 
 from os import getenv
-from typing import TYPE_CHECKING, List
+from typing import List
 
-if TYPE_CHECKING:
-    from requests import Session
+from requests import Session
 
 # ===== FILL THESE VARIABLES =====
 plex_base_url = "$PLEX_BASE_URL"
-plex_api_token = ""
 overseerr_base_url = "$OVERSEERR_BASE_URL"
-overseerr_api_token = ""
 # ================================
 
 # Environmental Variables
 plex_base_url = getenv("plex_base_url", plex_base_url)
-plex_api_token = getenv("plex_api_token", plex_api_token)
+plex_api_token = getenv("plex_api_token", "")
 overseerr_base_url = getenv("overseerr_base_url", overseerr_base_url)
-overseerr_api_token = getenv("overseerr_api_token", overseerr_api_token)
+overseerr_api_token = getenv("overseerr_api_token", "")
 p_base_url = plex_base_url.rstrip("/")
 o_base_url = overseerr_base_url.rstrip("/") + "/api/v1"
 
@@ -148,15 +145,6 @@ def overseerr_to_collection(
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
-
-    from requests import Session
-
-    # Setup vars
-    plex_ssn = Session()
-    plex_ssn.headers.update({"Accept": "application/json"})
-    plex_ssn.params.update({"X-Plex-Token": plex_api_token})
-    overseerr_ssn = Session()
-    overseerr_ssn.headers.update({"X-Api-Key": overseerr_api_token})
 
     # Setup vars
     plex_ssn = Session()
