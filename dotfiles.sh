@@ -2397,7 +2397,7 @@ _prereq_package() {
     git:winget)  echo "Git.Git" ;;
     git:*)       echo "git" ;;
     yq:pacman)   echo "go-yq" ;;
-    yq:dnf)      echo "yq" ;;   # unverified: confirm in a Fedora VM
+    yq:dnf)      echo "yq" ;;
     yq:brew)     echo "yq" ;;
     yq:winget)   echo "MikeFarah.yq" ;;
     # yq:apt has no package: apt's yq is the Python one (see _install_yq_release).
