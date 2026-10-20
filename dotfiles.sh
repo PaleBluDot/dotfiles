@@ -1851,12 +1851,19 @@ _unlink_one() {
 
 # Unlink one tool and set enabled: false. Returns 1 on failure.
 _unlink_configs() {
-  local tool="$1" src dest ok=true
-  while IFS=$'\t' read -r src dest; do
+  local tool="$1" src dest ok=true i
+  local -a pairs=()
+  while IFS= read -r src; do
+    pairs+=("$src")
+  done < <(tool_links "$tool")
+  # Last link first: the reverse of linking (a .path unit is switched off
+  # before the service it starts is removed).
+  for ((i = ${#pairs[@]} - 1; i >= 0; i--)); do
+    IFS=$'\t' read -r src dest <<<"${pairs[i]}"
     if ! _unlink_one "$tool" "$src" "$dest"; then
       ok=false
     fi
-  done < <(tool_links "$tool")
+  done
   if [[ $ok == true ]] && ! set_enabled "$tool" false; then
     ok=false
   fi
