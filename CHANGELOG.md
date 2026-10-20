@@ -4,6 +4,18 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.0.0](https://github.com/PaleBluDot/dotfiles/compare/v1.5.2...v2.0.0) (2026-10-20)
+
+
+### Features
+
+* **script:** rewrite dotfiles.sh as v2 ([#14](https://github.com/PaleBluDot/dotfiles/issues/14)) ([9cf182a](https://github.com/PaleBluDot/dotfiles/commit/9cf182a284fd0ab873e9416bcc732cd4c0850fca))
+
+
+### BREAKING CHANGES
+
+* **script:** install and uninstall are gone; use link and unlink
+
 ## [1.5.2](https://github.com/PaleBluDot/dotfiles/compare/v1.5.1...v1.5.2) (2026-03-21)
 
 
