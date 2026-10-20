@@ -28,6 +28,13 @@ default: []
 #   enable:   on a copied systemd unit: systemctl enable --now it
 #   os:       on a link: only use it on that OS (linux, macos, windows)
 packages:
+  aether:
+    enabled: true
+    manual: "Not auto-installed. Install by hand: git clone https://github.com/omacom/aether.git && cd aether && make build"
+    links:
+      - src: aether
+        dest: .config/aether
+
   bash:
     enabled: true
     locked: true
@@ -63,6 +70,15 @@ packages:
     links:
       - src: chromium-flags.conf
         dest: .config/chromium-flags.conf
+        os: linux
+
+  composer:
+    enabled: true
+    winget: none
+    links:
+      - src: composer
+        dest: .config/composer
+        windows: AppData/Roaming/Composer
 
   cspell:
     enabled: true
@@ -86,7 +102,7 @@ packages:
         dest: .config/fastfetch
 
   fd:
-    enabled: false
+    enabled: true
     apt: fd-find
     dnf: fd-find
     winget: sharkdp.fd
@@ -146,6 +162,7 @@ packages:
     links:
       - src: hypr
         dest: .config/hypr
+        os: linux
 
   hyprland-preview-share-picker:
     enabled: true
@@ -156,6 +173,19 @@ packages:
     links:
       - src: hyprland-preview-share-picker
         dest: .config/hyprland-preview-share-picker
+        os: linux
+
+  komorebi:
+    enabled: true
+    pacman: none
+    apt: none
+    dnf: none
+    brew: none
+    winget: LGUG2Z.komorebi
+    links:
+      - src: komorebi
+        dest: .config/komorebi
+        os: windows
 
   lazygit:
     enabled: true
@@ -182,6 +212,13 @@ packages:
         dest: /etc/boot/hooks/post.d/50-omarchy-limine-style
         copy: true
         os: linux
+
+  massCode:
+    enabled: true
+    manual: "Not auto-installed. Install the massCode app by hand"
+    links:
+      - src: massCode/startburst.yml
+        dest: .massCode/themes/startburst.yml
 
   mise:
     enabled: true
@@ -228,6 +265,7 @@ packages:
     links:
       - src: omarchy
         dest: .config/omarchy
+        os: linux
       # Boot menu, disk-password screen and screensaver follow the theme and
       # branding/settings.toml: the .path unit runs the apply script on change.
       - src: omarchy/system/surface-boot-theme-apply
@@ -242,6 +280,17 @@ packages:
         dest: /etc/systemd/system/surface-boot-theme.path
         copy: true
         enable: true
+        os: linux
+
+  ranger:
+    enabled: true
+    winget: none
+    links:
+      - src: ranger
+        dest: .config/ranger
+        os: macos
+      - src: ranger
+        dest: .config/ranger
         os: linux
 
   ssh:
@@ -264,6 +313,14 @@ packages:
     links:
       - src: starship
         dest: .config/starship
+
+  superfile:
+    enabled: true
+    command: spf
+    manual: 'Not auto-installed. Install by hand: bash -c "$(curl -sLo- https://superfile.dev/install.sh)"'
+    links:
+      - src: superfile
+        dest: .config/superfile
 
   thefuck:
     enabled: true
@@ -301,6 +358,13 @@ packages:
         macos: Library/Application Support/Code/User/settings.json
         windows: AppData/Roaming/Code/User/settings.json
 
+  warp:
+    enabled: true
+    manual: "Not auto-installed. Install the Warp app by hand"
+    links:
+      - src: warp/starburst.yml
+        dest: .warp/themes/starburst.yml
+
   wezterm:
     enabled: true
     apt: none
@@ -321,7 +385,7 @@ packages:
     links:
       - src: xdg-terminals.list
         dest: .config/xdg-terminals.list
-
+        os: linux
 
   yazi:
     enabled: true

@@ -21,6 +21,7 @@ export XDG_CACHE_HOME="$HOME/.cache"
 export ZDOTDIR="$XDG_CONFIG_HOME/zsh"
 
 export ZSH="$HOME/.config/zsh/oh-my-zsh"
+export ZSH_CACHE_DIR="$XDG_CACHE_HOME/oh-my-zsh"
 # DOTFILES: wherever this machine's repo is, found through the ~/.config/dotfiles
 # link that dotfiles.sh makes. :A resolves the link (…/dotfiles/config/dotfiles),
 # :h:h goes up two folders to the repo.
@@ -46,6 +47,7 @@ export CARGO_HOME="$XDG_DATA_HOME/cargo"
 export DOTNET_CLI_HOME="$XDG_DATA_HOME/dotnet"
 export CUDA_CACHE_PATH="$XDG_CACHE_HOME/nv"
 export GNUPGHOME="$XDG_DATA_HOME/gnupg"
+export COMPOSER_CACHE_DIR="$XDG_CACHE_HOME/composer"
 
 # COMPLETION CACHE
 # Out of the repo (ZDOTDIR is config/zsh) and into the cache folder

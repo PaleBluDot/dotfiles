@@ -1,0 +1,8 @@
+{
+  "config": {
+    "sort-packages": true,
+    "preferred-install": "dist",
+    "process-timeout": 600,
+    "htaccess-protect": false
+  }
+}
