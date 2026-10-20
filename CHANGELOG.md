@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.1.0](https://github.com/PaleBluDot/dotfiles/compare/v2.0.0...v2.1.0) (2026-10-20)
+
+
+### Features
+
+* **config:** add tool configs and keep OS-specific tools on their own OS ([#15](https://github.com/PaleBluDot/dotfiles/issues/15)) ([b7787ee](https://github.com/PaleBluDot/dotfiles/commit/b7787ee8fb163605cb36eb61eef6565f9926f58f))
+
 # [2.0.0](https://github.com/PaleBluDot/dotfiles/compare/v1.5.2...v2.0.0) (2026-10-20)
 
 
