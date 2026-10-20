@@ -18,6 +18,8 @@ default: []
 #             add windows:/macos:/linux: when that OS needs another dest
 #   enabled:  written by link (true) and unlink (false)
 #   locked:   true = unlink removes the links but never the package
+#   clone:    repos to git clone (repo, dest under $HOME) after linking, only
+#             when missing; an existing clone is never touched
 #   inject:   on a link: the file holds op:// references; dest gets a copy
 #             filled in by op inject (owner-only) instead of a symlink
 packages:
@@ -300,3 +302,12 @@ packages:
         dest: .config/zsh
       - src: zsh/.zshenv
         dest: .zshenv
+    clone:
+      - repo: https://github.com/ohmyzsh/ohmyzsh.git
+        dest: .config/zsh/oh-my-zsh
+      - repo: https://github.com/zsh-users/zsh-autosuggestions.git
+        dest: .config/zsh/oh-my-zsh/custom/plugins/zsh-autosuggestions
+      - repo: https://github.com/zsh-users/zsh-completions.git
+        dest: .config/zsh/oh-my-zsh/custom/plugins/zsh-completions
+      - repo: https://github.com/zsh-users/zsh-syntax-highlighting.git
+        dest: .config/zsh/oh-my-zsh/custom/plugins/zsh-syntax-highlighting

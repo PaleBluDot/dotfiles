@@ -365,6 +365,11 @@ tool_links() {
 
 # "true" when the link with this src has inject: true: the repo file holds
 # op:// references, and dest gets a filled-in copy instead of a symlink.
+# Repos to clone, one "repo<TAB>dest" line each (dest under $HOME).
+tool_clones() {
+  _yq ".packages[\"$1\"].clone // [] | .[] | (.repo // \"\") + \"\t\" + (.dest // \"\")"
+}
+
 tool_link_inject() {
   if [[ $(_yq ".packages[\"$1\"].links // [] | .[] | select(.src == \"$2\") | .inject // false" | head -n 1) == true ]]; then
     echo true
@@ -642,7 +647,8 @@ dotfiles link [tool...] [-d] [-v] [--force]
 Install tools and link their configs: install the package if its command
 is missing, link every config, set enabled: true. No tool = every tool with
 enabled: true in config.yaml. A tool with no package here (none, manual:)
-is still linked.
+is still linked. Repos under clone: are cloned once the links are in place,
+only when missing (an existing clone is never touched).
 
 What's in the way of a link:
   nothing                   link it
@@ -1447,14 +1453,62 @@ _link_path() {
   fi
 }
 
+# Clone one repo from a tool's clone: list if it isn't there yet. An
+# existing clone is never touched (oh-my-zsh updates itself). Returns 1
+# when the dest is in the way or the clone fails.
+_clone_one() {
+  local tool="$1" repo="$2" dest="$3"
+  local dest_path="$HOME/$3" shown="~/$3"
+  if [[ -z $repo || -z $dest ]]; then
+    log error "$tool: a clone: entry needs both repo and dest"
+    return 1
+  fi
+  if [[ -d $dest_path/.git ]]; then
+    log success "$tool: already cloned: $shown"
+    return 0
+  fi
+  if [[ -e $dest_path && -n $(ls -A "$dest_path" 2>/dev/null) ]]; then
+    log warn "$tool: $shown exists but isn't a git clone; left it alone"
+    return 1
+  fi
+  # Inside the repo (through a linked folder) the clone must be gitignored,
+  # or it would show up as a nested repo in git status.
+  if [[ $DRY_RUN != true ]] && _inside_repo "$(dirname "$dest_path")" &&
+    ! git -C "$DOTFILES" check-ignore -q "$(_physical "$(dirname "$dest_path")")/$(basename "$dest_path")" 2>/dev/null; then
+    log warn "$tool: $shown is inside the repo but not gitignored; add it to .gitignore"
+  fi
+  if ! command -v git >/dev/null 2>&1; then
+    log error "$tool: git is needed to clone $repo; run: dotfiles doctor"
+    return 1
+  fi
+  CHANGED=true
+  log info "$tool: cloning $repo into $shown"
+  if ! run_cmd git clone --depth 1 "$repo" "$dest_path"; then
+    log error "$tool: cloning $repo failed"
+    return 1
+  fi
+  if [[ $DRY_RUN != true ]]; then
+    log success "$tool: cloned $shown"
+  fi
+}
+
 # Link one tool and set enabled: true. Returns 1 when a link isn't in place.
 _link_configs() {
-  local tool="$1" src dest ok=true
+  local tool="$1" src dest repo ok=true
   while IFS=$'\t' read -r src dest; do
     if ! _link_one "$tool" "$src" "$dest"; then
       ok=false
     fi
   done < <(tool_links "$tool")
+  # Clones often go inside a linked folder (~/.config/zsh/oh-my-zsh), so
+  # only clone once every link is in place.
+  if [[ $ok == true ]]; then
+    while IFS=$'\t' read -r repo dest; do
+      if ! _clone_one "$tool" "$repo" "$dest"; then
+        ok=false
+      fi
+    done < <(tool_clones "$tool")
+  fi
   if [[ $ok == true ]] && ! set_enabled "$tool" true; then
     ok=false
   fi
