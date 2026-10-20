@@ -2268,8 +2268,8 @@ _bootstrap() {
       read -r answer </dev/tty || true
       _log_to_file "INFO" "asked: clone to -> ${answer:-<Enter>}"
     else
-      log error "first run: no terminal to ask where to clone; run it as: DOTFILES=<path> curl ... | bash"
-      exit 1
+      # No terminal to ask (run from a script or over ssh): take the default.
+      log info "first run: no terminal to ask where to clone; using the default"
     fi
     answer="${answer/#\~/$HOME}"            # a typed ~ means $HOME
     DOTFILES="${answer:-$SUGGESTED_DOTFILES_DIR}"
