@@ -54,6 +54,7 @@ packages:
 
   btop:
     enabled: true
+    locked: true
     winget: aristocratos.btop4win
     links:
       - src: btop
@@ -89,6 +90,7 @@ packages:
 
   espanso:
     enabled: true
+    locked: true
     manual: "AUR package: omarchy pkg aur add espanso-wayland"
     links:
       - src: espanso
@@ -122,6 +124,7 @@ packages:
 
   ghostty:
     enabled: true
+    locked: true
     apt: none
     dnf: none
     winget: none
