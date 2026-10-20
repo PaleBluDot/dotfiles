@@ -17,11 +17,13 @@ default: []
 #   links:    src is a path under config/, dest a path under $HOME;
 #             add windows:/macos:/linux: when that OS needs another dest
 #   enabled:  written by link (true) and unlink (false)
+#   locked:   true = unlink removes the links but never the package
 #   inject:   on a link: the file holds op:// references; dest gets a copy
 #             filled in by op inject (owner-only) instead of a symlink
 packages:
   bash:
     enabled: true
+    locked: true
     winget: none
     links:
       - src: bash/.bashrc
@@ -106,6 +108,7 @@ packages:
 
   git:
     enabled: true
+    locked: true
     winget: Git.Git
     links:
       - src: git
@@ -202,6 +205,7 @@ packages:
 
   ssh:
     enabled: true
+    locked: true
     pacman: openssh
     apt: openssh-client
     dnf: openssh-clients
@@ -289,6 +293,7 @@ packages:
 
   zsh:
     enabled: true
+    locked: true
     winget: none
     links:
       - src: zsh

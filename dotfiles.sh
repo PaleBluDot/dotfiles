@@ -382,6 +382,15 @@ tool_enabled() {
   fi
 }
 
+# locked: true = unlink never removes this tool's package (only its links).
+tool_locked() {
+  if [[ $(_yq ".packages[\"$1\"].locked") == true ]]; then
+    echo true
+  else
+    echo false
+  fi
+}
+
 # Names in the default: list, one per line.
 default_list() {
   _yq '.default // [] | .[]'
@@ -665,7 +674,8 @@ then enabled: false. Doesn't ask before removing the package.
 
 Removes the package only (pacman -R, apt remove, ...), never its
 dependencies. If removing fails, the tool stays linked and enabled. A tool
-with no package here (none, manual:) is just unlinked.
+with locked: true in config.yaml, or no package here (none, manual:), is
+just unlinked.
 
   -d  show what would happen, change nothing
   -v  show every step
@@ -1624,6 +1634,10 @@ _remove_package() {
   cmd_name="$(tool_command "$tool")"
   package="$(tool_package "$tool")"
 
+  if [[ $(tool_locked "$tool") == true ]]; then
+    log info "$tool: locked: true in config.yaml; kept the package, removing only the links"
+    return 0
+  fi
   if [[ -z $package ]]; then
     log warn "$tool: no package to remove here; if you installed it by hand, remove it the same way"
     return 0
