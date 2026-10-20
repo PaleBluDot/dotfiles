@@ -18,7 +18,7 @@ irm https://raw.githubusercontent.com/PaleBluDot/dotfiles/main/bootstrap.ps1 | i
 ```
 
 The first run asks where to clone the repo, links itself as `dotfiles`
-(`~/.local/bin`, or `~/bin` on Windows), then opens the interactive install.
+(`~/.local/bin`, or `~/bin` on Windows), then opens the interactive setup.
 To skip the question: `curl … | DOTFILES=<path> bash`.
 
 On Windows, turn on Developer Mode first (Settings > System > For developers),
@@ -27,11 +27,9 @@ or the config symlinks can't be made.
 ## Use
 
 ```text
-dotfiles                  interactive install
-dotfiles install [tool…]  install tools and link their configs
-dotfiles uninstall [tool…]
-dotfiles link [tool…]     links only
-dotfiles unlink [tool…]
+dotfiles                  interactive setup
+dotfiles link [tool…]     install tools and link their configs (no tool = all enabled)
+dotfiles unlink [tool…]   remove tools and their links (no tool = pick from a list)
 dotfiles default          install the default: list, link nothing
 dotfiles update           pull the repo, install what's missing, relink
 dotfiles status [tool]

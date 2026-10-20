@@ -16,7 +16,7 @@ default: []
 #   manual:   no package manager installs it; this message says how
 #   links:    src is a path under config/, dest a path under $HOME;
 #             add windows:/macos:/linux: when that OS needs another dest
-#   enabled:  written by install/link (true) and uninstall/unlink (false)
+#   enabled:  written by link (true) and unlink (false)
 #   inject:   on a link: the file holds op:// references; dest gets a copy
 #             filled in by op inject (owner-only) instead of a symlink
 packages:

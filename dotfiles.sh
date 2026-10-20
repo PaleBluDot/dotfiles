@@ -477,7 +477,7 @@ _with_version() {
 # ════════════════════════════════════════════════════════════════════════
 # RUNNING COMMANDS AND INSTALLING PACKAGES
 # Bare bones, so doctor can install its prerequisites. Step 7 builds the
-# full install/uninstall on top of this.
+# link (install) and unlink (remove) on top of this.
 # ════════════════════════════════════════════════════════════════════════
 
 # Run a command that changes the system. Its output shows in the terminal
@@ -601,7 +601,7 @@ parse_args() {
 warn_unused_flags() {
   local cmd="$1"
   case "$cmd" in
-    install | uninstall | link | unlink | default | update | doctor | interactive) ;;
+    link | unlink | default | update | doctor | interactive) ;;
     *)
       if [[ $DRY_RUN == true ]]; then
         log warn "--dry-run has no effect on '$cmd'"
@@ -609,7 +609,7 @@ warn_unused_flags() {
       ;;
   esac
   case "$cmd" in
-    install | uninstall | link | interactive) ;;
+    link | interactive) ;;
     *)
       if [[ $FORCE == true ]]; then
         log warn "--force has no effect on '$cmd'"
@@ -626,62 +626,16 @@ cmd_help() {
   local topic="${1:-}"
   case "$topic" in
     "") _help_main ;;
-    install)
-      cat <<'EOF'
-dotfiles install [tool...] [-d] [-v] [--force]
-
-Install tools and link their configs.
-
-  dotfiles install            interactive (same as plain "dotfiles"):
-                              screen 1: the default: list; Enter installs every missing one
-                              screen 2: packages:, [x] = enabled; Enter continues,
-                              numbers switch tools on/off. On = install + link,
-                              switched off = unlink (the program stays installed)
-  dotfiles install neovim fd  those tools: install the package if its command is
-                              missing, link every config, set enabled: true
-
-Picking in lists: 1 3 5, 2-4, a = all, Enter = continue.
-A real file in the way is backed up to <file>.bak after you say y.
-
-  -d  show what would happen, change nothing
-  -v  show every step (interactive mode is quiet otherwise)
-  --force  no questions, no backups: replace whatever is in the way
-
-Examples:
-  dotfiles install -dv neovim
-  dotfiles
-EOF
-      ;;
-    uninstall)
-      cat <<'EOF'
-dotfiles uninstall [tool...] [-d] [-v] [--force]
-
-Remove tools: the package, then the config links (backups are put back),
-then enabled: false.
-
-  dotfiles uninstall          interactive: pick from the enabled tools
-  dotfiles uninstall cowsay   that tool
-
-Asks "remove package X? [y/N]" for each package; n leaves everything as is.
-Removes the package only (pacman -R, apt remove, ...), never its
-dependencies. A tool with only a manual: install is just unlinked.
-
-  -d  show what would happen, change nothing
-  -v  show every step
-  --force  don't ask before removing packages
-
-Example:
-  dotfiles uninstall -dv cowsay
-EOF
-      ;;
     link)
       cat <<'EOF'
 dotfiles link [tool...] [-d] [-v] [--force]
 
-Create the config symlinks only; installs nothing. No tool = every tool with
-enabled: true in config.yaml. Sets enabled: true when all links are in place.
+Install tools and link their configs: install the package if its command
+is missing, link every config, set enabled: true. No tool = every tool with
+enabled: true in config.yaml. A tool with no package here (none, manual:)
+is still linked.
 
-What's in the way:
+What's in the way of a link:
   nothing                   link it
   already our link          "already linked"
   a real file               ask, back it up to <file>.bak, link it
@@ -694,23 +648,47 @@ Never touches anything inside the repo (through a linked folder).
   -v  show every step
   --force  no questions, no backups: replace files and folders
 
-Example:
-  dotfiles link -dv neovim
+Examples:
+  dotfiles link -dv neovim fd
+  dotfiles link -dv
 EOF
       ;;
     unlink)
       cat <<'EOF'
 dotfiles unlink [tool...] [-d] [-v]
 
-Remove the config symlinks and put any <file>.bak back. No tool = every tool
-with enabled: true. Sets enabled: false. Leaves anything that isn't its own
-link alone, and never uninstalls the program.
+Remove tools: the package, then the config links (backups are put back),
+then enabled: false. Doesn't ask before removing the package.
+
+  dotfiles unlink             interactive: pick from the enabled tools
+  dotfiles unlink cowsay      that tool
+
+Removes the package only (pacman -R, apt remove, ...), never its
+dependencies. If removing fails, the tool stays linked and enabled. A tool
+with no package here (none, manual:) is just unlinked.
 
   -d  show what would happen, change nothing
   -v  show every step
 
 Example:
-  dotfiles unlink -dv neovim
+  dotfiles unlink -dv cowsay
+EOF
+      ;;
+    interactive)
+      cat <<'EOF'
+dotfiles [-d] [-v] [--force]
+
+Interactive setup, two screens:
+  1. the default: list; Enter installs every missing one
+  2. packages:, [x] = enabled; Enter continues, numbers switch tools on/off.
+     Switched on = link (install + link), switched off = unlink (unlink +
+     remove the package)
+
+Picking in lists: 1 3 5, 2-4, a = all, Enter = continue.
+
+  -d  show what would happen, change nothing
+  -v  show every step (quiet otherwise; everything goes to the log)
+  --force  no questions, no backups: replace whatever is in the way
 EOF
       ;;
     default)
@@ -786,7 +764,7 @@ EOF
 dotfiles help [command]
 
 Show the overview, or help for one command:
-  install, uninstall, link, unlink, default, update, status, doctor, help, version
+  link, unlink, interactive, default, update, status, doctor, help, version
 EOF
       ;;
     version)
@@ -809,13 +787,11 @@ _help_main() {
 dotfiles $DOTFILES_VERSION: install, link and manage the tools in this repo
 
 Usage: dotfiles [command] [tool...] [flags]
-       dotfiles                 interactive install
+       dotfiles                 interactive setup (help interactive)
 
 Commands:
-  install [tool...]     install tools and link their configs (no tool = interactive)
-  uninstall [tool...]   remove tools and unlink their configs (no tool = interactive)
-  link [tool...]        create config symlinks only (no tool = enabled tools)
-  unlink [tool...]      remove config symlinks (no tool = enabled tools)
+  link [tool...]        install tools and link their configs (no tool = enabled tools)
+  unlink [tool...]      remove tools and their links (no tool = pick from a list)
   default               install the default: list, link nothing
   update                pull the repo, install what's missing, relink
   status [tool]         what's installed and linked
@@ -826,7 +802,7 @@ Commands:
 Flags (work anywhere on the line):
   -d, --dry-run         show what would happen, change nothing
   -v, --verbose         show every step
-  --force               no questions, no backups (install, uninstall, link)
+  --force               no questions, no backups (link, interactive)
   Short flags combine: -dv
 
 Files:
@@ -848,7 +824,7 @@ _not_built() {
   log error "$1: not built yet (Step $2)"
   exit 1
 }
-cmd_interactive() { _interactive_install; }
+cmd_interactive() { _interactive_link; }
 
 # ─── status (plan Sections 7 and 8) ─────────────────────────────────────
 
@@ -1462,7 +1438,7 @@ _link_path() {
 }
 
 # Link one tool and set enabled: true. Returns 1 when a link isn't in place.
-_link_tool() {
+_link_configs() {
   local tool="$1" src dest ok=true
   while IFS=$'\t' read -r src dest; do
     if ! _link_one "$tool" "$src" "$dest"; then
@@ -1475,19 +1451,26 @@ _link_tool() {
   [[ $ok == true ]]
 }
 
+# link [tool...]: install each tool's package if it's missing, link its
+# configs, set enabled: true. No tool = every enabled tool.
 cmd_link() {
   _require_config
   _pick_tools link "$@"
-  local tool good="" bad=""
+  local tool good="" bad="" manual=""
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
     CHANGED=false
     if ! _link_tool "$tool"; then
-      bad="${bad:+$bad }$tool"
+      bad="${bad:+$bad, }$tool"
+    elif [[ -n $INSTALL_NOTE ]]; then
+      manual="${manual:+$manual; }$tool: $INSTALL_NOTE"
     elif [[ $CHANGED == true ]]; then
-      good="${good:+$good }$tool"
+      good="${good:+$good, }$(_tool_with_version "$tool")"
     fi
   done
   _summary linked "$good" "$bad"
+  if [[ -n $manual && ${#TOOLS[@]} -gt 1 ]]; then
+    out "  install by hand: $manual"
+  fi
   if [[ -n $bad ]]; then
     exit 1
   fi
@@ -1535,7 +1518,7 @@ _unlink_one() {
 }
 
 # Unlink one tool and set enabled: false. Returns 1 on failure.
-_unlink_tool() {
+_unlink_configs() {
   local tool="$1" src dest ok=true
   while IFS=$'\t' read -r src dest; do
     if ! _unlink_one "$tool" "$src" "$dest"; then
@@ -1548,16 +1531,23 @@ _unlink_tool() {
   [[ $ok == true ]]
 }
 
+# unlink [tool...]: remove each tool's package, unlink its configs, set
+# enabled: false. No tool = pick from the enabled tools (never all of them
+# at once without asking).
 cmd_unlink() {
+  if [[ $# -eq 0 ]]; then
+    _interactive_unlink
+    return 0
+  fi
   _require_config
   _pick_tools unlink "$@"
   local tool good="" bad=""
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
     CHANGED=false
     if ! _unlink_tool "$tool"; then
-      bad="${bad:+$bad }$tool"
+      bad="${bad:+$bad, }$tool"
     elif [[ $CHANGED == true ]]; then
-      good="${good:+$good }$tool"
+      good="${good:+$good, }$tool"
     fi
   done
   _summary unlinked "$good" "$bad"
@@ -1566,7 +1556,7 @@ cmd_unlink() {
   fi
 }
 
-# ─── install / uninstall (plan Sections 7, 8, 11) ───────────────────────
+# ─── packages: install for link, remove for unlink (plan Sections 7, 8, 11)
 
 # Install one tool's package if it's missing. Sets INSTALL_NOTE to the
 # tool's manual: message when there's no package to install here.
@@ -1606,12 +1596,12 @@ _install_package() {
 
 # Install, link and set enabled: true for one tool. Returns 1 on failure.
 # Links even when there was nothing to install (plan Section 18).
-_install_tool() {
+_link_tool() {
   local tool="$1"
   if ! _install_package "$tool"; then
     return 1
   fi
-  _link_tool "$tool"
+  _link_configs "$tool"
 }
 
 # "tool (version)": the installed version; for a tool not installed yet
@@ -1627,35 +1617,8 @@ _tool_with_version() {
   fi
 }
 
-cmd_install() {
-  if [[ $# -eq 0 ]]; then
-    _interactive_install
-    return 0
-  fi
-  _require_config
-  _pick_tools install "$@"
-  local tool good="" bad="" manual=""
-  for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
-    CHANGED=false
-    if ! _install_tool "$tool"; then
-      bad="${bad:+$bad, }$tool"
-    elif [[ -n $INSTALL_NOTE ]]; then
-      manual="${manual:+$manual; }$tool: $INSTALL_NOTE"
-    elif [[ $CHANGED == true ]]; then
-      good="${good:+$good, }$(_tool_with_version "$tool")"
-    fi
-  done
-  _summary installed "$good" "$bad"
-  if [[ -n $manual && ${#TOOLS[@]} -gt 1 ]]; then
-    out "  install by hand: $manual"
-  fi
-  if [[ -n $bad ]]; then
-    exit 1
-  fi
-}
-
-# Remove one tool's package, after asking. Returns 1 when the tool should
-# stop here (declined or failed).
+# Remove one tool's package (no question: unlink always removes it).
+# Returns 1 when removing failed, so the tool stays linked and enabled.
 _remove_package() {
   local tool="$1" cmd_name package
   cmd_name="$(tool_command "$tool")"
@@ -1670,14 +1633,6 @@ _remove_package() {
     return 0
   fi
 
-  if [[ $FORCE != true ]]; then
-    if [[ $DRY_RUN == true ]]; then
-      log info "dry run, would ask: remove package $package?"
-    elif ! confirm "$tool: remove package $package?"; then
-      log warn "$tool: kept package $package; nothing changed"
-      return 1
-    fi
-  fi
   if ! pm_remove "$package"; then
     log error "$tool: removing $package failed"
     return 1
@@ -1693,46 +1648,24 @@ _remove_package() {
   fi
 }
 
-# Remove the package, unlink, set enabled: false. Returns 1 when declined
-# or failed (declining leaves everything as it was).
-_uninstall_tool() {
+# Remove the package, unlink, set enabled: false. Returns 1 on failure; a
+# failed removal leaves the links and enabled: as they were.
+_unlink_tool() {
   local tool="$1"
   if ! _remove_package "$tool"; then
     return 1
   fi
-  _unlink_tool "$tool"
+  _unlink_configs "$tool"
 }
 
-cmd_uninstall() {
-  if [[ $# -eq 0 ]]; then
-    _interactive_uninstall
-    return 0
-  fi
-  _require_config
-  _pick_tools uninstall "$@"
-  local tool good="" bad=""
-  for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
-    CHANGED=false
-    if ! _uninstall_tool "$tool"; then
-      bad="${bad:+$bad, }$tool"
-    elif [[ $CHANGED == true ]]; then
-      good="${good:+$good, }$tool"
-    fi
-  done
-  _summary uninstalled "$good" "$bad"
-  if [[ -n $bad ]]; then
-    exit 1
-  fi
-}
-
-# ─── interactive install / uninstall (plan Section 7) ───────────────────
+# ─── interactive link / unlink (plan Section 7) ─────────────────────────
 
 ANSWER=""
 
 # Interactive mode reads answers from the terminal.
 _require_tty() {
   if ! { true </dev/tty; } 2>/dev/null; then
-    log error "interactive mode needs a terminal; name tools instead, e.g. dotfiles.sh install neovim"
+    log error "interactive mode needs a terminal; name tools instead, e.g. dotfiles link neovim"
     exit 1
   fi
 }
@@ -1856,8 +1789,8 @@ _screen_defaults() {
 }
 
 # Screen 2: packages: with the enabled ones marked. Enter = continue;
-# numbers switch packages on/off. On = install and link; switched off =
-# unlink (the program stays installed).
+# numbers switch packages on/off. On = link (install and link); switched
+# off = unlink (remove the package and the links).
 INTERACTIVE_FAILED=false
 _screen_packages() {
   local -a names=() selected=() before=()
@@ -1910,7 +1843,7 @@ _screen_packages() {
     name="${names[i]}"
     CHANGED=false
     if [[ ${selected[i]} == true ]]; then
-      if ! _install_tool "$name"; then
+      if ! _link_tool "$name"; then
         ui "  $name: failed (see the messages above)"
         INTERACTIVE_FAILED=true
       elif [[ -n $INSTALL_NOTE ]]; then
@@ -1929,14 +1862,14 @@ _screen_packages() {
       elif [[ $DRY_RUN == true ]]; then
         ui "  Test: unlink $name"
       else
-        ui "  $name: unlinked (still installed)"
+        ui "  $name: unlinked and removed"
       fi
     fi
   done
 }
 
-# dotfiles.sh, or dotfiles.sh install with no tool.
-_interactive_install() {
+# dotfiles with no command.
+_interactive_link() {
   _require_config
   _require_tty
   QUIET=true
@@ -1948,8 +1881,8 @@ _interactive_install() {
   fi
 }
 
-# dotfiles.sh uninstall with no tool: pick from the enabled packages.
-_interactive_uninstall() {
+# dotfiles unlink with no tool: pick from the enabled packages.
+_interactive_unlink() {
   _require_config
   _require_tty
   QUIET=true
@@ -1963,7 +1896,7 @@ _interactive_uninstall() {
 
   ui ""
   if [[ ${#names[@]} -eq 0 ]]; then
-    ui "No package has enabled: true in config.yaml; nothing to uninstall."
+    ui "No package has enabled: true in config.yaml; nothing to unlink."
     return 0
   fi
   ui "Enabled packages:"
@@ -1971,7 +1904,7 @@ _interactive_uninstall() {
     ui "$(printf '  %2d) %-16s %s' "$((n + 1))" "${names[n]}" "$(_state_text "${names[n]}")")"
   done
   while true; do
-    _ask "Uninstall: numbers (a = all), Enter = nothing: "
+    _ask "Unlink and remove: numbers (a = all), Enter = nothing: "
     if [[ -z $ANSWER ]]; then
       return 0
     fi
@@ -1983,13 +1916,13 @@ _interactive_uninstall() {
   for n in "${PICKS[@]}"; do
     name="${names[n - 1]}"
     CHANGED=false
-    if ! _uninstall_tool "$name"; then
-      ui "  $name: not uninstalled (declined or failed)"
+    if ! _unlink_tool "$name"; then
+      ui "  $name: failed (see the messages above)"
       failed=true
     elif [[ $DRY_RUN == true ]]; then
-      ui "  Test: uninstall $name"
+      ui "  Test: unlink $name"
     else
-      ui "  $name: uninstalled"
+      ui "  $name: unlinked and removed"
     fi
   done
   if [[ $failed == true ]]; then
@@ -2068,7 +2001,7 @@ cmd_update() {
   fi
   for tool in "${TOOLS[@]}"; do
     CHANGED=false
-    if ! _install_tool "$tool"; then
+    if ! _link_tool "$tool"; then
       bad="${bad:+$bad, }$tool"
     elif [[ $CHANGED == true ]]; then
       good="${good:+$good, }$(_tool_with_version "$tool")"
@@ -2675,7 +2608,7 @@ main() {
   log debug "flags: dry-run=$DRY_RUN force=$FORCE verbose=$VERBOSE"
   log debug "log file: ${LOG_FILE:-<none>}"
 
-  # No command = the interactive install/uninstall flow (plan Section 7).
+  # No command = the interactive setup (plan Section 7).
   local cmd="${1:-interactive}"
   if [[ $# -gt 0 ]]; then
     shift
@@ -2706,8 +2639,6 @@ main() {
 
   case "$cmd" in
     interactive) cmd_interactive ;;
-    install)   cmd_install "$@" ;;
-    uninstall) cmd_uninstall "$@" ;;
     default)   cmd_default "$@" ;;
     link)      cmd_link "$@" ;;
     unlink)    cmd_unlink "$@" ;;
@@ -2716,6 +2647,10 @@ main() {
     doctor)    cmd_doctor "$@" ;;
     help)      cmd_help "$@" ;;
     version)   cmd_version "$@" ;;
+    install | uninstall)
+      log error "'$cmd' is gone: use 'dotfiles link' (installs and links) or 'dotfiles unlink' (removes and unlinks)"
+      exit 2
+      ;;
     *)
       log error "unknown command: $cmd (see: dotfiles.sh help)"
       exit 2
