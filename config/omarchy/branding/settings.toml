@@ -1,0 +1,9 @@
+# Branding settings. Saving this file (or any logo it names) updates everything automatically,
+# in the colors of the current Omarchy theme. Logos are text files in this folder.
+
+# Title at the top of the boot menu (letters, numbers, spaces, . _ - ; max 40)
+menu_title = "OS Bootloader"
+
+boot_menu_logo   = "surfacebook.txt"   # above the boot menu (Windows / Omarchy picker)
+password_logo    = "omasurface.txt"    # disk password screen
+screensaver_logo = "surface.txt"       # Omarchy screensaver (fits at 2x scaling)

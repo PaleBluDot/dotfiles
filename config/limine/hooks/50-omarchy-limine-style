@@ -1,0 +1,113 @@
+#!/usr/bin/python3 -I
+# Reshapes /boot/limine.conf after limine-entry-tool / limine-snapper-sync rewrite it:
+#   /Omarchy            -> direct boot of the linux-surface UKI (default)
+#   /Windows 11         -> the Windows Boot Manager entry, renamed
+#   /Advanced options   -> the generated OS entry (TARGET_OS_NAME), collapsed: all kernels + Snapshots
+# Only writes when the result differs, so the .path watcher doesn't loop.
+import os, re, sys
+
+CONF = sys.argv[1] if len(sys.argv) > 1 else "/boot/limine.conf"
+ADV = "Advanced options"
+MARK = "### omarchy-direct (managed by 50-omarchy-limine-style)"  # "###" lines are not shown in the menu
+OLD_MARKS = ("omarchy-direct (managed by 50-omarchy-limine-style)",)
+HEADER_OPTS = {
+    "interface_branding": "OS Bootloader",
+    "timeout": "5",
+    "default_entry": "Omarchy",
+    "wallpaper": "boot():/limine-wallpaper.png",
+    "wallpaper_style": "stretched",
+    "interface_resolution": "3000x2000",
+    "interface_help_hidden": "yes",
+    "term_font_scale": "3x3",
+    "term_margin": "560",
+    "term_margin_gradient": "0",
+    "term_background": "ff000000",
+}
+# Menu colors from the current Omarchy theme (written by surface-boot-theme-apply). Strictly validated.
+THEME_JSON = "/etc/surface-boot/theme.json"
+_HEX = re.compile(r"^[0-9a-f]{6}$")
+_PAL = re.compile(r"^([0-9a-f]{6};){7}[0-9a-f]{6}$")
+_THEME_KEYS = {"interface_branding": re.compile(r"^[A-Za-z0-9 ._-]{1,40}$"), "backdrop": _HEX, "interface_branding_color": _HEX, "interface_help_color": _HEX,
+               "interface_help_color_bright": _HEX, "term_foreground": _HEX, "term_foreground_bright": _HEX,
+               "term_background_bright": _HEX, "term_palette": _PAL, "term_palette_bright": _PAL}
+try:
+    import json
+    with open(THEME_JSON) as _f:
+        for _k, _v in json.load(_f).items():
+            if _k in _THEME_KEYS and isinstance(_v, str) and _THEME_KEYS[_k].match(_v):
+                HEADER_OPTS[_k] = _v
+except (OSError, ValueError):
+    pass
+PREFERRED_KERNELS = ["linux-surface", "linux-omarchy", "linux"]
+
+if not os.path.isfile(CONF):
+    sys.exit(0)
+with open(CONF) as f:
+    original = f.read()
+lines = original.split("\n")
+
+top = re.compile(r"^/(?!/)\+?(.*)$")
+header, blocks, cur = [], [], None
+for ln in lines:
+    m = top.match(ln)
+    if m:
+        cur = [m.group(1).strip(), [ln]]
+        blocks.append(cur)
+    elif cur is None:
+        header.append(ln)
+    else:
+        cur[1].append(ln)
+
+# Global options live in the header, before the first entry
+for key, val in HEADER_OPTS.items():
+    pat = re.compile(r"^#?\s*" + re.escape(key) + r"\s*:")
+    for i, ln in enumerate(header):
+        if pat.match(ln):
+            header[i] = f"{key}: {val}"
+            break
+    else:
+        while header and header[-1] == "":
+            header.pop()
+        header.append(f"{key}: {val}")
+
+adv = next((b for b in blocks if b[0] == ADV), None)
+if adv is None:
+    # Generated entry not renamed yet: only apply header styling.
+    out = "\n".join(header + [l for b in blocks for l in b[1]])
+else:
+    # Pull the preferred kernel's boot options out of the Advanced directory.
+    children, child = {}, None
+    for ln in adv[1][1:]:
+        if re.match(r"^\s*///", ln):
+            child = None  # snapshot tree, not a current kernel
+        elif m := re.match(r"^\s*//(.*)$", ln):
+            child = m.group(1).strip()
+            children[child] = []
+        elif child is not None:
+            children[child].append(ln.strip())
+    kernel = next((k for k in PREFERRED_KERNELS if children.get(k)), None)
+    direct = []
+    if kernel:
+        opts = [l for l in children[kernel] if re.match(r"^(protocol|path|cmdline|kernel_cmdline|module_path)\s*:", l)]
+        direct = ["/Omarchy", "  " + MARK, f"  ### boots {kernel}"] + ["  " + l for l in opts] + [""]
+    adv[1][0] = "/" + ADV  # no "+" = collapsed
+    win = next((b for b in blocks if "windows" in b[0].lower()), None)
+    if win:
+        win[1][0] = "/Windows 11"
+    others = [b for b in blocks if b is not adv and b is not win and not any(m in l for l in b[1] for m in (MARK,) + OLD_MARKS)]
+    body = list(direct)
+    if win:
+        body += win[1]
+    for b in others:
+        body += b[1]
+    body += adv[1]
+    out = "\n".join(header + [""] + body)
+
+out = re.sub(r"\n{3,}", "\n\n", out).rstrip("\n") + "\n"
+if out != original:
+    tmp = CONF + ".style-tmp"
+    with open(tmp, "w") as f:
+        f.write(out)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, CONF)

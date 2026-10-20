@@ -1,27 +1,13 @@
 # Espanso Match File
-
+name: base
+package_author: Pavel Sanchez
 matches:
-# Outputs a Choice list of Emails
-  - triggers: [";email", ";eml"]
-    replace: "{{output}}"
-    vars:
-      - name: output
-        type: choice
-        params:
-          values:
-            - label: "Personal"
-              id: "23495830+PaleBluDot@users.noreply.github.com"
-            - label: "Work"
-              id: "23495830+PaleBluDot@users.noreply.github.com"
-            - label: "CAN Support"
-              id: "23495830+PaleBluDot@users.noreply.github.com"
-            - label: "CAN Test"
-              id: "23495830+PaleBluDot@users.noreply.github.com"
-            - label: "ACLU Test"
-              id: "23495830+PaleBluDot@users.noreply.github.com"
-            - label: "Litmus"
-              id: "23495830+PaleBluDot@users.noreply.github.com"
+  - triggers: [";fn"]
+    replace: "Pavel"
 
+  - triggers: [";ln"]
+    replace: "Sanchez"
 
-
+  - triggers: [";fln"]
+    replace: "Pavel Sanchez"
 

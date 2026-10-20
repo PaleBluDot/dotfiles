@@ -1,0 +1,23 @@
+# fd ignore file (~/.config/fd/ignore): paths fd skips everywhere, on top of
+# each repo's .gitignore. Same pattern syntax as .gitignore.
+
+# version control
+.git/
+
+# dependencies and build output
+node_modules/
+vendor/
+dist/
+build/
+target/
+__pycache__/
+.venv/
+venv/
+
+# caches
+.cache/
+*.pyc
+
+# OS clutter
+.DS_Store
+Thumbs.db

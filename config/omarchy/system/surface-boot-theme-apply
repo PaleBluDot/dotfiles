@@ -1,0 +1,194 @@
+#!/usr/bin/python3 -I
+# Rebuilds the boot screens from the current Omarchy theme (run as root by surface-boot-theme.service).
+#   Boot menu : /boot/limine-wallpaper.png + /etc/surface-boot/theme.json (read by the Limine style hook)
+#   Password  : /usr/share/plymouth/themes/omarchy (logo + colors), then boot images rebuilt (signed by mok-sign)
+#   Screensaver: ~/.config/omarchy/branding/screensaver.txt -> chosen logo (symlink, owned by the user)
+# Settings and logos: $HOME/.config/omarchy/branding/{settings.toml,*.txt}
+import hashlib, json, os, re, shutil, subprocess, tempfile, tomllib
+
+HOME = "$HOME"
+BRANDING = f"{HOME}/.config/omarchy/branding"
+SETTINGS = f"{BRANDING}/settings.toml"
+COLORS = f"{HOME}/.local/state/omarchy/current/theme/colors.toml"
+WALLPAPER = "/boot/limine-wallpaper.png"
+THEME_JSON = "/etc/surface-boot/theme.json"
+STYLE_HOOK = "/etc/boot/hooks/post.d/50-omarchy-limine-style"
+PLY_SRC = "/usr/share/omarchy/default/plymouth"
+PLY_DST = "/usr/share/plymouth/themes/omarchy"
+FONT = "/usr/share/fonts/TTF/FiraCodeNerdFont-Regular.ttf"
+HEX = re.compile(r"^#?([0-9a-fA-F]{6})$")
+TITLE = re.compile(r"^[A-Za-z0-9 ._-]{1,40}$")
+LOGO = re.compile(r"^[A-Za-z0-9._-]{1,64}\.txt$")
+DEFAULTS = {  # Tokyo Night, for any key a theme doesn't define
+    "accent": "7aa2f7", "selection": "283457", "muted": "414868",
+    "background": "1a1b26", "darker_background": "15161e", "lighter_background": "1f2335",
+    "foreground": "c0caf5", "dark_foreground": "565f89", "light_foreground": "a9b1d6", "bright_foreground": "c0caf5",
+    "red": "f7768e", "green": "9ece6a", "yellow": "e0af68", "blue": "7aa2f7", "magenta": "bb9af7", "cyan": "7dcfff",
+    "bright_red": "f7768e", "bright_green": "9ece6a", "bright_yellow": "e0af68", "bright_blue": "7aa2f7",
+    "bright_magenta": "bb9af7", "bright_cyan": "7dcfff",
+}
+
+def load_toml(path):
+    try:
+        with open(path, "rb") as f:
+            return tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
+
+def load_colors():
+    c, data = dict(DEFAULTS), load_toml(COLORS)
+    for k in DEFAULTS:
+        m = HEX.match(str(data.get(k, "")))
+        if m:
+            c[k] = m.group(1).lower()
+    return c
+
+def load_settings():
+    s = {"menu_title": "OS Bootloader", "boot_menu_logo": "surfacebook.txt",
+         "password_logo": "omasurface.txt", "screensaver_logo": "omasurface.txt"}
+    data = load_toml(SETTINGS)
+    if TITLE.match(str(data.get("menu_title", ""))):
+        s["menu_title"] = data["menu_title"]
+    for k in ("boot_menu_logo", "password_logo", "screensaver_logo"):
+        if LOGO.match(str(data.get(k, ""))):
+            s[k] = data[k]
+    return s
+
+def logo_rows(name):
+    try:
+        with open(os.path.join(BRANDING, name), encoding="utf-8") as f:
+            rows = [r.rstrip() for r in f.read(64 * 1024).split("\n")][:40]
+    except (OSError, UnicodeDecodeError):
+        return []
+    while rows and not rows[-1].strip():
+        rows.pop()
+    return rows
+
+def logo_mvg(rows, color, u, x0, y0):
+    out = [f"fill '#{color}'"]
+    for y, r in enumerate(rows):
+        for x, ch in enumerate(r):
+            X, Y = x0 + x * u, y0 + y * 2 * u
+            b = {"█": (X, Y, X + u, Y + 2 * u), "▀": (X, Y, X + u, Y + u), "▄": (X, Y + u, X + u, Y + 2 * u),
+                 "▐": (X + u // 2, Y, X + u, Y + 2 * u), "▌": (X, Y, X + u // 2, Y + 2 * u)}.get(ch)
+            if b:
+                out.append(f"rectangle {b[0]},{b[1]} {b[2]-1},{b[3]-1}")
+    return "\n".join(out)
+
+def write(path, text):
+    with open(path, "w") as f:
+        f.write(text)
+
+def magick(*args):
+    # No timestamps in PNGs, so unchanged output hashes the same and doesn't trigger a rebuild
+    *opts, out = args
+    subprocess.run(["magick", *opts, "-define", "png:exclude-chunk=date,time,tIME", out], check=True)
+
+def render_wallpaper(c, rows, out, tmp):
+    mvg = os.path.join(tmp, "menu.mvg")
+    if rows:
+        width = max(len(r) for r in rows)
+        u = max(2, min(12, 2600 // width))
+        write(mvg, logo_mvg(rows, c["accent"], u, 1500 - width * u // 2, max(20, 400 - len(rows) * 2 * u)))
+    else:
+        write(mvg, "")
+    magick("-size", "3000x2000", f"xc:#{c['background']}",
+           "-fill", f"#{c['lighter_background']}", "-stroke", f"#{c['muted']}", "-strokewidth", "3",
+           "-draw", "roundrectangle 520,520 2480,1480 36,36", "-stroke", "none", "-draw", f"@{mvg}",
+           "-font", FONT, "-pointsize", "44", "-fill", f"#{c['dark_foreground']}",
+           "-gravity", "south", "-annotate", "+0+300", "↑ ↓  choose      Enter  boot      or click",
+           "-depth", "8", "-alpha", "off", f"PNG24:{out}")
+
+def menu_colors(c, title):
+    return {
+        "interface_branding": title,
+        "backdrop": c["background"],
+        "interface_branding_color": c["accent"],
+        "interface_help_color": c["accent"],
+        "interface_help_color_bright": c["bright_blue"],
+        "term_foreground": c["foreground"],
+        "term_foreground_bright": c["bright_foreground"],
+        "term_background_bright": c["selection"],
+        "term_palette": ";".join(c[k] for k in ("darker_background", "red", "green", "yellow", "blue", "magenta", "cyan", "light_foreground")),
+        "term_palette_bright": ";".join(c[k] for k in ("muted", "bright_red", "bright_green", "bright_yellow", "bright_blue", "bright_magenta", "bright_cyan", "bright_foreground")),
+    }
+
+def stage_plymouth(c, rows, stage):
+    """Same result as `omarchy plymouth set <bg> <fg> <logo>` for the Plymouth part, built as root."""
+    for f in ("bullet.png", "entry.png", "lock.png", "omarchy.plymouth", "omarchy.script",
+              "preview-unlock.png", "progress_bar.png", "progress_box.png"):
+        shutil.copyfile(os.path.join(PLY_SRC, f), os.path.join(stage, f))
+    if rows:
+        width = max(len(r) for r in rows)
+        u = max(2, min(10, 1600 // width))
+        mvg = os.path.join(stage, "logo.mvg")
+        write(mvg, logo_mvg(rows, c["accent"], u, 0, 0))
+        magick("-size", f"{width * u}x{len(rows) * 2 * u}", "xc:none", "-draw", f"@{mvg}", f"PNG32:{stage}/logo.png")
+        os.unlink(mvg)
+    else:
+        shutil.copyfile(os.path.join(PLY_SRC, "logo.png"), os.path.join(stage, "logo.png"))
+    r, g, b = (int(c["background"][i:i + 2], 16) / 255 for i in (0, 2, 4))
+    script = os.path.join(stage, "omarchy.script")
+    with open(script) as f:
+        s = f.read()
+    s = re.sub(r"^Window\.SetBackgroundTopColor.*$", f"Window.SetBackgroundTopColor({r:.3f}, {g:.3f}, {b:.3f});", s, flags=re.M)
+    s = re.sub(r"^Window\.SetBackgroundBottomColor.*$", f"Window.SetBackgroundBottomColor({r:.3f}, {g:.3f}, {b:.3f});", s, flags=re.M)
+    write(script, s)
+    for f in ("bullet.png", "entry.png", "lock.png", "progress_bar.png"):
+        p = os.path.join(stage, f)
+        magick(p, "-channel", "RGB", "+level-colors", f"#{c['foreground']},#{c['foreground']}", p)
+
+def link_screensaver(name):
+    """Point Omarchy's screensaver.txt at the chosen logo, as the user (never as root in their home)."""
+    if name == "screensaver.txt" or not os.path.isfile(os.path.join(BRANDING, name)):
+        return
+    link = os.path.join(BRANDING, "screensaver.txt")
+    if os.path.islink(link) and os.readlink(link) == name:
+        return
+    subprocess.run(["runuser", "-u", "$USER", "--", "ln", "-sfn", name, link], check=False)
+    print("surface-boot-theme: screensaver ->", name)
+
+def sha(path):
+    try:
+        with open(path, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except OSError:
+        return None
+
+def main():
+    c, s = load_colors(), load_settings()
+    os.makedirs(os.path.dirname(THEME_JSON), exist_ok=True)
+    tmp = tempfile.mkdtemp()
+    try:
+        # Boot menu
+        png = os.path.join(tmp, "w.png")
+        render_wallpaper(c, logo_rows(s["boot_menu_logo"]), png, tmp)
+        shutil.copyfile(png, WALLPAPER + ".new"); os.chmod(WALLPAPER + ".new", 0o644)
+        os.replace(WALLPAPER + ".new", WALLPAPER)
+        write(THEME_JSON + ".new", json.dumps(menu_colors(c, s["menu_title"]), indent=1))
+        os.replace(THEME_JSON + ".new", THEME_JSON)
+        if os.access(STYLE_HOOK, os.X_OK):
+            subprocess.run([STYLE_HOOK], check=False)
+        print("surface-boot-theme: boot menu updated")
+        link_screensaver(s["screensaver_logo"])
+
+        # Disk password screen: publish + rebuild boot images only when something changed
+        stage = os.path.join(tmp, "plymouth"); os.mkdir(stage)
+        stage_plymouth(c, logo_rows(s["password_logo"]), stage)
+        changed = [f for f in sorted(os.listdir(stage)) if sha(os.path.join(stage, f)) != sha(os.path.join(PLY_DST, f))]
+        if changed:
+            for f in changed:
+                shutil.copyfile(os.path.join(stage, f), os.path.join(PLY_DST, f + ".new"))
+                os.chmod(os.path.join(PLY_DST, f + ".new"), 0o644)
+                os.replace(os.path.join(PLY_DST, f + ".new"), os.path.join(PLY_DST, f))
+            subprocess.run(["plymouth-set-default-theme", "omarchy"], check=False)
+            print("surface-boot-theme: password screen changed, rebuilding boot images...")
+            subprocess.run(["limine-mkinitcpio"], check=True)
+            print("surface-boot-theme: password screen updated")
+        else:
+            print("surface-boot-theme: password screen already up to date")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+if __name__ == "__main__":
+    main()
