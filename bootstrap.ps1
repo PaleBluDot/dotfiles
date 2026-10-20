@@ -56,7 +56,7 @@ function Invoke-DotfilesBootstrap {
     }
 
     # 4. Hand over: dotfiles.sh's first run clones the repo, links itself
-    #    into ~/bin and runs the interactive install. -l = login shell, so
+    #    into ~/.local/bin and runs the interactive setup. -l = login shell, so
     #    Git Bash sets up its PATH (curl, git). DOTFILES / DOTFILES_BRANCH
     #    carry over as environment variables.
     # nativestrict: ln -s makes a real symlink or fails; never a silent copy.

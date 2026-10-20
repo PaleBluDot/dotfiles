@@ -2160,11 +2160,7 @@ cmd_default() {
 # The two links dotfiles.sh always makes for itself: the command, and its
 # own config folder (decided 2026-10-12).
 _self_links() {
-  local bin=".local/bin/dotfiles"
-  if [[ $DOTFILES_OS == windows ]]; then
-    bin="bin/dotfiles"
-  fi
-  printf '%s\t%s\n' "$DOTFILES/dotfiles.sh" "$bin"
+  printf '%s\t%s\n' "$DOTFILES/dotfiles.sh" ".local/bin/dotfiles"
   printf '%s\t%s\n' "$DOTFILES/config/dotfiles" ".config/dotfiles"
 }
 
@@ -2219,9 +2215,9 @@ _setup_self_links() {
   [[ $ok == true ]]
 }
 
-# Say how to put the command's folder on PATH when it isn't: ~/.local/bin,
-# or ~/bin on Windows (Git Bash puts ~/bin on PATH by itself). Changes no
-# files. Once per run (first run and doctor both ask).
+# Say how to put ~/.local/bin (the command's folder, on every OS) on PATH
+# when it isn't. Changes no files. Once per run (first run and doctor both
+# ask).
 PATH_CHECKED=false
 _path_check() {
   if [[ $PATH_CHECKED == true ]]; then
@@ -2229,10 +2225,6 @@ _path_check() {
   fi
   PATH_CHECKED=true
   local bin_dir="$HOME/.local/bin" shown="~/.local/bin"
-  if [[ $DOTFILES_OS == windows ]]; then
-    bin_dir="$HOME/bin"
-    shown="~/bin"
-  fi
   case ":$ORIG_PATH:" in
     *":$bin_dir:"*)
       log debug "$shown is on PATH"

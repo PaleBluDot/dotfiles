@@ -18,7 +18,7 @@ irm https://raw.githubusercontent.com/PaleBluDot/dotfiles/main/bootstrap.ps1 | i
 ```
 
 The first run asks where to clone the repo, links itself as `dotfiles`
-(`~/.local/bin`, or `~/bin` on Windows), then opens the interactive setup.
+(`~/.local/bin`), then opens the interactive setup.
 To skip the question: `curl … | DOTFILES=<path> bash`.
 
 On Windows, turn on Developer Mode first (Settings > System > For developers),
