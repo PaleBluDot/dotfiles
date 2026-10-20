@@ -1,0 +1,12 @@
+[Unit]
+Description=Rebuild the boot screens when the Omarchy theme, logos or branding settings change
+
+[Path]
+PathChanged=$HOME/.local/state/surface-boot/trigger
+PathChanged=$HOME/.config/omarchy/branding/settings.toml
+PathChanged=$HOME/.config/omarchy/branding/surfacebook.txt
+PathChanged=$HOME/.config/omarchy/branding/omasurface.txt
+PathChanged=$HOME/.config/omarchy/branding/surface.txt
+
+[Install]
+WantedBy=multi-user.target

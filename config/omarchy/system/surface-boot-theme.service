@@ -1,0 +1,6 @@
+[Unit]
+Description=Rebuild the boot screen from the current Omarchy theme
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/surface-boot-theme-apply

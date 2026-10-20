@@ -165,6 +165,24 @@ packages:
       - src: lazygit
         dest: .config/lazygit
 
+  limine:
+    enabled: true
+    locked: true
+    apt: none
+    dnf: none
+    brew: none
+    winget: none
+    links:
+      # Boot hooks, run as root after every kernel or boot update
+      - src: limine/hooks/40-shim-limine-sync
+        dest: /etc/boot/hooks/post.d/40-shim-limine-sync
+        copy: true
+        os: linux
+      - src: limine/hooks/50-omarchy-limine-style
+        dest: /etc/boot/hooks/post.d/50-omarchy-limine-style
+        copy: true
+        os: linux
+
   mise:
     enabled: true
     pacman: mise-bin
@@ -202,6 +220,7 @@ packages:
 
   omarchy:
     enabled: true
+    locked: true
     apt: none
     dnf: none
     brew: none
@@ -209,6 +228,21 @@ packages:
     links:
       - src: omarchy
         dest: .config/omarchy
+      # Boot menu, disk-password screen and screensaver follow the theme and
+      # branding/settings.toml: the .path unit runs the apply script on change.
+      - src: omarchy/system/surface-boot-theme-apply
+        dest: /usr/local/sbin/surface-boot-theme-apply
+        copy: true
+        os: linux
+      - src: omarchy/system/surface-boot-theme.service
+        dest: /etc/systemd/system/surface-boot-theme.service
+        copy: true
+        os: linux
+      - src: omarchy/system/surface-boot-theme.path
+        dest: /etc/systemd/system/surface-boot-theme.path
+        copy: true
+        enable: true
+        os: linux
 
   ssh:
     enabled: true

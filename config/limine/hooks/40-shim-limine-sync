@@ -1,0 +1,33 @@
+#!/bin/bash
+# Keep /boot/EFI/limine/grubx64.efi (what shim loads) = current limine_x64.efi
+# + an SBAT section (shim refuses loaders without one under Secure Boot) + MOK signature.
+set -euo pipefail
+key=/etc/secureboot-mok/MOK.key
+crt=/etc/secureboot-mok/MOK.crt
+dir=/boot/EFI/limine
+src=$dir/limine_x64.efi
+dst=$dir/grubx64.efi
+stamp=/etc/secureboot-mok/limine-src.sha256
+[[ -f $src && -r $key ]] || exit 0
+want=$(sha256sum "$src" | cut -d' ' -f1)
+if [[ -f $dst && -f $stamp && $(cat "$stamp") == "$want" ]] && sbverify --cert "$crt" "$dst" &>/dev/null; then
+  exit 0
+fi
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+cp "$src" "$tmp/limine.efi"
+if ! objdump -h "$tmp/limine.efi" | grep -q '\.sbat'; then
+  ver=$(pacman -Q limine 2>/dev/null | awk '{print $2}' | cut -d- -f1)
+  printf 'sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md\nlimine,1,Limine,limine,%s,https://github.com/limine-bootloader/limine\n' "${ver:-0}" > "$tmp/sbat.csv"
+  # place .sbat after the end of the loaded image (SizeOfImage), not after raw data, so it can't overlap .bss
+  end=0x$(objdump -p "$tmp/limine.efi" | awk '/^SizeOfImage/{print $2}')
+  objcopy --add-section .sbat="$tmp/sbat.csv" --set-section-flags .sbat=contents,alloc,load,readonly,data \
+          --change-section-vma .sbat="$end" "$tmp/limine.efi" "$tmp/limine-sbat.efi"
+  mv "$tmp/limine-sbat.efi" "$tmp/limine.efi"
+fi
+sbsign --key "$key" --cert "$crt" --output "$tmp/signed.efi" "$tmp/limine.efi"
+cp "$tmp/signed.efi" "$dst.new"
+mv -f "$dst.new" "$dst"
+sync -f "$dst"
+echo "$want" > "$stamp"
+echo "shim: re-signed $dst (with SBAT) from $src"
