@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.1.1](https://github.com/PaleBluDot/dotfiles/compare/v2.1.0...v2.1.1) (2026-10-20)
+
+
+### Bug Fixes
+
+* **config:** lock ghostty, btop and espanso ([#16](https://github.com/PaleBluDot/dotfiles/issues/16)) ([51ea0ff](https://github.com/PaleBluDot/dotfiles/commit/51ea0ffea61eb47921937a7b6039b64aec8f5e32))
+
 # [2.1.0](https://github.com/PaleBluDot/dotfiles/compare/v2.0.0...v2.1.0) (2026-10-20)
 
 
