@@ -312,6 +312,16 @@ packages:
       - src: npm
         dest: .config/npm
 
+  obsidian:
+    enabled: true
+    apt: none
+    dnf: none
+    winget: Obsidian.Obsidian
+    links:
+      - src: obsidian/user-flags.conf
+        dest: .config/obsidian/user-flags.conf
+        os: linux
+
   omarchy:
     enabled: true
     locked: true
