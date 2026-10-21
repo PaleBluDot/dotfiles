@@ -24,6 +24,7 @@ RUNNING_FROM_FILE=false
 DRY_RUN=false
 FORCE=false
 VERBOSE=false
+NO_COLOR_FLAG=false   # --no-color: the banner without colour
 QUIET=false   # interactive mode: info/success and command output go to the log only
 
 # ─── Logging state ──────────────────────────────────────────────────────
@@ -769,6 +770,7 @@ parse_args() {
       --dry-run) DRY_RUN=true ;;
       --force)   FORCE=true ;;
       --verbose) VERBOSE=true ;;
+      --no-color) NO_COLOR_FLAG=true ;;
       -[!-]*)
         # One dash: walk the letters after it. ${arg:i:1} = 1 char at i.
         for ((i = 1; i < ${#arg}; i++)); do
@@ -1047,10 +1049,11 @@ Flags (work anywhere on the line):
   -d, --dry-run         show what would happen, change nothing
   -v, --verbose         show every step
   --force               no questions, no backups (link, update, interactive)
+  --no-color            the banner without colour
   Short flags combine: -dv
 
 Every command but help starts with a "dotfiles" banner on a terminal at
-least 84 columns wide. NO_COLOR=1 shows it without colour.
+least 84 columns wide, fading through the terminal's ANSI colours.
 
 Files:
   config:  ${DOTFILES_CONFIG:-<not found>}
@@ -3401,10 +3404,11 @@ cmd_doctor() {
 
 # ─── Banner ─────────────────────────────────────────────────────────────
 # "dotfiles" in figlet's fraktur font, drawn once and kept here so a new
-# machine shows it before figlet is installed. ANSI cyan, like fastfetch's
-# Arch logo: the terminal's theme decides the actual colour. Only on a
-# terminal at least 84 columns wide (no banner in pipes, logs or narrow
-# windows); NO_COLOR=1 shows it without colour.
+# machine shows it before figlet is installed. It fades through the
+# terminal's ANSI colours from top to bottom (red, yellow, green, cyan,
+# blue, magenta), so the terminal's theme decides the actual colours. Only
+# on a terminal at least 84 columns wide (no banner in pipes, logs or
+# narrow windows); --no-color shows it without colour.
 _banner() {
   if [[ ! -t 1 ]]; then
     return 0
@@ -3433,11 +3437,19 @@ _banner() {
                                      48
                                      '8
 EOF
-  if [[ -n ${NO_COLOR:-} ]]; then
-    printf '%s\n' "$art"
-  else
-    printf '\033[1;36m%s\033[0m\n' "$art"
+  if [[ $NO_COLOR_FLAG == true ]]; then
+    printf '%s\n\n' "$art"
+    return 0
   fi
+  # 15 lines over 6 colours: each colour gets its share of the lines.
+  local -a colors=(31 33 32 36 34 35)
+  local line i=0 total
+  total="$(grep -c '' <<<"$art")"
+  while IFS= read -r line; do
+    printf '\033[1;%sm%s\033[0m\n' "${colors[i * ${#colors[@]} / total]}" "$line"
+    i=$((i + 1))
+  done <<<"$art"
+  printf '\n'
 }
 
 main() {
