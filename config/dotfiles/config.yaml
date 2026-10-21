@@ -159,7 +159,8 @@ packages:
 
   gh:
     enabled: true
-    manual: "Installed by mise (see config/mise/config.toml)"
+    pacman: github-cli
+    winget: GitHub.cli
     links:
       - src: gh/config.yml
         dest: .config/gh/config.yml
@@ -175,7 +176,9 @@ packages:
 
   go:
     enabled: true
-    manual: "Installed by mise (see config/mise/config.toml)"
+    apt: golang-go
+    dnf: golang
+    winget: GoLang.Go
     links:
       - src: go/env
         dest: .config/go/env
@@ -308,7 +311,8 @@ packages:
 
   npm:
     enabled: true
-    manual: "Comes with Node.js, installed by mise"
+    brew: node
+    winget: OpenJS.NodeJS
     links:
       - src: npm
         dest: .config/npm
