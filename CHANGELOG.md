@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.1.6](https://github.com/PaleBluDot/dotfiles/compare/v2.1.5...v2.1.6) (2026-10-21)
+
+
+### Bug Fixes
+
+* **script:** read config.yaml once per run ([f84e858](https://github.com/PaleBluDot/dotfiles/commit/f84e858dc15c0e0035ee3141e5dd607035d087e1))
+
 ## [2.1.5](https://github.com/PaleBluDot/dotfiles/compare/v2.1.4...v2.1.5) (2026-10-21)
 
 

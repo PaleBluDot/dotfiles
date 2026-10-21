@@ -1,6 +1,6 @@
 {
 	"name": "dotfiles",
-	"version": "2.1.5",
+	"version": "2.1.6",
 	"description": "Dotfile management system.",
 	"author": "Pavel Sanchez",
 	"repository": "https://github.com/PaleBluDot/dotfiles",
