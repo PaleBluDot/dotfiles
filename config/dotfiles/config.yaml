@@ -83,7 +83,7 @@ packages:
 
   cspell:
     enabled: true
-    manual: "Not auto-installed. Install by hand: npm install -g cspell"
+    manual: "Not auto-installed. Install by hand: npm install -g cspell, then: cd ~/.config/cspell && npm install"
     links:
       - src: cspell
         dest: .config/cspell
