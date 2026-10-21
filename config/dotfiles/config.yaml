@@ -172,6 +172,15 @@ packages:
       - src: gitlogue/config.toml
         dest: .config/gitlogue/config.toml
 
+  go:
+    enabled: true
+    manual: "Installed by mise (see config/mise/config.toml)"
+    links:
+      - src: go/env
+        dest: .config/go/env
+        macos: Library/Application Support/go/env
+        windows: AppData/Roaming/go/env
+
   gobuster:
     enabled: true
     winget: none
