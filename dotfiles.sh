@@ -1016,8 +1016,8 @@ EOF
       cat <<'EOF'
 dotfiles version
 
-Print this script's version (DOTFILES_VERSION), which is separate from the
-repo's release versions.
+Print the release this repo is at: its latest git tag (e.g. v2.1.7). Without
+the repo, the version written in the script.
 EOF
       ;;
     *)
@@ -1029,7 +1029,7 @@ EOF
 
 _help_main() {
   cat <<EOF
-dotfiles $DOTFILES_VERSION: install, link and manage the tools in this repo
+Install, link and manage the tools in this repo.
 
 Usage: dotfiles [command] [tool...] [flags]
        dotfiles                 interactive setup (help interactive)
@@ -1049,11 +1049,12 @@ Flags (work anywhere on the line):
   -d, --dry-run         show what would happen, change nothing
   -v, --verbose         show every step
   --force               no questions, no backups (link, update, interactive)
-  --no-color            the banner without colour
+  --no-color            the banner without colour (interactive, update)
   Short flags combine: -dv
 
-Every command but help starts with a "dotfiles" banner on a terminal at
-least 84 columns wide, fading through the terminal's ANSI colours.
+The interactive setup and update start with a "dotfiles" banner on a
+terminal at least 84 columns wide, fading through the terminal's ANSI
+colours. help, status and doctor start with "dotfiles <version>".
 
 Files:
   config:  ${DOTFILES_CONFIG:-<not found>}
@@ -1063,8 +1064,24 @@ More: dotfiles help <command>
 EOF
 }
 
+# The release this repo is at: the latest git tag (the release workflow
+# tags each version), e.g. v2.1.7. Without the repo or its tags, the
+# version written in this script.
+_version() {
+  local tag=""
+  if [[ -n ${DOTFILES:-} ]] && command -v git >/dev/null 2>&1; then
+    tag="$(git -C "$DOTFILES" describe --tags --abbrev=0 2>/dev/null)" || tag=""
+  fi
+  echo "${tag:-v$DOTFILES_VERSION}"
+}
+
 cmd_version() {
-  echo "dotfiles.sh $DOTFILES_VERSION"
+  echo "dotfiles $(_version)"
+}
+
+# One line with the version, for help, status and doctor.
+_title() {
+  printf 'dotfiles %s\n\n' "$(_version)"
 }
 
 # Stubs: each one is replaced in its build step (plan Section 16).
@@ -3499,9 +3516,10 @@ main() {
     _bootstrap
   fi
   # After _bootstrap: a first run from curl | bash shows it once, from the clone.
-  if [[ $cmd != help ]]; then
-    _banner
-  fi
+  case "$cmd" in
+    interactive | update) _banner ;;
+    help | status | doctor) _title ;;
+  esac
   if [[ ${DOTFILES_FIRST_RUN:-} == 1 ]]; then
     _first_run_setup
   elif [[ $cmd != doctor ]]; then
