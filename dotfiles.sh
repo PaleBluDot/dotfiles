@@ -1833,6 +1833,39 @@ _inject_path() {
   log success "$tool: filled $shown from ${src_path#"$DOTFILES"/} (owner-only)"
 }
 
+# Folders (under $HOME) that must stay owner-only: the 1Password CLI
+# refuses to run when ~/.config/op is readable by others ("permissions are
+# too broad"). A link into one creates it as 700, or tightens it to 700.
+PRIVATE_DIRS=(".config/op")
+
+# File mode as octal digits (755). stat differs: GNU -c, BSD/macOS -f.
+_mode() {
+  stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"
+}
+
+# "true" when a dest's folder is one of PRIVATE_DIRS.
+_private_parent() {
+  local dir="$1" private
+  for private in "${PRIVATE_DIRS[@]}"; do
+    if [[ $dir == "$HOME/$private" ]]; then
+      echo true
+      return 0
+    fi
+  done
+  echo false
+}
+
+# Make a private folder 700 when it already exists with a wider mode.
+_tighten_private_parent() {
+  local tool="$1" dir="$2"
+  if [[ $(_private_parent "$dir") == true && -d $dir && ! -L $dir && $(_mode "$dir") != 700 ]]; then
+    run_cmd chmod 700 "$dir"
+    if [[ $DRY_RUN != true ]]; then
+      log success "$tool: set $(_tilde "$dir") to 700 (owner-only)"
+    fi
+  fi
+}
+
 # Link a full source path to a dest under $HOME, with all the conflict
 # handling (plan Section 10). Also used for dotfiles.sh's own links.
 _link_path() {
@@ -1848,6 +1881,7 @@ _link_path() {
 
   state="$(_link_state "$src_path" "$dest_path")"
   log debug "$tool: $shown is $state"
+  _tighten_private_parent "$tool" "$(dirname "$dest_path")"
 
   if [[ $state == linked ]]; then
     log success "$tool: already linked: $shown"
@@ -1922,7 +1956,11 @@ _link_path() {
       ;;
   esac
 
-  run_cmd mkdir -p "$(dirname "$dest_path")"
+  if [[ $(_private_parent "$(dirname "$dest_path")") == true && ! -e $(dirname "$dest_path") ]]; then
+    run_cmd mkdir -p -m 700 "$(dirname "$dest_path")"
+  else
+    run_cmd mkdir -p "$(dirname "$dest_path")"
+  fi
   run_cmd ln -s "$src_path" "$dest_path"
   if [[ $DRY_RUN != true ]]; then
     log success "$tool: linked $shown -> ${src_path#"$DOTFILES"/}"
