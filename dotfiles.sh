@@ -1550,8 +1550,12 @@ _require_sudo() {
     exit 1
   fi
   # Shown even when QUIET: it explains the password prompt that follows.
-  printf '%s\n' "$need: system files changed; sudo needs your password" >&2
-  _log_to_file "INFO" "$need: system files changed; sudo needs your password"
+  local why="system files to install or update"
+  if [[ $mode == unlink ]]; then
+    why="system files to remove"
+  fi
+  printf '%s\n' "$need: $why; sudo needs your password" >&2
+  _log_to_file "INFO" "$need: $why; sudo needs your password"
   if ! sudo -v; then
     log error "$need installs system files and sudo was refused; nothing changed"
     exit 1
