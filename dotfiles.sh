@@ -6,10 +6,6 @@
 set -euo pipefail
 set -o errtrace
 
-# ─── Metadata ───────────────────────────────────────────────────────────
-readonly DOTFILES_VERSION="2.0.0"
-export DOTFILES_VERSION
-
 # ─── First run (plan Section 2) ─────────────────────────────────────────
 # A bare machine's first run asks where to clone; this is only the suggested
 # answer. DOTFILES / DOTFILES_REPO / DOTFILES_BRANCH in the environment skip
@@ -24,6 +20,7 @@ RUNNING_FROM_FILE=false
 DRY_RUN=false
 FORCE=false
 VERBOSE=false
+NO_COLOR_FLAG=false   # --no-color: the banner without colour
 QUIET=false   # interactive mode: info/success and command output go to the log only
 
 # ─── Logging state ──────────────────────────────────────────────────────
@@ -769,6 +766,7 @@ parse_args() {
       --dry-run) DRY_RUN=true ;;
       --force)   FORCE=true ;;
       --verbose) VERBOSE=true ;;
+      --no-color) NO_COLOR_FLAG=true ;;
       -[!-]*)
         # One dash: walk the letters after it. ${arg:i:1} = 1 char at i.
         for ((i = 1; i < ${#arg}; i++)); do
@@ -1014,8 +1012,9 @@ EOF
       cat <<'EOF'
 dotfiles version
 
-Print this script's version (DOTFILES_VERSION), which is separate from the
-repo's release versions.
+Print the release this repo is at: its latest git tag (e.g. v2.1.7), which
+the release workflow creates. Before the repo is cloned, the newest tag on
+GitHub; offline, "unknown".
 EOF
       ;;
     *)
@@ -1027,7 +1026,7 @@ EOF
 
 _help_main() {
   cat <<EOF
-dotfiles $DOTFILES_VERSION: install, link and manage the tools in this repo
+Install, link and manage the tools in this repo.
 
 Usage: dotfiles [command] [tool...] [flags]
        dotfiles                 interactive setup (help interactive)
@@ -1047,7 +1046,12 @@ Flags (work anywhere on the line):
   -d, --dry-run         show what would happen, change nothing
   -v, --verbose         show every step
   --force               no questions, no backups (link, update, interactive)
+  --no-color            the banner without colour (interactive, update)
   Short flags combine: -dv
+
+The interactive setup and update start with a "dotfiles" banner on a
+terminal at least 84 columns wide, fading through the terminal's ANSI
+colours. help, status and doctor start with "dotfiles <version>".
 
 Files:
   config:  ${DOTFILES_CONFIG:-<not found>}
@@ -1057,8 +1061,33 @@ More: dotfiles help <command>
 EOF
 }
 
+# The release this repo is at: the latest git tag, which the release
+# workflow creates for each version (e.g. v2.1.7). No version is written in
+# the script. Without a clone (curl | bash before cloning), the newest tag
+# on GitHub; offline, "unknown".
+_version() {
+  local tag=""
+  if ! command -v git >/dev/null 2>&1; then
+    echo "unknown"
+    return 0
+  fi
+  if [[ -n ${DOTFILES:-} ]]; then
+    tag="$(git -C "$DOTFILES" describe --tags --abbrev=0 2>/dev/null)" || tag=""
+  fi
+  if [[ -z $tag ]]; then
+    tag="$(git ls-remote --tags --refs --sort=-v:refname "${DOTFILES_REPO:-$DEFAULT_DOTFILES_REPO}" 'v*' 2>/dev/null |
+      head -n 1 | sed 's|.*refs/tags/||')" || tag=""
+  fi
+  echo "${tag:-unknown}"
+}
+
 cmd_version() {
-  echo "dotfiles.sh $DOTFILES_VERSION"
+  echo "dotfiles $(_version)"
+}
+
+# One line with the version, for help, status and doctor.
+_title() {
+  printf 'dotfiles %s\n\n' "$(_version)"
 }
 
 # Stubs: each one is replaced in its build step (plan Section 16).
@@ -3396,6 +3425,58 @@ cmd_doctor() {
 # MAIN
 # ════════════════════════════════════════════════════════════════════════
 
+# ─── Banner ─────────────────────────────────────────────────────────────
+# "dotfiles" in figlet's fraktur font, drawn once and kept here so a new
+# machine shows it before figlet is installed. It fades through the
+# terminal's ANSI colours from top to bottom (red, yellow, green, cyan,
+# blue, magenta), so the terminal's theme decides the actual colours. Only
+# on a terminal at least 84 columns wide (no banner in pipes, logs or
+# narrow windows); --no-color shows it without colour.
+_banner() {
+  if [[ ! -t 1 ]]; then
+    return 0
+  fi
+  local cols="${COLUMNS:-}" art
+  if [[ -z $cols ]]; then
+    cols="$(tput cols 2>/dev/null)" || cols=80
+  fi
+  if [[ $cols -lt 84 ]]; then
+    return 0
+  fi
+  IFS= read -r -d '' art <<'EOF' || true
+   ..                        s                 .          ..               .x+=:.
+ dF                         :8       oec :    @88>  x .d88"               z`    ^%
+'88bu.             u.      .88      @88888    %8P    5888R                   .   <k
+'*88888bu    ...ue888b    :888ooo   8"*88%     .     '888R        .u       .@8Ned8"
+  ^"*8888N   888R Y888r -*8888888   8b.      .@88u    888R     ud8888.   .@^%8888"
+ beWE "888L  888R I888>   8888     u888888> ''888E`   888R   :888'8888. x88:  `)8b.
+ 888E  888E  888R I888>   8888      8888R     888E    888R   d888 '88%" 8888N=*8888
+ 888E  888E  888R I888>   8888      8888P     888E    888R   8888.+"     %8"    R88
+ 888E  888F u8888cJ888   .8888Lu=   *888>     888E    888R   8888L        @8Wou 9%
+.888N..888   "*888*P"    ^%888*     4888      888&   .888B . '8888c. .+ .888888P`
+ `"888*""      'Y"         'Y"      '888      R888"  ^*888%   "88888%   `   ^"F
+    ""                               88R       ""      "%       "YP'
+                                     88>
+                                     48
+                                     '8
+EOF
+  # A blank line above, so it doesn't touch the line before it.
+  printf '\n'
+  if [[ $NO_COLOR_FLAG == true ]]; then
+    printf '%s\n\n' "$art"
+    return 0
+  fi
+  # 15 lines over 6 colours: each colour gets its share of the lines.
+  local -a colors=(31 33 32 36 34 35)
+  local line i=0 total
+  total="$(grep -c '' <<<"$art")"
+  while IFS= read -r line; do
+    printf '\033[1;%sm%s\033[0m\n' "${colors[i * ${#colors[@]} / total]}" "$line"
+    i=$((i + 1))
+  done <<<"$art"
+  printf '\n'
+}
+
 main() {
   ORIG_ARGS=("$@")
   # No need to start dotfiles with sudo: it asks for sudo itself when a
@@ -3416,7 +3497,7 @@ main() {
     *) PATH="$HOME/.local/bin:$PATH" ;;
   esac
   init_log
-  _log_to_file "DEBUG" "──── run start: dotfiles.sh $DOTFILES_VERSION, args: $*"
+  _log_to_file "DEBUG" "──── run start: dotfiles.sh, args: $*"
 
   parse_args "$@"
   # "${ARGS[@]}" on an empty array is an "unbound variable" error in
@@ -3440,6 +3521,11 @@ main() {
   if [[ $RUNNING_FROM_FILE != true ]]; then
     _bootstrap
   fi
+  # After _bootstrap: a first run from curl | bash shows it once, from the clone.
+  case "$cmd" in
+    interactive | update) _banner ;;
+    help | status | doctor) _title ;;
+  esac
   if [[ ${DOTFILES_FIRST_RUN:-} == 1 ]]; then
     _first_run_setup
   elif [[ $cmd != doctor ]]; then
