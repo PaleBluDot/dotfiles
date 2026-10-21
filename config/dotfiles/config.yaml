@@ -163,6 +163,15 @@ packages:
       - src: gh/config.yml
         dest: .config/gh/config.yml
 
+  gitlogue:
+    enabled: true
+    apt: none
+    dnf: none
+    winget: none
+    links:
+      - src: gitlogue/config.toml
+        dest: .config/gitlogue/config.toml
+
   gobuster:
     enabled: true
     winget: none
