@@ -451,6 +451,17 @@ packages:
         dest: .config/xdg-terminals.list
         os: linux
 
+  yay:
+    enabled: true
+    apt: none
+    dnf: none
+    brew: none
+    winget: none
+    links:
+      - src: yay/config.json
+        dest: .config/yay/config.json
+        os: linux
+
   yazi:
     enabled: true
     apt: none
