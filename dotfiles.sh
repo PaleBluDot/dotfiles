@@ -414,6 +414,17 @@ tool_clones() {
   _yq ".packages[\"$1\"].clone // [] | .[] | (.repo // \"\") + \"\t\" + (.dest // \"\")"
 }
 
+# "true" when a tool has nothing to do on this machine: no package, no
+# manual: message and no links for this OS (hypr or limine on macOS,
+# komorebi on Linux). link and update skip it; doctor reports it.
+tool_unused_here() {
+  if [[ -z $(tool_package "$1") && -z $(tool_manual "$1") && -z $(tool_links "$1") ]]; then
+    echo true
+  else
+    echo false
+  fi
+}
+
 tool_link_inject() { _link_flag "$1" "$2" inject; }
 
 # "true" or "false"; anything else counts as false.
@@ -1832,6 +1843,10 @@ cmd_link() {
   local tool good="" bad="" manual=""
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
     CHANGED=false
+    if [[ $(tool_unused_here "$tool") == true ]]; then
+      log debug "$tool: not used on ${DOTFILES_OS:-this OS} (no package, nothing to link); skipped"
+      continue
+    fi
     if ! _link_tool "$tool"; then
       bad="${bad:+$bad, }$tool"
     elif [[ -n $INSTALL_NOTE ]]; then
@@ -2498,6 +2513,10 @@ cmd_update() {
   fi
   for tool in "${TOOLS[@]}"; do
     CHANGED=false
+    if [[ $(tool_unused_here "$tool") == true ]]; then
+      log debug "$tool: not used on ${DOTFILES_OS:-this OS} (no package, nothing to link); skipped"
+      continue
+    fi
     if ! _link_tool "$tool"; then
       bad="${bad:+$bad, }$tool"
     elif [[ $CHANGED == true ]]; then
@@ -2990,15 +3009,13 @@ _doctor_tool() {
 
   # A missing manager name falls back to the key, so an empty package here
   # is a deliberate none: the tool is linked, nothing is installed.
-  local unused=false
-  if [[ -z $package && -z $manual ]]; then
-    if [[ -n $(tool_links "$tool") ]]; then
-      log info "$tool: not available on ${PKG_MANAGER:-this OS} (none); links only"
-      DOCTOR_LINKS_ONLY=$((DOCTOR_LINKS_ONLY + 1))
-    else
-      log info "$tool: not used on ${DOTFILES_OS:-this OS} (no package, nothing to link)"
-      unused=true
-    fi
+  local unused
+  unused="$(tool_unused_here "$tool")"
+  if [[ $unused == true ]]; then
+    log info "$tool: not used on ${DOTFILES_OS:-this OS} (no package, nothing to link)"
+  elif [[ -z $package && -z $manual ]]; then
+    log info "$tool: not available on ${PKG_MANAGER:-this OS} (none); links only"
+    DOCTOR_LINKS_ONLY=$((DOCTOR_LINKS_ONLY + 1))
   fi
   while IFS=$'\t' read -r src dest; do
     count=$((count + 1))
