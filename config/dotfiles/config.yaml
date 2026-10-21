@@ -170,6 +170,15 @@ packages:
       - src: gobuster
         dest: .config/gobuster
 
+  herdr:
+    enabled: true
+    apt: none
+    dnf: none
+    winget: none
+    links:
+      - src: herdr/config.toml
+        dest: .config/herdr/config.toml
+
   hypr:
     enabled: true
     pacman: hyprland
