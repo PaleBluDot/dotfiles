@@ -25,6 +25,7 @@ DRY_RUN=false
 FORCE=false
 VERBOSE=false
 QUIET=false   # interactive mode: info/success and command output go to the log only
+REPORT=false  # link/update: one line per tool at the end instead of the step-by-step log
 
 # ─── Logging state ──────────────────────────────────────────────────────
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
@@ -74,6 +75,21 @@ log() {
 
   _log_to_file "$label" "$message"
 
+  # link/update: a tool's first error (else first warning) becomes its line
+  # in the report. Shown live only with -v.
+  if [[ $REPORT == true && -n $REPORT_TOOL && ( $level == error || $level == warn ) ]]; then
+    if [[ $level == error && $REPORT_LEVEL != error ]]; then
+      REPORT_LEVEL=error
+      REPORT_MSG="${message#"$REPORT_TOOL: "}"
+    elif [[ $level == warn && -z $REPORT_LEVEL ]]; then
+      REPORT_LEVEL=warn
+      REPORT_MSG="${message#"$REPORT_TOOL: "}"
+    fi
+    if [[ $VERBOSE != true ]]; then
+      return 0
+    fi
+  fi
+
   case "$level" in
     error | warn)
       printf '[%s] %s\n' "$label" "$message" >&2
@@ -89,6 +105,84 @@ log() {
       fi
       ;;
   esac
+}
+
+# ─── Report: one line per tool for link and update ──────────────────────
+#   ✓ gitlogue(0.12.1)   ~/.config/gitlogue/config.toml
+#   ! cspell             not installed: <how to install it>
+#   ✗ ssh                op inject failed …
+REPORT_TOOL=""    # the tool being handled
+REPORT_LEVEL=""   # its worst message so far: "", warn or error
+REPORT_MSG=""     # that message, without the "tool: " prefix
+REPORT_SYMS=()
+REPORT_LABELS=()
+REPORT_TEXTS=()   # newline-separated: extra lines line up under the first
+
+_report_start() {
+  REPORT_TOOL="$1"
+  REPORT_LEVEL=""
+  REPORT_MSG=""
+}
+
+_report_add() {
+  REPORT_SYMS+=("$1")
+  REPORT_LABELS+=("$2")
+  REPORT_TEXTS+=("$3")
+}
+
+# Print the lines, the labels padded to the longest one so the second
+# column lines up. Goes to the terminal even when QUIET.
+_report_print() {
+  local i width=0 first=true line
+  for ((i = 0; i < ${#REPORT_LABELS[@]}; i++)); do
+    if [[ ${#REPORT_LABELS[i]} -gt $width ]]; then
+      width=${#REPORT_LABELS[i]}
+    fi
+  done
+  for ((i = 0; i < ${#REPORT_LABELS[@]}; i++)); do
+    first=true
+    while IFS= read -r line || [[ -n $line ]]; do
+      if [[ $first == true ]]; then
+        printf '%s %-*s %s\n' "${REPORT_SYMS[i]}" "$width" "${REPORT_LABELS[i]}" "$line"
+        first=false
+      else
+        printf '  %-*s %s\n' "$width" "" "$line"
+      fi
+    done <<<"${REPORT_TEXTS[i]}"
+    _log_to_file "INFO" "report: ${REPORT_SYMS[i]} ${REPORT_LABELS[i]} ${REPORT_TEXTS[i]//$'\n'/, }"
+  done
+}
+
+# link/update: from here on, steps go to the log (and to the terminal only
+# with -v); the report is printed at the end.
+_report_begin() {
+  REPORT=true
+  QUIET=true
+  REPORT_SYMS=()
+  REPORT_LABELS=()
+  REPORT_TEXTS=()
+}
+
+_report_end() {
+  REPORT=false
+  if [[ $VERBOSE == true && ${#REPORT_LABELS[@]} -gt 0 ]]; then
+    printf '\n'
+  fi
+  _report_print
+  if [[ $DRY_RUN == true && ${#REPORT_LABELS[@]} -gt 0 ]]; then
+    printf '(dry run: nothing was changed)\n'
+  fi
+}
+
+# A full-width rule with a title, for -v: "===== installing x (brew) =====".
+# No title = a plain rule.
+_rule() {
+  local title="${1:+ $1 }" total=76 left right pad
+  left=$(((total - ${#title}) / 2))
+  right=$((total - ${#title} - left))
+  printf -v pad '%*s' "$total" ""
+  pad="${pad// /=}"
+  printf '%s%s%s\n' "${pad:0:left}" "$title" "${pad:0:right}"
 }
 
 # Create the log folder and file. If that fails, keep going terminal-only.
@@ -1102,10 +1196,14 @@ _tool_installed_version() {
 
 # Fallback version (plan Section 8): first line of "<command> --version".
 # </dev/null so a tool that ignores --version can't sit waiting for input.
+# Only the version number when the line has one ("aether 4.32.0" -> 4.32.0,
+# "aerospace CLI client version: 0.21.3-Beta d56e…" -> 0.21.3-Beta).
 _tool_version() {
-  local cmd_name="$1" output
+  local cmd_name="$1" output number
   if output="$("$cmd_name" --version </dev/null 2>&1)" && [[ -n $output ]]; then
-    echo "${output%%$'\n'*}"
+    output="${output%%$'\n'*}"
+    number="$(grep -oE '[0-9]+(\.[0-9]+)+[^ ,()]*' <<<"$output" | head -n 1)" || true
+    echo "${number:-$output}"
   else
     echo "unknown"
   fi
@@ -1431,7 +1529,9 @@ _require_sudo() {
     log error "$need installs system files and needs root, but sudo isn't installed; nothing changed"
     exit 1
   fi
-  log info "$need installs system files; sudo needs your password"
+  # Shown even when QUIET: it explains the password prompt that follows.
+  printf '%s\n' "$need: system files changed; sudo needs your password" >&2
+  _log_to_file "INFO" "$need: system files changed; sudo needs your password"
   if ! sudo -v; then
     log error "$need installs system files and sudo was refused; nothing changed"
     exit 1
@@ -1751,13 +1851,17 @@ _link_path() {
 
   if [[ $state == linked ]]; then
     log success "$tool: already linked: $shown"
-    out "$(ls -ld "$dest_path")"
+    if [[ $VERBOSE == true ]]; then
+      out "$(ls -ld "$dest_path")"
+    fi
     return 0
   fi
   if [[ $state == linked-parent ]]; then
     target="$(_linked_parent "$dest_path")"
     log success "$tool: already linked: $shown (through the linked folder $(_tilde "$target"))"
-    out "$(ls -ld "$target")"
+    if [[ $VERBOSE == true ]]; then
+      out "$(ls -ld "$target")"
+    fi
     return 0
   fi
 
@@ -1822,7 +1926,9 @@ _link_path() {
   run_cmd ln -s "$src_path" "$dest_path"
   if [[ $DRY_RUN != true ]]; then
     log success "$tool: linked $shown -> ${src_path#"$DOTFILES"/}"
-    out "$(ls -ld "$dest_path")"
+    if [[ $VERBOSE == true ]]; then
+      out "$(ls -ld "$dest_path")"
+    fi
   fi
 }
 
@@ -1894,26 +2000,24 @@ cmd_link() {
   _require_config
   _pick_tools link "$@"
   _require_sudo link ${TOOLS[@]+"${TOOLS[@]}"}
-  local tool good="" bad="" manual=""
+  _report_begin
+  local tool bad=false
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
     CHANGED=false
     if [[ $(tool_unused_here "$tool") == true ]]; then
       log debug "$tool: not used on ${DOTFILES_OS:-this OS} (no package, nothing to link); skipped"
       continue
     fi
-    if ! _link_tool "$tool"; then
-      bad="${bad:+$bad, }$tool"
-    elif [[ -n $INSTALL_NOTE ]]; then
-      manual="${manual:+$manual; }$tool: $INSTALL_NOTE"
-    elif [[ $CHANGED == true ]]; then
-      good="${good:+$good, }$(_tool_with_version "$tool")"
+    _report_start "$tool"
+    if _link_tool "$tool"; then
+      _report_tool "$tool" true
+    else
+      _report_tool "$tool" false
+      bad=true
     fi
   done
-  _summary linked "$good" "$bad"
-  if [[ -n $manual && ${#TOOLS[@]} -gt 1 ]]; then
-    out "  install by hand: $manual"
-  fi
-  if [[ -n $bad ]]; then
+  _report_end
+  if [[ $bad == true ]]; then
     exit 1
   fi
 }
@@ -2028,13 +2132,24 @@ _install_package() {
   if [[ -z $package ]]; then
     INSTALL_NOTE="$(tool_manual "$tool")"
     INSTALL_NOTE="${INSTALL_NOTE:-no package for ${PKG_MANAGER:-this OS} in config.yaml}"
-    log warn "$tool: not installed, and there's no package for it here: $INSTALL_NOTE"
+    log warn "$tool: not installed: $INSTALL_NOTE"
     return 0
   fi
 
   log info "$tool: not installed, installing package $package"
+  # -v: the package manager's output in its own block, easy to tell apart.
+  if [[ $VERBOSE == true ]]; then
+    printf '\n%s\n' "$(_rule "installing $tool ($PKG_MANAGER)")"
+  fi
+  local installed=true
   if ! pm_install "$package"; then
-    log error "$tool: installing $package failed"
+    installed=false
+  fi
+  if [[ $VERBOSE == true ]]; then
+    printf '%s\n\n' "$(_rule)"
+  fi
+  if [[ $installed != true ]]; then
+    log error "$tool: installing $package failed; run again with -v to see why"
     return 1
   fi
   if [[ $DRY_RUN == true ]]; then
@@ -2069,6 +2184,32 @@ _tool_with_version() {
   else
     echo "$tool"
   fi
+}
+
+# Add one tool's report line. ok = whether _link_tool succeeded.
+# only_changed = true (update): a tool that's fine and didn't change gets
+# no line; problems always do.
+_report_tool() {
+  local tool="$1" ok="$2" only_changed="${3:-false}" version="" text="" src dest
+  if [[ $ok != true || $REPORT_LEVEL == error ]]; then
+    _report_add "✗" "$tool" "${REPORT_MSG:-failed; run again with -v to see why}"
+  elif [[ $REPORT_LEVEL == warn ]]; then
+    _report_add "!" "$tool" "$REPORT_MSG"
+  elif [[ $only_changed != true || $CHANGED == true ]]; then
+    if [[ $(_tool_installed "$tool") == true ]]; then
+      version="$(_tool_installed_version "$tool")"
+    elif [[ $DRY_RUN == true ]]; then
+      version="$(package_available_version "$(tool_package "$tool")")"
+    fi
+    if [[ $version == unknown ]]; then
+      version=""
+    fi
+    while IFS=$'\t' read -r src dest; do
+      text="${text:+$text$'\n'}$(_dest_shown "$dest")"
+    done < <(tool_links "$tool")
+    _report_add "✓" "$tool${version:+($version)}" "${text:-installed, nothing to link}"
+  fi
+  REPORT_TOOL=""
 }
 
 # Remove one tool's package (no question: unlink always removes it).
@@ -2498,8 +2639,9 @@ cmd_wipe() {
 
 # Fetch, show what's coming in, then pull --rebase --autostash. A dry run
 # fetches (changes no files) and stops before pulling.
+PULLED=false   # update: the pull brought new commits
 _update_pull() {
-  local upstream output incoming
+  local upstream output incoming count
   if ! upstream="$(git -C "$DOTFILES" rev-parse --abbrev-ref '@{u}' 2>/dev/null)"; then
     log error "the current branch has no upstream to pull from; set one with: git -C \"$DOTFILES\" branch --set-upstream-to origin/<branch>"
     return 1
@@ -2524,6 +2666,7 @@ _update_pull() {
   while IFS= read -r output; do
     out "  $output"
   done <<<"$incoming"
+  count="$(grep -c '' <<<"$incoming")"
 
   if [[ $DRY_RUN == true ]]; then
     log info "dry run: the installs and links below use config.yaml as it is now; the pull may change it"
@@ -2532,8 +2675,12 @@ _update_pull() {
     log error "git pull failed. Check: git -C \"$DOTFILES\" status. If a rebase is in progress, fix the files, then git rebase --continue (or git rebase --abort to undo)."
     return 1
   fi
-  if [[ $DRY_RUN != true ]]; then
+  PULLED=true
+  if [[ $DRY_RUN == true ]]; then
+    _report_add "✓" "repo" "would pull $count commit(s) from $upstream"
+  else
     log success "repo: pulled from $upstream"
+    _report_add "✓" "repo($(git -C "$DOTFILES" rev-parse --short HEAD))" "pulled $count commit(s) from $upstream"
   fi
 }
 
@@ -2547,6 +2694,7 @@ cmd_update() {
     log error "$DOTFILES isn't a git repo; nothing to pull"
     exit 1
   fi
+  _report_begin
   if ! _update_pull; then
     exit 1
   fi
@@ -2555,7 +2703,7 @@ cmd_update() {
   _require_sudo link $(_enabled_tools)
 
   # Install what's missing (no upgrades) and relink every enabled package.
-  local tool good="" bad=""
+  local tool bad=false
   TOOLS=()
   while IFS= read -r tool; do
     if [[ $(tool_enabled "$tool") == true ]]; then
@@ -2563,23 +2711,33 @@ cmd_update() {
     fi
   done < <(manifest_tools)
   if [[ ${#TOOLS[@]} -eq 0 ]]; then
-    log info "update: no package has enabled: true; nothing to install or link"
+    _report_end
+    printf 'update: no tool has enabled: true in config.yaml; nothing to install or link\n'
     return 0
   fi
+  local changed=$PULLED
   for tool in "${TOOLS[@]}"; do
     CHANGED=false
     if [[ $(tool_unused_here "$tool") == true ]]; then
       log debug "$tool: not used on ${DOTFILES_OS:-this OS} (no package, nothing to link); skipped"
       continue
     fi
-    if ! _link_tool "$tool"; then
-      bad="${bad:+$bad, }$tool"
-    elif [[ $CHANGED == true ]]; then
-      good="${good:+$good, }$(_tool_with_version "$tool")"
+    _report_start "$tool"
+    if _link_tool "$tool"; then
+      _report_tool "$tool" true true
+      if [[ $CHANGED == true ]]; then
+        changed=true
+      fi
+    else
+      _report_tool "$tool" false true
+      bad=true
     fi
   done
-  _summary "installed or linked" "$good" "$bad"
-  if [[ -n $bad ]]; then
+  _report_end
+  if [[ $changed != true && $bad != true ]]; then
+    printf '✓ dotfiles: everything is up to date\n'
+  fi
+  if [[ $bad == true ]]; then
     exit 1
   fi
 }
