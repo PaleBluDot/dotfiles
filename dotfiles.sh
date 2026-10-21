@@ -3437,6 +3437,8 @@ _banner() {
                                      48
                                      '8
 EOF
+  # A blank line above, so it doesn't touch the line before it.
+  printf '\n'
   if [[ $NO_COLOR_FLAG == true ]]; then
     printf '%s\n\n' "$art"
     return 0
