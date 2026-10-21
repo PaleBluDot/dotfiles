@@ -391,46 +391,110 @@ load_settings() {
   log debug "settings: backup_suffix=$BACKUP_SUFFIX log_file=${LOG_FILE:-<none>}"
 }
 
+# ─── config.yaml, read once per run ─────────────────────────────────────
+# Every packages: field the script needs comes out of one yq call and is
+# kept in shell variables, so asking for a tool's package or links costs
+# nothing (one yq call per question made update take ~17 s). set_enabled
+# updates the copy when it writes the file.
+#   CFG_TOOLS               tool names, in config.yaml order
+#   CFG_<id>_S_<field>      "=value" for a plain field (enabled, manual, brew…)
+#   CFG_<id>_C_<key>        "=value" for a command: map entry
+#   CFG_<id>_CMAP           1 when command: is a map
+#   CFG_<id>_L              links: "src dest os linux macos windows copy inject enable"
+#   CFG_<id>_K              clones: "repo dest"
+# Records use the unit separator (\x1f) between fields: tabs would collapse
+# empty fields when read.
+CFG_LOADED=false
+CFG_TOOLS=""
+readonly CFG_SEP=$'\x1f'
+
+# A tool name as a variable-name part: letters and digits kept, anything
+# else as _<hex> (chromium-flags.conf -> chromium_2dflags_2econf).
+CFG_ID_FOR=""
+CFG_ID=""
+_cfg_id() {
+  if [[ $1 == "$CFG_ID_FOR" ]]; then
+    return 0
+  fi
+  local name="$1" id="" char i
+  for ((i = 0; i < ${#name}; i++)); do
+    char="${name:i:1}"
+    case "$char" in
+      [A-Za-z0-9]) id+="$char" ;;
+      *) id+="$(printf '_%02x' "'$char")" ;;
+    esac
+  done
+  CFG_ID_FOR="$1"
+  CFG_ID="t_$id"
+}
+
+_cfg_load() {
+  if [[ $CFG_LOADED == true ]]; then
+    return 0
+  fi
+  CFG_LOADED=true
+  local dump line kind tool a b rest var
+  dump="$(_yq '.packages // {} | to_entries | .[] | .key as $t | .value as $v |
+    ( ($v // {} | to_entries | .[] | select((.value | tag) != "!!seq" and (.value | tag) != "!!map" and (.value | tag) != "!!null") | "S\t" + $t + "\t" + .key + "\t" + (.value | tostring)),
+      ($v.command // "" | select(tag == "!!map") | to_entries | .[] | "C\t" + $t + "\t" + .key + "\t" + (.value | tostring)),
+      ($v.links // [] | .[] | "L\t" + $t + "\t" + (.src // "") + "\t" + (.dest // "") + "\t" + (.os // "") + "\t" + (.linux // "") + "\t" + (.macos // "") + "\t" + (.windows // "") + "\t" + ((.copy // false) | tostring) + "\t" + ((.inject // false) | tostring) + "\t" + ((.enable // false) | tostring)),
+      ($v.clone // [] | .[] | "K\t" + $t + "\t" + (.repo // "") + "\t" + (.dest // "")),
+      ("T\t" + $t) )' 2>/dev/null)" || return 0
+  while IFS= read -r line; do
+    line="${line//$'\t'/$CFG_SEP}"
+    IFS="$CFG_SEP" read -r kind tool a b <<<"$line"
+    _cfg_id "$tool"
+    case "$kind" in
+      T)
+        CFG_TOOLS+="$tool"$'\n'
+        ;;
+      S)
+        printf -v "CFG_${CFG_ID}_S_$a" '=%s' "$b"
+        ;;
+      C)
+        printf -v "CFG_${CFG_ID}_C_$a" '=%s' "$b"
+        printf -v "CFG_${CFG_ID}_CMAP" '1'
+        ;;
+      L | K)
+        rest="${line#*"$CFG_SEP"*"$CFG_SEP"}"
+        var="CFG_${CFG_ID}_$kind"
+        printf -v "$var" '%s%s\n' "${!var:-}" "$rest"
+        ;;
+    esac
+  done <<<"$dump"
+}
+
+# A plain field's value; returns 1 when the tool doesn't have it.
+_cfg_field() {
+  _cfg_load
+  _cfg_id "$1"
+  local var="CFG_${CFG_ID}_S_$2"
+  if [[ -z ${!var:-} ]]; then
+    return 1
+  fi
+  echo "${!var#=}"
+}
+
 # Every package name under packages:, one per line.
 manifest_tools() {
-  _yq '.packages // {} | keys | .[]'
+  _cfg_load
+  printf '%s' "$CFG_TOOLS"
 }
 
 # True when the name is a key under packages:.
 _tool_exists() {
-  [[ $(_yq ".packages | has(\"$1\")") == true ]]
-}
-
-# A field that is either one value, or a map of values per manager/OS.
-# Prints the value for this machine: manager, then OS, then default.
-_value_for_machine() {
-  local path="$1" key
-  case "$(_yq "$path | tag")" in
-    '!!null')
-      return 0
-      ;;
-    '!!map')
-      for key in "$PKG_MANAGER" "$DOTFILES_OS" default; do
-        if [[ -n $key && $(_yq "$path[\"$key\"] | tag") != '!!null' ]]; then
-          _yq "$path[\"$key\"]"
-          return 0
-        fi
-      done
-      ;;
-    *)
-      _yq "$path"
-      ;;
-  esac
+  _cfg_load
+  [[ $'\n'$CFG_TOOLS == *$'\n'"$1"$'\n'* ]]
 }
 
 # Package name on this machine: the manager's own name if one is set,
 # else the key. Empty = nothing to install here (a manual-only tool, or
 # "none" for this manager).
 tool_package() {
-  local tool="$1" base=".packages[\"$1\"]" value=""
-  if [[ -n $PKG_MANAGER && $(_yq "$base[\"$PKG_MANAGER\"] | tag") != '!!null' ]]; then
-    value="$(_yq "$base[\"$PKG_MANAGER\"]")"
-  elif [[ $(_yq "$base.manual | tag") == '!!null' ]]; then
+  local tool="$1" value=""
+  if [[ -n $PKG_MANAGER ]] && value="$(_cfg_field "$tool" "$PKG_MANAGER")"; then
+    :
+  elif ! _cfg_field "$tool" manual >/dev/null; then
     value="$tool"
   fi
   if [[ $value == none ]]; then
@@ -440,27 +504,70 @@ tool_package() {
 }
 
 # Command that proves the tool is installed: command:, else the key.
+# A command: map picks this machine's entry: manager, then OS, then default.
 tool_command() {
-  local value
-  value="$(_value_for_machine ".packages[\"$1\"].command")"
-  echo "${value:-$1}"
+  local tool="$1" value="" key var
+  _cfg_load
+  _cfg_id "$tool"
+  var="CFG_${CFG_ID}_CMAP"
+  if [[ -n ${!var:-} ]]; then
+    for key in "$PKG_MANAGER" "$DOTFILES_OS" default; do
+      var="CFG_${CFG_ID}_C_$key"
+      if [[ -n $key && -n ${!var:-} ]]; then
+        value="${!var#=}"
+        break
+      fi
+    done
+  else
+    value="$(_cfg_field "$tool" command)" || value=""
+  fi
+  echo "${value:-$tool}"
 }
 
 # The manual: message (how to install by hand), or nothing.
 tool_manual() {
-  _yq ".packages[\"$1\"].manual // \"\""
+  _cfg_field "$1" manual || true
 }
 
 # Links, one "src<TAB>dest" line each, with this OS's dest when the link
 # has one (windows:, macos:, linux:). Missing src or dest comes out empty.
 # A link with os: is only used on that OS (os: linux for system files).
 tool_links() {
-  _yq ".packages[\"$1\"].links // [] | .[] | select((.os // \"\") == \"\" or .os == \"${DOTFILES_OS:-none}\") | (.src // \"\") + \"\t\" + (.[\"${DOTFILES_OS:-none}\"] // .dest // \"\")"
+  _cfg_load
+  _cfg_id "$1"
+  local var="CFG_${CFG_ID}_L" src dest os linux macos windows rest
+  while IFS="$CFG_SEP" read -r src dest os linux macos windows rest; do
+    if [[ -z $src && -z $dest ]]; then
+      continue
+    fi
+    if [[ -n $os && $os != "${DOTFILES_OS:-none}" ]]; then
+      continue
+    fi
+    case "${DOTFILES_OS:-}" in
+      linux) dest="${linux:-$dest}" ;;
+      macos) dest="${macos:-$dest}" ;;
+      windows) dest="${windows:-$dest}" ;;
+    esac
+    printf '%s\t%s\n' "$src" "$dest"
+  done <<<"${!var:-}"
 }
 
 # One true/false field of the link with this src (inject, copy, enable).
 _link_flag() {
-  if [[ $(_yq ".packages[\"$1\"].links // [] | .[] | select(.src == \"$2\") | .[\"$3\"] // false" | head -n 1) == true ]]; then
+  _cfg_load
+  _cfg_id "$1"
+  local var="CFG_${CFG_ID}_L" src dest os linux macos windows copy inject enable value=""
+  while IFS="$CFG_SEP" read -r src dest os linux macos windows copy inject enable; do
+    if [[ -n $src && $src == "$2" ]]; then
+      case "$3" in
+        copy) value="$copy" ;;
+        inject) value="$inject" ;;
+        enable) value="$enable" ;;
+      esac
+      break
+    fi
+  done <<<"${!var:-}"
+  if [[ $value == true ]]; then
     echo true
   else
     echo false
@@ -505,7 +612,14 @@ _dest_shown() {
 # op:// references, and dest gets a filled-in copy instead of a symlink.
 # Repos to clone, one "repo<TAB>dest" line each (dest under $HOME).
 tool_clones() {
-  _yq ".packages[\"$1\"].clone // [] | .[] | (.repo // \"\") + \"\t\" + (.dest // \"\")"
+  _cfg_load
+  _cfg_id "$1"
+  local var="CFG_${CFG_ID}_K" repo dest
+  while IFS="$CFG_SEP" read -r repo dest; do
+    if [[ -n $repo || -n $dest ]]; then
+      printf '%s\t%s\n' "$repo" "$dest"
+    fi
+  done <<<"${!var:-}"
 }
 
 # "true" when a tool has nothing to do on this machine: no package, no
@@ -523,7 +637,7 @@ tool_link_inject() { _link_flag "$1" "$2" inject; }
 
 # "true" or "false"; anything else counts as false.
 tool_enabled() {
-  if [[ $(_yq ".packages[\"$1\"].enabled") == true ]]; then
+  if [[ $(_cfg_field "$1" enabled) == true ]]; then
     echo true
   else
     echo false
@@ -532,7 +646,7 @@ tool_enabled() {
 
 # locked: true = unlink never removes this tool's package (only its links).
 tool_locked() {
-  if [[ $(_yq ".packages[\"$1\"].locked") == true ]]; then
+  if [[ $(_cfg_field "$1" locked) == true ]]; then
     echo true
   else
     echo false
@@ -1485,10 +1599,13 @@ set_enabled() {
     { print }
   ' "$file" >"$tmp"
   mv "$tmp" "$file"
-  if [[ $(tool_enabled "$tool") != "$value" ]]; then
+  # Check the file itself, then update the copy read at the start of the run.
+  if [[ $(_yq ".packages[\"$tool\"].enabled") != "$value" ]]; then
     log error "$tool: couldn't set enabled: $value in config.yaml (is the tool's name indented 2 spaces under packages:?)"
     return 1
   fi
+  _cfg_id "$tool"
+  printf -v "CFG_${CFG_ID}_S_enabled" '=%s' "$value"
   log info "$tool: config.yaml now has enabled: $value"
 }
 
