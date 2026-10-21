@@ -25,7 +25,6 @@ DRY_RUN=false
 FORCE=false
 VERBOSE=false
 QUIET=false   # interactive mode: info/success and command output go to the log only
-REPORT=false  # link/update: one line per tool at the end instead of the step-by-step log
 
 # ─── Logging state ──────────────────────────────────────────────────────
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
@@ -75,21 +74,6 @@ log() {
 
   _log_to_file "$label" "$message"
 
-  # link/update: a tool's first error (else first warning) becomes its line
-  # in the report. Shown live only with -v.
-  if [[ $REPORT == true && -n $REPORT_TOOL && ( $level == error || $level == warn ) ]]; then
-    if [[ $level == error && $REPORT_LEVEL != error ]]; then
-      REPORT_LEVEL=error
-      REPORT_MSG="${message#"$REPORT_TOOL: "}"
-    elif [[ $level == warn && -z $REPORT_LEVEL ]]; then
-      REPORT_LEVEL=warn
-      REPORT_MSG="${message#"$REPORT_TOOL: "}"
-    fi
-    if [[ $VERBOSE != true ]]; then
-      return 0
-    fi
-  fi
-
   case "$level" in
     error | warn)
       printf '[%s] %s\n' "$label" "$message" >&2
@@ -105,73 +89,6 @@ log() {
       fi
       ;;
   esac
-}
-
-# ─── Report: one line per tool for link and update ──────────────────────
-#   ✓ gitlogue(0.12.1)   ~/.config/gitlogue/config.toml
-#   ! cspell             not installed: <how to install it>
-#   ✗ ssh                op inject failed …
-REPORT_TOOL=""    # the tool being handled
-REPORT_LEVEL=""   # its worst message so far: "", warn or error
-REPORT_MSG=""     # that message, without the "tool: " prefix
-REPORT_SYMS=()
-REPORT_LABELS=()
-REPORT_TEXTS=()   # newline-separated: extra lines line up under the first
-
-_report_start() {
-  REPORT_TOOL="$1"
-  REPORT_LEVEL=""
-  REPORT_MSG=""
-}
-
-_report_add() {
-  REPORT_SYMS+=("$1")
-  REPORT_LABELS+=("$2")
-  REPORT_TEXTS+=("$3")
-}
-
-# Print the lines, the labels padded to the longest one so the second
-# column lines up. Goes to the terminal even when QUIET.
-_report_print() {
-  local i width=0 first=true line
-  for ((i = 0; i < ${#REPORT_LABELS[@]}; i++)); do
-    if [[ ${#REPORT_LABELS[i]} -gt $width ]]; then
-      width=${#REPORT_LABELS[i]}
-    fi
-  done
-  for ((i = 0; i < ${#REPORT_LABELS[@]}; i++)); do
-    first=true
-    while IFS= read -r line || [[ -n $line ]]; do
-      if [[ $first == true ]]; then
-        printf '%s %-*s %s\n' "${REPORT_SYMS[i]}" "$width" "${REPORT_LABELS[i]}" "$line"
-        first=false
-      else
-        printf '  %-*s %s\n' "$width" "" "$line"
-      fi
-    done <<<"${REPORT_TEXTS[i]}"
-    _log_to_file "INFO" "report: ${REPORT_SYMS[i]} ${REPORT_LABELS[i]} ${REPORT_TEXTS[i]//$'\n'/, }"
-  done
-}
-
-# link/update: from here on, steps go to the log (and to the terminal only
-# with -v); the report is printed at the end.
-_report_begin() {
-  REPORT=true
-  QUIET=true
-  REPORT_SYMS=()
-  REPORT_LABELS=()
-  REPORT_TEXTS=()
-}
-
-_report_end() {
-  REPORT=false
-  if [[ $VERBOSE == true && ${#REPORT_LABELS[@]} -gt 0 ]]; then
-    printf '\n'
-  fi
-  _report_print
-  if [[ $DRY_RUN == true && ${#REPORT_LABELS[@]} -gt 0 ]]; then
-    printf '(dry run: nothing was changed)\n'
-  fi
 }
 
 # A full-width rule with a title, for -v: "===== installing x (brew) =====".
@@ -754,6 +671,7 @@ _with_version() {
 # Run a command that changes the system. Its output shows in the terminal
 # and goes into the log file line by line. Honors --dry-run.
 CHANGED=false   # set by run_cmd: something was changed (or would be, in a dry run)
+HIDE_OUTPUT=false   # set by _pm: the package manager's own output shows only with -v
 run_cmd() {
   CHANGED=true
   if [[ $DRY_RUN == true ]]; then
@@ -765,7 +683,7 @@ run_cmd() {
   # With pipefail, the pipeline's exit code is the command's, not the loop's.
   # </dev/null: the command can't eat input meant for a loop around run_cmd.
   "$@" </dev/null 2>&1 | while IFS= read -r line || [[ -n $line ]]; do
-    if [[ $QUIET != true || $VERBOSE == true ]]; then
+    if [[ ( $QUIET != true && $HIDE_OUTPUT != true ) || $VERBOSE == true ]]; then
       printf '%s\n' "$line"
     fi
     _log_to_file "DEBUG" "  > $line"
@@ -815,6 +733,9 @@ _pm() {
     fi
     cmd=(sudo "${cmd[@]}")
   fi
+  # The package manager's own output (downloads, brew's warnings) goes to
+  # the log; the terminal shows it only with -v. The [INFO] lines stay.
+  HIDE_OUTPUT=true
   # apt needs fresh package lists on a new machine; once per run is enough.
   if [[ $action == install && $PKG_MANAGER == apt && $APT_UPDATED != true ]]; then
     APT_UPDATED=true
@@ -825,7 +746,10 @@ _pm() {
     fi
   fi
 
-  run_cmd "${cmd[@]}"
+  local code=0
+  run_cmd "${cmd[@]}" || code=$?
+  HIDE_OUTPUT=false
+  return "$code"
 }
 
 pm_install() { _pm install "$1"; }
@@ -909,11 +833,6 @@ no package and nothing to link on this OS is skipped. Repos under clone:
 are cloned once the links are in place, only when missing (an existing
 clone is never touched).
 
-Prints one line per tool at the end, lined up:
-  ✓ tool(version)  where it's linked
-  ! tool           a warning (e.g. not installed: how to install it)
-  ✗ tool           what failed
-
 What's in the way of a link:
   nothing                   link it
   already our link          "already linked"
@@ -934,7 +853,7 @@ filled in again when its source in the repo changed; --force fills it in
 again anyway (for values changed in 1Password).
 
   -d  show what would happen, change nothing (doesn't ask for sudo)
-  -v  show every step, the package manager's output and ls -l of each link
+  -v  also show the package manager's output and ls -l of each link
   --force  no questions, no backups: replace files and folders, and fill
            in 1Password files again
 
@@ -1036,12 +955,11 @@ Get the latest repo changes and bring this machine in line with them:
 
 Made to run from .zshrc/.bashrc on every new shell: it only asks for sudo
 when a system file changes, and only asks 1Password when a filled-in file's
-source changed. It lists only the tools that changed or have a problem
-(same lines as link); nothing to do prints:
-  ✓ dotfiles: everything is up to date
+source changed. With nothing to do it ends with:
+  [INFO] update: nothing to change
 
   -d  fetch, pull nothing, change nothing; show what would change
-  -v  show every step: incoming commits, the package manager's output
+  -v  also show the package manager's output
   --force  no questions, no backups (like link), and fill in 1Password
            files (~/.ssh/config) again
 
@@ -2179,24 +2097,26 @@ cmd_link() {
   _require_config
   _pick_tools link "$@"
   _require_sudo link ${TOOLS[@]+"${TOOLS[@]}"}
-  _report_begin
-  local tool bad=false
+  local tool good="" bad="" manual=""
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
     CHANGED=false
     if [[ $(tool_unused_here "$tool") == true ]]; then
       log debug "$tool: not used on ${DOTFILES_OS:-this OS} (no package, nothing to link); skipped"
       continue
     fi
-    _report_start "$tool"
-    if _link_tool "$tool"; then
-      _report_tool "$tool" true
-    else
-      _report_tool "$tool" false
-      bad=true
+    if ! _link_tool "$tool"; then
+      bad="${bad:+$bad, }$tool"
+    elif [[ -n $INSTALL_NOTE ]]; then
+      manual="${manual:+$manual; }$tool: $INSTALL_NOTE"
+    elif [[ $CHANGED == true ]]; then
+      good="${good:+$good, }$(_tool_with_version "$tool")"
     fi
   done
-  _report_end
-  if [[ $bad == true ]]; then
+  _summary linked "$good" "$bad"
+  if [[ -n $manual && ${#TOOLS[@]} -gt 1 ]]; then
+    out "  install by hand: $manual"
+  fi
+  if [[ -n $bad ]]; then
     exit 1
   fi
 }
@@ -2363,32 +2283,6 @@ _tool_with_version() {
   else
     echo "$tool"
   fi
-}
-
-# Add one tool's report line. ok = whether _link_tool succeeded.
-# only_changed = true (update): a tool that's fine and didn't change gets
-# no line; problems always do.
-_report_tool() {
-  local tool="$1" ok="$2" only_changed="${3:-false}" version="" text="" src dest
-  if [[ $ok != true || $REPORT_LEVEL == error ]]; then
-    _report_add "✗" "$tool" "${REPORT_MSG:-failed; run again with -v to see why}"
-  elif [[ $REPORT_LEVEL == warn ]]; then
-    _report_add "!" "$tool" "$REPORT_MSG"
-  elif [[ $only_changed != true || $CHANGED == true ]]; then
-    if [[ $(_tool_installed "$tool") == true ]]; then
-      version="$(_tool_installed_version "$tool")"
-    elif [[ $DRY_RUN == true ]]; then
-      version="$(package_available_version "$(tool_package "$tool")")"
-    fi
-    if [[ $version == unknown ]]; then
-      version=""
-    fi
-    while IFS=$'\t' read -r src dest; do
-      text="${text:+$text$'\n'}$(_dest_shown "$dest")"
-    done < <(tool_links "$tool")
-    _report_add "✓" "$tool${version:+($version)}" "${text:-installed, nothing to link}"
-  fi
-  REPORT_TOOL=""
 }
 
 # Remove one tool's package (no question: unlink always removes it).
@@ -2855,11 +2749,8 @@ _update_pull() {
     return 1
   fi
   PULLED=true
-  if [[ $DRY_RUN == true ]]; then
-    _report_add "✓" "repo" "would pull $count commit(s) from $upstream"
-  else
-    log success "repo: pulled from $upstream"
-    _report_add "✓" "repo($(git -C "$DOTFILES" rev-parse --short HEAD))" "pulled $count commit(s) from $upstream"
+  if [[ $DRY_RUN != true ]]; then
+    log success "repo: pulled $count commit(s) from $upstream"
   fi
 }
 
@@ -2873,7 +2764,6 @@ cmd_update() {
     log error "$DOTFILES isn't a git repo; nothing to pull"
     exit 1
   fi
-  _report_begin
   if ! _update_pull; then
     exit 1
   fi
@@ -2882,7 +2772,7 @@ cmd_update() {
   _require_sudo link $(_enabled_tools)
 
   # Install what's missing (no upgrades) and relink every enabled package.
-  local tool bad=false
+  local tool good="" bad=""
   TOOLS=()
   while IFS= read -r tool; do
     if [[ $(tool_enabled "$tool") == true ]]; then
@@ -2890,8 +2780,7 @@ cmd_update() {
     fi
   done < <(manifest_tools)
   if [[ ${#TOOLS[@]} -eq 0 ]]; then
-    _report_end
-    printf 'update: no tool has enabled: true in config.yaml; nothing to install or link\n'
+    log info "update: no package has enabled: true; nothing to install or link"
     return 0
   fi
   local changed=$PULLED
@@ -2901,22 +2790,18 @@ cmd_update() {
       log debug "$tool: not used on ${DOTFILES_OS:-this OS} (no package, nothing to link); skipped"
       continue
     fi
-    _report_start "$tool"
-    if _link_tool "$tool"; then
-      _report_tool "$tool" true true
-      if [[ $CHANGED == true ]]; then
-        changed=true
-      fi
-    else
-      _report_tool "$tool" false true
-      bad=true
+    if ! _link_tool "$tool"; then
+      bad="${bad:+$bad, }$tool"
+    elif [[ $CHANGED == true ]]; then
+      changed=true
+      good="${good:+$good, }$(_tool_with_version "$tool")"
     fi
   done
-  _report_end
-  if [[ $changed != true && $bad != true ]]; then
-    printf '✓ dotfiles: everything is up to date\n'
+  _summary "installed or linked" "$good" "$bad"
+  if [[ $changed != true && -z $bad ]]; then
+    log info "update: nothing to change"
   fi
-  if [[ $bad == true ]]; then
+  if [[ -n $bad ]]; then
     exit 1
   fi
 }
