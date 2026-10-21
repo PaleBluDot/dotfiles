@@ -403,6 +403,19 @@ packages:
       - src: tmux
         dest: .config/tmux
 
+  top:
+    enabled: true
+    locked: true
+    pacman: procps-ng
+    apt: procps
+    dnf: procps-ng
+    brew: none
+    winget: none
+    links:
+      - src: top/toprc
+        dest: .config/procps/toprc
+        os: linux
+
   vim:
     enabled: true
     dnf: vim-enhanced
