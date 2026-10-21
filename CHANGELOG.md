@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.1.2](https://github.com/PaleBluDot/dotfiles/compare/v2.1.1...v2.1.2) (2026-10-21)
+
+
+### Bug Fixes
+
+* **cspell:** install dictionaries locally instead of a global npm path ([#17](https://github.com/PaleBluDot/dotfiles/issues/17)) ([e8d9fb0](https://github.com/PaleBluDot/dotfiles/commit/e8d9fb0c464533f7f1919e74e319d950c4e176d0))
+
 ## [2.1.1](https://github.com/PaleBluDot/dotfiles/compare/v2.1.0...v2.1.1) (2026-10-20)
 
 
