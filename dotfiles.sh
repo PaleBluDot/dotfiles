@@ -787,11 +787,18 @@ cmd_help() {
       cat <<'EOF'
 dotfiles link [tool...] [-d] [-v] [--force]
 
-Install tools and link their configs: install the package if its command
-is missing, link every config, set enabled: true. No tool = every tool with
-enabled: true in config.yaml. A tool with no package here (none, manual:)
-is still linked. Repos under clone: are cloned once the links are in place,
-only when missing (an existing clone is never touched).
+Install tools and link their configs: install the package if it's missing
+(neither its command nor the package manager finds it), link every config,
+set enabled: true. No tool = every tool with enabled: true in config.yaml.
+A tool with no package here (none, manual:) is still linked; a tool with
+no package and nothing to link on this OS is skipped. Repos under clone:
+are cloned once the links are in place, only when missing (an existing
+clone is never touched).
+
+Prints one line per tool at the end, lined up:
+  ✓ tool(version)  where it's linked
+  ! tool           a warning (e.g. not installed: how to install it)
+  ✗ tool           what failed
 
 What's in the way of a link:
   nothing                   link it
@@ -803,14 +810,19 @@ What's in the way of a link:
 Never touches anything inside the repo (through a linked folder).
 
 System files (links with copy: true, e.g. omarchy, limine) get a
-root-owned copy instead of a symlink, so linking those tools asks for your
-sudo password first; refused = nothing changes. A copy that differs from
-the repo is replaced after you say y (the old one is kept in
-/var/lib/dotfiles/backup).
+root-owned copy instead of a symlink. When one is missing or differs from
+the repo, linking asks for your sudo password first; refused = nothing
+changes. All in place = no password. A copy that differs from the repo is
+replaced after you say y (the old one is kept in /var/lib/dotfiles/backup).
+
+A file filled in from 1Password (inject: true, e.g. ~/.ssh/config) is only
+filled in again when its source in the repo changed; --force fills it in
+again anyway (for values changed in 1Password).
 
   -d  show what would happen, change nothing (doesn't ask for sudo)
-  -v  show every step
-  --force  no questions, no backups: replace files and folders
+  -v  show every step, the package manager's output and ls -l of each link
+  --force  no questions, no backups: replace files and folders, and fill
+           in 1Password files again
 
 Examples:
   dotfiles link -dv neovim fd
@@ -900,16 +912,24 @@ EOF
       ;;
     update)
       cat <<'EOF'
-dotfiles update [-d] [-v]
+dotfiles update [-d] [-v] [--force]
 
 Get the latest repo changes and bring this machine in line with them:
-  1. git fetch, and list the incoming commits
+  1. git fetch
   2. git pull --rebase --autostash (your local changes are set aside and
      put back; a conflict stops with how to continue or undo)
-  3. install anything missing for enabled tools (never upgrades), relink
+  3. install new tools (never upgrades) and make sure every link is there
 
-  -d  fetch and show what's incoming, pull nothing, change nothing
-  -v  show every step
+Made to run from .zshrc/.bashrc on every new shell: it only asks for sudo
+when a system file changes, and only asks 1Password when a filled-in file's
+source changed. It lists only the tools that changed or have a problem
+(same lines as link); nothing to do prints:
+  ✓ dotfiles: everything is up to date
+
+  -d  fetch, pull nothing, change nothing; show what would change
+  -v  show every step: incoming commits, the package manager's output
+  --force  no questions, no backups (like link), and fill in 1Password
+           files (~/.ssh/config) again
 
 Example:
   dotfiles update -dv
@@ -984,7 +1004,7 @@ Commands:
   link [tool...]        install tools and link their configs (no tool = enabled tools)
   unlink [tool...]      remove tools and their links (no tool = pick from a list)
   default               install the default: list, link nothing
-  update                pull the repo, install what's missing, relink
+  update                pull the repo, install new tools, check links
   wipe                  undo everything dotfiles set up here (for re-testing)
   status [tool]         what's installed and linked
   doctor                check (and fix) what dotfiles needs
@@ -994,7 +1014,7 @@ Commands:
 Flags (work anywhere on the line):
   -d, --dry-run         show what would happen, change nothing
   -v, --verbose         show every step
-  --force               no questions, no backups (link, interactive)
+  --force               no questions, no backups (link, update, interactive)
   Short flags combine: -dv
 
 Files:
