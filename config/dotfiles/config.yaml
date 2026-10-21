@@ -215,6 +215,17 @@ packages:
         dest: .config/komorebi
         os: windows
 
+  lazydocker:
+    enabled: true
+    apt: none
+    dnf: none
+    winget: JesseDuffield.Lazydocker
+    links:
+      - src: lazydocker/config.yml
+        dest: .config/lazydocker/config.yml
+        macos: Library/Application Support/jesseduffield/lazydocker/config.yml
+        windows: AppData/Roaming/jesseduffield/lazydocker/config.yml
+
   lazygit:
     enabled: true
     dnf: none
