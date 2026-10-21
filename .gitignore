@@ -56,3 +56,4 @@ config/composer/vendor/
 config/composer/composer.lock
 config/composer/.htaccess
 config/composer/config.json
+config/cspell/node_modules/

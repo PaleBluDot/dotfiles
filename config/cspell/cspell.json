@@ -20,10 +20,10 @@
 		"es-es"
 	],
 	"import": [
-		"__HOME__/.config/npm/lib/node_modules/@palebludot/cspell-locations/cspell-ext.json",
-		"__HOME__/.config/npm/lib/node_modules/@palebludot/cspell-names/cspell-ext.json",
-		"__HOME__/.config/npm/lib/node_modules/@palebludot/cspell-personal/cspell-ext.json",
-		"__HOME__/.config/npm/lib/node_modules/@cspell/dict-es-es/cspell-ext.json"
+    "@palebludot/cspell-locations/cspell-ext.json",
+    "@palebludot/cspell-names/cspell-ext.json",
+    "@palebludot/cspell-personal/cspell-ext.json",
+    "@cspell/dict-es-es/cspell-ext.json"
 	],
 	"words": [
 		"Mewdules"

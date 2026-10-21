@@ -1,0 +1,11 @@
+{
+  "name": "cspell-config",
+  "private": true,
+  "description": "Dictionaries imported by cspell.json. Run npm install in this folder on each machine.",
+  "dependencies": {
+    "@cspell/dict-es-es": "^3.0.9",
+    "@palebludot/cspell-locations": "^1.3.0",
+    "@palebludot/cspell-names": "^1.4.0",
+    "@palebludot/cspell-personal": "^1.5.0"
+  }
+}
