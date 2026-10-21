@@ -486,19 +486,6 @@ packages:
         dest: .config/yay/config.json
         os: linux
 
-  user-dirs.dirs:
-    enabled: true
-    pacman: xdg-user-dirs
-    apt: xdg-user-dirs
-    dnf: xdg-user-dirs
-    brew: none
-    winget: none
-    command: xdg-user-dirs-update
-    links:
-      - src: user-dirs.dirs
-        dest: .config/user-dirs.dirs
-        os: linux
-
   yazi:
     enabled: true
     apt: none
