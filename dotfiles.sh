@@ -25,6 +25,7 @@ DRY_RUN=false
 FORCE=false
 VERBOSE=false
 QUIET=false   # interactive mode: info/success and command output go to the log only
+REPORT=false  # link/update: one line per tool at the end instead of the step-by-step log
 
 # ─── Logging state ──────────────────────────────────────────────────────
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
@@ -74,6 +75,21 @@ log() {
 
   _log_to_file "$label" "$message"
 
+  # link/update: a tool's first error (else first warning) becomes its line
+  # in the report. Shown live only with -v.
+  if [[ $REPORT == true && -n $REPORT_TOOL && ( $level == error || $level == warn ) ]]; then
+    if [[ $level == error && $REPORT_LEVEL != error ]]; then
+      REPORT_LEVEL=error
+      REPORT_MSG="${message#"$REPORT_TOOL: "}"
+    elif [[ $level == warn && -z $REPORT_LEVEL ]]; then
+      REPORT_LEVEL=warn
+      REPORT_MSG="${message#"$REPORT_TOOL: "}"
+    fi
+    if [[ $VERBOSE != true ]]; then
+      return 0
+    fi
+  fi
+
   case "$level" in
     error | warn)
       printf '[%s] %s\n' "$label" "$message" >&2
@@ -89,6 +105,84 @@ log() {
       fi
       ;;
   esac
+}
+
+# ─── Report: one line per tool for link and update ──────────────────────
+#   ✓ gitlogue(0.12.1)   ~/.config/gitlogue/config.toml
+#   ! cspell             not installed: <how to install it>
+#   ✗ ssh                op inject failed …
+REPORT_TOOL=""    # the tool being handled
+REPORT_LEVEL=""   # its worst message so far: "", warn or error
+REPORT_MSG=""     # that message, without the "tool: " prefix
+REPORT_SYMS=()
+REPORT_LABELS=()
+REPORT_TEXTS=()   # newline-separated: extra lines line up under the first
+
+_report_start() {
+  REPORT_TOOL="$1"
+  REPORT_LEVEL=""
+  REPORT_MSG=""
+}
+
+_report_add() {
+  REPORT_SYMS+=("$1")
+  REPORT_LABELS+=("$2")
+  REPORT_TEXTS+=("$3")
+}
+
+# Print the lines, the labels padded to the longest one so the second
+# column lines up. Goes to the terminal even when QUIET.
+_report_print() {
+  local i width=0 first=true line
+  for ((i = 0; i < ${#REPORT_LABELS[@]}; i++)); do
+    if [[ ${#REPORT_LABELS[i]} -gt $width ]]; then
+      width=${#REPORT_LABELS[i]}
+    fi
+  done
+  for ((i = 0; i < ${#REPORT_LABELS[@]}; i++)); do
+    first=true
+    while IFS= read -r line || [[ -n $line ]]; do
+      if [[ $first == true ]]; then
+        printf '%s %-*s %s\n' "${REPORT_SYMS[i]}" "$width" "${REPORT_LABELS[i]}" "$line"
+        first=false
+      else
+        printf '  %-*s %s\n' "$width" "" "$line"
+      fi
+    done <<<"${REPORT_TEXTS[i]}"
+    _log_to_file "INFO" "report: ${REPORT_SYMS[i]} ${REPORT_LABELS[i]} ${REPORT_TEXTS[i]//$'\n'/, }"
+  done
+}
+
+# link/update: from here on, steps go to the log (and to the terminal only
+# with -v); the report is printed at the end.
+_report_begin() {
+  REPORT=true
+  QUIET=true
+  REPORT_SYMS=()
+  REPORT_LABELS=()
+  REPORT_TEXTS=()
+}
+
+_report_end() {
+  REPORT=false
+  if [[ $VERBOSE == true && ${#REPORT_LABELS[@]} -gt 0 ]]; then
+    printf '\n'
+  fi
+  _report_print
+  if [[ $DRY_RUN == true && ${#REPORT_LABELS[@]} -gt 0 ]]; then
+    printf '(dry run: nothing was changed)\n'
+  fi
+}
+
+# A full-width rule with a title, for -v: "===== installing x (brew) =====".
+# No title = a plain rule.
+_rule() {
+  local title="${1:+ $1 }" total=76 left right pad
+  left=$(((total - ${#title}) / 2))
+  right=$((total - ${#title} - left))
+  printf -v pad '%*s' "$total" ""
+  pad="${pad// /=}"
+  printf '%s%s%s\n' "${pad:0:left}" "$title" "${pad:0:right}"
 }
 
 # Create the log folder and file. If that fails, keep going terminal-only.
@@ -414,6 +508,17 @@ tool_clones() {
   _yq ".packages[\"$1\"].clone // [] | .[] | (.repo // \"\") + \"\t\" + (.dest // \"\")"
 }
 
+# "true" when a tool has nothing to do on this machine: no package, no
+# manual: message and no links for this OS (hypr or limine on macOS,
+# komorebi on Linux). link and update skip it; doctor reports it.
+tool_unused_here() {
+  if [[ -z $(tool_package "$1") && -z $(tool_manual "$1") && -z $(tool_links "$1") ]]; then
+    echo true
+  else
+    echo false
+  fi
+}
+
 tool_link_inject() { _link_flag "$1" "$2" inject; }
 
 # "true" or "false"; anything else counts as false.
@@ -682,11 +787,18 @@ cmd_help() {
       cat <<'EOF'
 dotfiles link [tool...] [-d] [-v] [--force]
 
-Install tools and link their configs: install the package if its command
-is missing, link every config, set enabled: true. No tool = every tool with
-enabled: true in config.yaml. A tool with no package here (none, manual:)
-is still linked. Repos under clone: are cloned once the links are in place,
-only when missing (an existing clone is never touched).
+Install tools and link their configs: install the package if it's missing
+(neither its command nor the package manager finds it), link every config,
+set enabled: true. No tool = every tool with enabled: true in config.yaml.
+A tool with no package here (none, manual:) is still linked; a tool with
+no package and nothing to link on this OS is skipped. Repos under clone:
+are cloned once the links are in place, only when missing (an existing
+clone is never touched).
+
+Prints one line per tool at the end, lined up:
+  ✓ tool(version)  where it's linked
+  ! tool           a warning (e.g. not installed: how to install it)
+  ✗ tool           what failed
 
 What's in the way of a link:
   nothing                   link it
@@ -698,14 +810,19 @@ What's in the way of a link:
 Never touches anything inside the repo (through a linked folder).
 
 System files (links with copy: true, e.g. omarchy, limine) get a
-root-owned copy instead of a symlink, so linking those tools asks for your
-sudo password first; refused = nothing changes. A copy that differs from
-the repo is replaced after you say y (the old one is kept in
-/var/lib/dotfiles/backup).
+root-owned copy instead of a symlink. When one is missing or differs from
+the repo, linking asks for your sudo password first; refused = nothing
+changes. All in place = no password. A copy that differs from the repo is
+replaced after you say y (the old one is kept in /var/lib/dotfiles/backup).
+
+A file filled in from 1Password (inject: true, e.g. ~/.ssh/config) is only
+filled in again when its source in the repo changed; --force fills it in
+again anyway (for values changed in 1Password).
 
   -d  show what would happen, change nothing (doesn't ask for sudo)
-  -v  show every step
-  --force  no questions, no backups: replace files and folders
+  -v  show every step, the package manager's output and ls -l of each link
+  --force  no questions, no backups: replace files and folders, and fill
+           in 1Password files again
 
 Examples:
   dotfiles link -dv neovim fd
@@ -795,16 +912,24 @@ EOF
       ;;
     update)
       cat <<'EOF'
-dotfiles update [-d] [-v]
+dotfiles update [-d] [-v] [--force]
 
 Get the latest repo changes and bring this machine in line with them:
-  1. git fetch, and list the incoming commits
+  1. git fetch
   2. git pull --rebase --autostash (your local changes are set aside and
      put back; a conflict stops with how to continue or undo)
-  3. install anything missing for enabled tools (never upgrades), relink
+  3. install new tools (never upgrades) and make sure every link is there
 
-  -d  fetch and show what's incoming, pull nothing, change nothing
-  -v  show every step
+Made to run from .zshrc/.bashrc on every new shell: it only asks for sudo
+when a system file changes, and only asks 1Password when a filled-in file's
+source changed. It lists only the tools that changed or have a problem
+(same lines as link); nothing to do prints:
+  ✓ dotfiles: everything is up to date
+
+  -d  fetch, pull nothing, change nothing; show what would change
+  -v  show every step: incoming commits, the package manager's output
+  --force  no questions, no backups (like link), and fill in 1Password
+           files (~/.ssh/config) again
 
 Example:
   dotfiles update -dv
@@ -879,7 +1004,7 @@ Commands:
   link [tool...]        install tools and link their configs (no tool = enabled tools)
   unlink [tool...]      remove tools and their links (no tool = pick from a list)
   default               install the default: list, link nothing
-  update                pull the repo, install what's missing, relink
+  update                pull the repo, install new tools, check links
   wipe                  undo everything dotfiles set up here (for re-testing)
   status [tool]         what's installed and linked
   doctor                check (and fix) what dotfiles needs
@@ -889,7 +1014,7 @@ Commands:
 Flags (work anywhere on the line):
   -d, --dry-run         show what would happen, change nothing
   -v, --verbose         show every step
-  --force               no questions, no backups (link, interactive)
+  --force               no questions, no backups (link, update, interactive)
   Short flags combine: -dv
 
 Files:
@@ -1034,6 +1159,15 @@ _render_copy() {
 #   differs  something else is there (changed by hand, or a symlink)
 #   folder   a folder is in the way
 #   missing  nothing at dest
+# SHA-256 of stdin, hex only. sha256sum (Linux) or shasum (macOS).
+_sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | cut -d' ' -f1
+  else
+    shasum -a 256 | cut -d' ' -f1
+  fi
+}
+
 _copy_state() {
   local src_path="$1" dest_path="$2"
   if [[ -d $dest_path && ! -L $dest_path ]]; then
@@ -1082,18 +1216,40 @@ _tool_installed_version() {
 
 # Fallback version (plan Section 8): first line of "<command> --version".
 # </dev/null so a tool that ignores --version can't sit waiting for input.
+# Only the version number when the line has one ("aether 4.32.0" -> 4.32.0,
+# "aerospace CLI client version: 0.21.3-Beta d56e…" -> 0.21.3-Beta).
 _tool_version() {
-  local cmd_name="$1" output
+  local cmd_name="$1" output number
   if output="$("$cmd_name" --version </dev/null 2>&1)" && [[ -n $output ]]; then
-    echo "${output%%$'\n'*}"
+    output="${output%%$'\n'*}"
+    number="$(grep -oE '[0-9]+(\.[0-9]+)+[^ ,()]*' <<<"$output" | head -n 1)" || true
+    echo "${number:-$output}"
   else
     echo "unknown"
   fi
 }
 
-# "true" when the tool's command is on PATH.
+# Where an installed tool was found: its command's path, else the package
+# manager's record ("brew package 1password"). Apps like the 1Password
+# desktop app have no command on PATH, but the package manager knows them.
+# Returns 1 when neither finds it.
+_tool_location() {
+  local tool="$1" path package
+  if path="$(command -v "$(tool_command "$tool")" 2>/dev/null)"; then
+    echo "$path"
+    return 0
+  fi
+  package="$(tool_package "$tool")"
+  if [[ -n $package ]] && package_version "$package" >/dev/null; then
+    echo "$PKG_MANAGER package $package"
+    return 0
+  fi
+  return 1
+}
+
+# "true" when the tool is installed (_tool_location finds it).
 _tool_installed() {
-  if command -v "$(tool_command "$1")" >/dev/null 2>&1; then
+  if _tool_location "$1" >/dev/null; then
     echo true
   else
     echo false
@@ -1196,7 +1352,7 @@ _status_tool() {
   fi
   out "  command:    $command"
   if [[ $installed == true ]]; then
-    out "  installed:  $(command -v "$command")"
+    out "  installed:  $(_tool_location "$tool")"
     out "  version:    $(_tool_installed_version "$tool")"
   else
     out "  installed:  no"
@@ -1337,19 +1493,52 @@ set_enabled() {
 }
 
 # Tools to act on: the ones named, or every tool with enabled: true.
+# "true" when linking (link) or unlinking (unlink) a tool would change a
+# system file: for link, a copy is missing or differs, or its unit isn't
+# enabled yet; for unlink, a copy is there to remove.
+_system_needs_root() {
+  local tool="$1" mode="$2" src dest state
+  while IFS=$'\t' read -r src dest; do
+    if [[ $(tool_link_copy "$tool" "$src") != true ]]; then
+      continue
+    fi
+    state="$(_copy_state "$(_src_path "$src")" "$dest")"
+    if [[ $mode == unlink ]]; then
+      if [[ $state != missing ]]; then
+        echo true
+        return 0
+      fi
+    elif [[ $state != copied ]]; then
+      echo true
+      return 0
+    elif [[ $dest == /etc/systemd/* && $(tool_link_enable "$tool" "$src") == true ]] &&
+      command -v systemctl >/dev/null 2>&1 &&
+      ! systemctl is-enabled --quiet "$(basename "$dest")" 2>/dev/null; then
+      echo true
+      return 0
+    fi
+  done < <(tool_links "$tool")
+  echo false
+}
+
 # Sets TOOLS. Unknown names stop the run before anything changes.
 TOOLS=()
 # Tools with system files (copy: true links) need root for them. Before
 # changing anything, ask for the sudo password (sudo -v); refused = stop,
 # nothing changed. Later sudo calls in this run don't ask again. A dry run
 # changes nothing, so it doesn't ask.
+# Only tools whose system files would actually change count: a link run
+# where every copy is already in place (and its unit enabled) doesn't ask,
+# so update can run from a shell's startup file without a password prompt.
+#   _require_sudo link|unlink <tool...>
 _require_sudo() {
-  local tool need=""
+  local mode="$1" tool need=""
+  shift
   if [[ $DRY_RUN == true || $EUID -eq 0 ]]; then
     return 0
   fi
   for tool in "$@"; do
-    if [[ $(tool_has_system "$tool") == true ]]; then
+    if [[ $(_system_needs_root "$tool" "$mode") == true ]]; then
       need="${need:+$need, }$tool"
     fi
   done
@@ -1360,7 +1549,13 @@ _require_sudo() {
     log error "$need installs system files and needs root, but sudo isn't installed; nothing changed"
     exit 1
   fi
-  log info "$need installs system files; sudo needs your password"
+  # Shown even when QUIET: it explains the password prompt that follows.
+  local why="system files to install or update"
+  if [[ $mode == unlink ]]; then
+    why="system files to remove"
+  fi
+  printf '%s\n' "$need: $why; sudo needs your password" >&2
+  _log_to_file "INFO" "$need: $why; sudo needs your password"
   if ! sudo -v; then
     log error "$need installs system files and sudo was refused; nothing changed"
     exit 1
@@ -1589,12 +1784,23 @@ _uncopy_path() {
 # to dest, outside the repo, owner-only. The result is written next to dest
 # and renamed into place, so an old symlink is replaced, never written
 # through (that would put the real values into the repo).
+#
+# The header records the source's SHA-256. When it still matches, the file
+# is left alone without calling op (no 1Password unlock prompt on every
+# update); --force fills it in again anyway, for values changed in 1Password.
 _inject_path() {
   local tool="$1" src_path="$2" dest="$3"
-  local dest_path="$HOME/$3" shown="~/$3" tmp err
+  local dest_path="$HOME/$3" shown="~/$3" tmp err src_hash
+  local first="# GENERATED FILE: do not edit. Changes here are overwritten."
   if [[ ! -f $src_path ]]; then
     log error "$tool: source ${src_path#"$DOTFILES"/} doesn't exist"
     return 1
+  fi
+  src_hash="$(_sha256 <"$src_path")"
+  if [[ $FORCE != true && -f $dest_path && ! -L $dest_path && $(head -n 1 "$dest_path") == "$first" ]] &&
+    head -n 5 "$dest_path" | grep -qxF "# Source-SHA256: $src_hash"; then
+    log success "$tool: already up to date: $shown (source unchanged; --force fills it in from 1Password again)"
+    return 0
   fi
   if ! command -v op >/dev/null 2>&1; then
     log warn "$tool: $shown needs the 1Password CLI (op) to fill in its op:// references; skipped"
@@ -1624,11 +1830,11 @@ _inject_path() {
   fi
   chmod 600 "$tmp"
 
-  # Up to date = same content under the 4-line header (the header's time is
-  # when the content last changed, so it isn't compared).
-  local first="# GENERATED FILE: do not edit. Changes here are overwritten."
+  # Up to date = same content and source under the 5-line header (the
+  # header's time is when the content last changed, so it isn't compared).
   if [[ -f $dest_path && ! -L $dest_path && $(head -n 1 "$dest_path") == "$first" ]] &&
-    tail -n +5 "$dest_path" | cmp -s - "$tmp"; then
+    head -n 5 "$dest_path" | grep -qxF "# Source-SHA256: $src_hash" &&
+    tail -n +6 "$dest_path" | cmp -s - "$tmp"; then
     rm -f "$tmp"
     CHANGED=false
     log success "$tool: already up to date: $shown (filled in from 1Password)"
@@ -1640,6 +1846,7 @@ _inject_path() {
   {
     printf '%s\n' "$first" \
       "# Source: $(_tilde "$src_path") (op:// references filled in by op inject)" \
+      "# Source-SHA256: $src_hash" \
       "# Edit the source, then run: dotfiles link $tool" \
       "# Generated: $(_timestamp)"
     cat "$tmp"
@@ -1648,6 +1855,39 @@ _inject_path() {
   rm -f "$tmp"
   mv -f "$tmp.full" "$dest_path"
   log success "$tool: filled $shown from ${src_path#"$DOTFILES"/} (owner-only)"
+}
+
+# Folders (under $HOME) that must stay owner-only: the 1Password CLI
+# refuses to run when ~/.config/op is readable by others ("permissions are
+# too broad"). A link into one creates it as 700, or tightens it to 700.
+PRIVATE_DIRS=(".config/op")
+
+# File mode as octal digits (755). stat differs: GNU -c, BSD/macOS -f.
+_mode() {
+  stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"
+}
+
+# "true" when a dest's folder is one of PRIVATE_DIRS.
+_private_parent() {
+  local dir="$1" private
+  for private in "${PRIVATE_DIRS[@]}"; do
+    if [[ $dir == "$HOME/$private" ]]; then
+      echo true
+      return 0
+    fi
+  done
+  echo false
+}
+
+# Make a private folder 700 when it already exists with a wider mode.
+_tighten_private_parent() {
+  local tool="$1" dir="$2"
+  if [[ $(_private_parent "$dir") == true && -d $dir && ! -L $dir && $(_mode "$dir") != 700 ]]; then
+    run_cmd chmod 700 "$dir"
+    if [[ $DRY_RUN != true ]]; then
+      log success "$tool: set $(_tilde "$dir") to 700 (owner-only)"
+    fi
+  fi
 }
 
 # Link a full source path to a dest under $HOME, with all the conflict
@@ -1665,16 +1905,21 @@ _link_path() {
 
   state="$(_link_state "$src_path" "$dest_path")"
   log debug "$tool: $shown is $state"
+  _tighten_private_parent "$tool" "$(dirname "$dest_path")"
 
   if [[ $state == linked ]]; then
     log success "$tool: already linked: $shown"
-    out "$(ls -ld "$dest_path")"
+    if [[ $VERBOSE == true ]]; then
+      out "$(ls -ld "$dest_path")"
+    fi
     return 0
   fi
   if [[ $state == linked-parent ]]; then
     target="$(_linked_parent "$dest_path")"
     log success "$tool: already linked: $shown (through the linked folder $(_tilde "$target"))"
-    out "$(ls -ld "$target")"
+    if [[ $VERBOSE == true ]]; then
+      out "$(ls -ld "$target")"
+    fi
     return 0
   fi
 
@@ -1735,11 +1980,17 @@ _link_path() {
       ;;
   esac
 
-  run_cmd mkdir -p "$(dirname "$dest_path")"
+  if [[ $(_private_parent "$(dirname "$dest_path")") == true && ! -e $(dirname "$dest_path") ]]; then
+    run_cmd mkdir -p -m 700 "$(dirname "$dest_path")"
+  else
+    run_cmd mkdir -p "$(dirname "$dest_path")"
+  fi
   run_cmd ln -s "$src_path" "$dest_path"
   if [[ $DRY_RUN != true ]]; then
     log success "$tool: linked $shown -> ${src_path#"$DOTFILES"/}"
-    out "$(ls -ld "$dest_path")"
+    if [[ $VERBOSE == true ]]; then
+      out "$(ls -ld "$dest_path")"
+    fi
   fi
 }
 
@@ -1810,23 +2061,25 @@ _link_configs() {
 cmd_link() {
   _require_config
   _pick_tools link "$@"
-  _require_sudo ${TOOLS[@]+"${TOOLS[@]}"}
-  local tool good="" bad="" manual=""
+  _require_sudo link ${TOOLS[@]+"${TOOLS[@]}"}
+  _report_begin
+  local tool bad=false
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
     CHANGED=false
-    if ! _link_tool "$tool"; then
-      bad="${bad:+$bad, }$tool"
-    elif [[ -n $INSTALL_NOTE ]]; then
-      manual="${manual:+$manual; }$tool: $INSTALL_NOTE"
-    elif [[ $CHANGED == true ]]; then
-      good="${good:+$good, }$(_tool_with_version "$tool")"
+    if [[ $(tool_unused_here "$tool") == true ]]; then
+      log debug "$tool: not used on ${DOTFILES_OS:-this OS} (no package, nothing to link); skipped"
+      continue
+    fi
+    _report_start "$tool"
+    if _link_tool "$tool"; then
+      _report_tool "$tool" true
+    else
+      _report_tool "$tool" false
+      bad=true
     fi
   done
-  _summary linked "$good" "$bad"
-  if [[ -n $manual && ${#TOOLS[@]} -gt 1 ]]; then
-    out "  install by hand: $manual"
-  fi
-  if [[ -n $bad ]]; then
+  _report_end
+  if [[ $bad == true ]]; then
     exit 1
   fi
 }
@@ -1907,7 +2160,7 @@ cmd_unlink() {
   fi
   _require_config
   _pick_tools unlink "$@"
-  _require_sudo ${TOOLS[@]+"${TOOLS[@]}"}
+  _require_sudo unlink ${TOOLS[@]+"${TOOLS[@]}"}
   local tool good="" bad=""
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
     CHANGED=false
@@ -1934,27 +2187,38 @@ _install_package() {
   cmd_name="$(tool_command "$tool")"
   package="$(tool_package "$tool")"
 
-  if path="$(command -v "$cmd_name" 2>/dev/null)"; then
+  if path="$(_tool_location "$tool")"; then
     log success "$tool: already installed: $path ($(_tool_installed_version "$tool"))"
     return 0
   fi
   if [[ -z $package ]]; then
     INSTALL_NOTE="$(tool_manual "$tool")"
     INSTALL_NOTE="${INSTALL_NOTE:-no package for ${PKG_MANAGER:-this OS} in config.yaml}"
-    log warn "$tool: not installed, and there's no package for it here: $INSTALL_NOTE"
+    log warn "$tool: not installed: $INSTALL_NOTE"
     return 0
   fi
 
   log info "$tool: not installed, installing package $package"
+  # -v: the package manager's output in its own block, easy to tell apart.
+  if [[ $VERBOSE == true ]]; then
+    printf '\n%s\n' "$(_rule "installing $tool ($PKG_MANAGER)")"
+  fi
+  local installed=true
   if ! pm_install "$package"; then
-    log error "$tool: installing $package failed"
+    installed=false
+  fi
+  if [[ $VERBOSE == true ]]; then
+    printf '%s\n\n' "$(_rule)"
+  fi
+  if [[ $installed != true ]]; then
+    log error "$tool: installing $package failed; run again with -v to see why"
     return 1
   fi
   if [[ $DRY_RUN == true ]]; then
     return 0
   fi
   hash -r
-  if ! path="$(command -v "$cmd_name" 2>/dev/null)"; then
+  if ! path="$(_tool_location "$tool")"; then
     log error "$tool: $package installed, but $cmd_name still isn't on PATH"
     return 1
   fi
@@ -1984,6 +2248,32 @@ _tool_with_version() {
   fi
 }
 
+# Add one tool's report line. ok = whether _link_tool succeeded.
+# only_changed = true (update): a tool that's fine and didn't change gets
+# no line; problems always do.
+_report_tool() {
+  local tool="$1" ok="$2" only_changed="${3:-false}" version="" text="" src dest
+  if [[ $ok != true || $REPORT_LEVEL == error ]]; then
+    _report_add "✗" "$tool" "${REPORT_MSG:-failed; run again with -v to see why}"
+  elif [[ $REPORT_LEVEL == warn ]]; then
+    _report_add "!" "$tool" "$REPORT_MSG"
+  elif [[ $only_changed != true || $CHANGED == true ]]; then
+    if [[ $(_tool_installed "$tool") == true ]]; then
+      version="$(_tool_installed_version "$tool")"
+    elif [[ $DRY_RUN == true ]]; then
+      version="$(package_available_version "$(tool_package "$tool")")"
+    fi
+    if [[ $version == unknown ]]; then
+      version=""
+    fi
+    while IFS=$'\t' read -r src dest; do
+      text="${text:+$text$'\n'}$(_dest_shown "$dest")"
+    done < <(tool_links "$tool")
+    _report_add "✓" "$tool${version:+($version)}" "${text:-installed, nothing to link}"
+  fi
+  REPORT_TOOL=""
+}
+
 # Remove one tool's package (no question: unlink always removes it).
 # Returns 1 when removing failed, so the tool stays linked and enabled.
 _remove_package() {
@@ -1999,7 +2289,7 @@ _remove_package() {
     log warn "$tool: no package to remove here; if you installed it by hand, remove it the same way"
     return 0
   fi
-  if ! command -v "$cmd_name" >/dev/null 2>&1; then
+  if [[ $(_tool_installed "$tool") != true ]]; then
     log info "$tool: $cmd_name isn't installed; nothing to remove"
     return 0
   fi
@@ -2243,7 +2533,7 @@ _screen_packages() {
 _interactive_link() {
   _require_config
   # shellcheck disable=SC2046
-  _require_sudo $(manifest_tools)
+  _require_sudo link $(manifest_tools)
   _require_tty
   QUIET=true
   INTERACTIVE_FAILED=false
@@ -2258,7 +2548,7 @@ _interactive_link() {
 _interactive_unlink() {
   _require_config
   # shellcheck disable=SC2046
-  _require_sudo $(_enabled_tools)
+  _require_sudo unlink $(_enabled_tools)
   _require_tty
   QUIET=true
   local -a names=()
@@ -2377,7 +2667,7 @@ cmd_wipe() {
     fi
     _log_to_file "INFO" "wipe confirmed"
   fi
-  _require_sudo ${tools[@]+"${tools[@]}"}
+  _require_sudo unlink ${tools[@]+"${tools[@]}"}
 
   KEEP_ENABLED=true
   for tool in ${tools[@]+"${tools[@]}"}; do
@@ -2411,8 +2701,9 @@ cmd_wipe() {
 
 # Fetch, show what's coming in, then pull --rebase --autostash. A dry run
 # fetches (changes no files) and stops before pulling.
+PULLED=false   # update: the pull brought new commits
 _update_pull() {
-  local upstream output incoming
+  local upstream output incoming count
   if ! upstream="$(git -C "$DOTFILES" rev-parse --abbrev-ref '@{u}' 2>/dev/null)"; then
     log error "the current branch has no upstream to pull from; set one with: git -C \"$DOTFILES\" branch --set-upstream-to origin/<branch>"
     return 1
@@ -2437,6 +2728,7 @@ _update_pull() {
   while IFS= read -r output; do
     out "  $output"
   done <<<"$incoming"
+  count="$(grep -c '' <<<"$incoming")"
 
   if [[ $DRY_RUN == true ]]; then
     log info "dry run: the installs and links below use config.yaml as it is now; the pull may change it"
@@ -2445,8 +2737,12 @@ _update_pull() {
     log error "git pull failed. Check: git -C \"$DOTFILES\" status. If a rebase is in progress, fix the files, then git rebase --continue (or git rebase --abort to undo)."
     return 1
   fi
-  if [[ $DRY_RUN != true ]]; then
+  PULLED=true
+  if [[ $DRY_RUN == true ]]; then
+    _report_add "✓" "repo" "would pull $count commit(s) from $upstream"
+  else
     log success "repo: pulled from $upstream"
+    _report_add "✓" "repo($(git -C "$DOTFILES" rev-parse --short HEAD))" "pulled $count commit(s) from $upstream"
   fi
 }
 
@@ -2460,14 +2756,16 @@ cmd_update() {
     log error "$DOTFILES isn't a git repo; nothing to pull"
     exit 1
   fi
-  # shellcheck disable=SC2046
-  _require_sudo $(_enabled_tools)
+  _report_begin
   if ! _update_pull; then
     exit 1
   fi
+  # After the pull: the new commits decide whether a system file changes.
+  # shellcheck disable=SC2046
+  _require_sudo link $(_enabled_tools)
 
   # Install what's missing (no upgrades) and relink every enabled package.
-  local tool good="" bad=""
+  local tool bad=false
   TOOLS=()
   while IFS= read -r tool; do
     if [[ $(tool_enabled "$tool") == true ]]; then
@@ -2475,19 +2773,33 @@ cmd_update() {
     fi
   done < <(manifest_tools)
   if [[ ${#TOOLS[@]} -eq 0 ]]; then
-    log info "update: no package has enabled: true; nothing to install or link"
+    _report_end
+    printf 'update: no tool has enabled: true in config.yaml; nothing to install or link\n'
     return 0
   fi
+  local changed=$PULLED
   for tool in "${TOOLS[@]}"; do
     CHANGED=false
-    if ! _link_tool "$tool"; then
-      bad="${bad:+$bad, }$tool"
-    elif [[ $CHANGED == true ]]; then
-      good="${good:+$good, }$(_tool_with_version "$tool")"
+    if [[ $(tool_unused_here "$tool") == true ]]; then
+      log debug "$tool: not used on ${DOTFILES_OS:-this OS} (no package, nothing to link); skipped"
+      continue
+    fi
+    _report_start "$tool"
+    if _link_tool "$tool"; then
+      _report_tool "$tool" true true
+      if [[ $CHANGED == true ]]; then
+        changed=true
+      fi
+    else
+      _report_tool "$tool" false true
+      bad=true
     fi
   done
-  _summary "installed or linked" "$good" "$bad"
-  if [[ -n $bad ]]; then
+  _report_end
+  if [[ $changed != true && $bad != true ]]; then
+    printf '✓ dotfiles: everything is up to date\n'
+  fi
+  if [[ $bad == true ]]; then
     exit 1
   fi
 }
@@ -2972,15 +3284,13 @@ _doctor_tool() {
 
   # A missing manager name falls back to the key, so an empty package here
   # is a deliberate none: the tool is linked, nothing is installed.
-  local unused=false
-  if [[ -z $package && -z $manual ]]; then
-    if [[ -n $(tool_links "$tool") ]]; then
-      log info "$tool: not available on ${PKG_MANAGER:-this OS} (none); links only"
-      DOCTOR_LINKS_ONLY=$((DOCTOR_LINKS_ONLY + 1))
-    else
-      log info "$tool: not used on ${DOTFILES_OS:-this OS} (no package, nothing to link)"
-      unused=true
-    fi
+  local unused
+  unused="$(tool_unused_here "$tool")"
+  if [[ $unused == true ]]; then
+    log info "$tool: not used on ${DOTFILES_OS:-this OS} (no package, nothing to link)"
+  elif [[ -z $package && -z $manual ]]; then
+    log info "$tool: not available on ${PKG_MANAGER:-this OS} (none); links only"
+    DOCTOR_LINKS_ONLY=$((DOCTOR_LINKS_ONLY + 1))
   fi
   while IFS=$'\t' read -r src dest; do
     count=$((count + 1))
