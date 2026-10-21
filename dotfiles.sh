@@ -1091,9 +1091,27 @@ _tool_version() {
   fi
 }
 
-# "true" when the tool's command is on PATH.
+# Where an installed tool was found: its command's path, else the package
+# manager's record ("brew package 1password"). Apps like the 1Password
+# desktop app have no command on PATH, but the package manager knows them.
+# Returns 1 when neither finds it.
+_tool_location() {
+  local tool="$1" path package
+  if path="$(command -v "$(tool_command "$tool")" 2>/dev/null)"; then
+    echo "$path"
+    return 0
+  fi
+  package="$(tool_package "$tool")"
+  if [[ -n $package ]] && package_version "$package" >/dev/null; then
+    echo "$PKG_MANAGER package $package"
+    return 0
+  fi
+  return 1
+}
+
+# "true" when the tool is installed (_tool_location finds it).
 _tool_installed() {
-  if command -v "$(tool_command "$1")" >/dev/null 2>&1; then
+  if _tool_location "$1" >/dev/null; then
     echo true
   else
     echo false
@@ -1196,7 +1214,7 @@ _status_tool() {
   fi
   out "  command:    $command"
   if [[ $installed == true ]]; then
-    out "  installed:  $(command -v "$command")"
+    out "  installed:  $(_tool_location "$tool")"
     out "  version:    $(_tool_installed_version "$tool")"
   else
     out "  installed:  no"
@@ -1934,7 +1952,7 @@ _install_package() {
   cmd_name="$(tool_command "$tool")"
   package="$(tool_package "$tool")"
 
-  if path="$(command -v "$cmd_name" 2>/dev/null)"; then
+  if path="$(_tool_location "$tool")"; then
     log success "$tool: already installed: $path ($(_tool_installed_version "$tool"))"
     return 0
   fi
@@ -1954,7 +1972,7 @@ _install_package() {
     return 0
   fi
   hash -r
-  if ! path="$(command -v "$cmd_name" 2>/dev/null)"; then
+  if ! path="$(_tool_location "$tool")"; then
     log error "$tool: $package installed, but $cmd_name still isn't on PATH"
     return 1
   fi
@@ -1999,7 +2017,7 @@ _remove_package() {
     log warn "$tool: no package to remove here; if you installed it by hand, remove it the same way"
     return 0
   fi
-  if ! command -v "$cmd_name" >/dev/null 2>&1; then
+  if [[ $(_tool_installed "$tool") != true ]]; then
     log info "$tool: $cmd_name isn't installed; nothing to remove"
     return 0
   fi
