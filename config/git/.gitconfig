@@ -2,8 +2,6 @@
 	name = Pavel Sanchez
 	email = 23495830+PaleBluDot@users.noreply.github.com
   signingkey = key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF7jEwz0kG5lG5VzA6c958an7bgbt+UBFgTMwi+GILqV
-  # No signingkey here: each machine's public key is ~/.ssh/<hostname>.pub,
-	# and 1Password signs with the matching private key.
 [init]
 	defaultBranch = main
 [filter "lfs"]
