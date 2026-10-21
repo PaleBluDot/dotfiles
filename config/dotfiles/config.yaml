@@ -14,7 +14,8 @@ default: []
 # brew, winget) where its package name differs from the key; "none" = not there.
 #   command:  only when the command isn't the key (can also be per manager)
 #   manual:   no package manager installs it; this message says how
-#   links:    src is a path under config/, dest a path under $HOME;
+#   links:    src is a path under config/, dest a path under $HOME (none =
+#             install only);
 #             add windows:/macos:/linux: when that OS needs another dest
 #   enabled:  written by link (true) and unlink (false)
 #   locked:   true = unlink removes the links but never the package
