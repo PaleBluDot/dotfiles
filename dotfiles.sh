@@ -1049,6 +1049,9 @@ Flags (work anywhere on the line):
   --force               no questions, no backups (link, update, interactive)
   Short flags combine: -dv
 
+Every command but help starts with a "dotfiles" banner on a terminal at
+least 84 columns wide. NO_COLOR=1 shows it without colour.
+
 Files:
   config:  ${DOTFILES_CONFIG:-<not found>}
   log:     ${LOG_FILE:-<not available>}
@@ -3396,6 +3399,47 @@ cmd_doctor() {
 # MAIN
 # ════════════════════════════════════════════════════════════════════════
 
+# ─── Banner ─────────────────────────────────────────────────────────────
+# "dotfiles" in figlet's fraktur font, drawn once and kept here so a new
+# machine shows it before figlet is installed. ANSI cyan, like fastfetch's
+# Arch logo: the terminal's theme decides the actual colour. Only on a
+# terminal at least 84 columns wide (no banner in pipes, logs or narrow
+# windows); NO_COLOR=1 shows it without colour.
+_banner() {
+  if [[ ! -t 1 ]]; then
+    return 0
+  fi
+  local cols="${COLUMNS:-}" art
+  if [[ -z $cols ]]; then
+    cols="$(tput cols 2>/dev/null)" || cols=80
+  fi
+  if [[ $cols -lt 84 ]]; then
+    return 0
+  fi
+  IFS= read -r -d '' art <<'EOF' || true
+   ..                        s                 .          ..               .x+=:.
+ dF                         :8       oec :    @88>  x .d88"               z`    ^%
+'88bu.             u.      .88      @88888    %8P    5888R                   .   <k
+'*88888bu    ...ue888b    :888ooo   8"*88%     .     '888R        .u       .@8Ned8"
+  ^"*8888N   888R Y888r -*8888888   8b.      .@88u    888R     ud8888.   .@^%8888"
+ beWE "888L  888R I888>   8888     u888888> ''888E`   888R   :888'8888. x88:  `)8b.
+ 888E  888E  888R I888>   8888      8888R     888E    888R   d888 '88%" 8888N=*8888
+ 888E  888E  888R I888>   8888      8888P     888E    888R   8888.+"     %8"    R88
+ 888E  888F u8888cJ888   .8888Lu=   *888>     888E    888R   8888L        @8Wou 9%
+.888N..888   "*888*P"    ^%888*     4888      888&   .888B . '8888c. .+ .888888P`
+ `"888*""      'Y"         'Y"      '888      R888"  ^*888%   "88888%   `   ^"F
+    ""                               88R       ""      "%       "YP'
+                                     88>
+                                     48
+                                     '8
+EOF
+  if [[ -n ${NO_COLOR:-} ]]; then
+    printf '%s\n' "$art"
+  else
+    printf '\033[1;36m%s\033[0m\n' "$art"
+  fi
+}
+
 main() {
   ORIG_ARGS=("$@")
   # No need to start dotfiles with sudo: it asks for sudo itself when a
@@ -3439,6 +3483,10 @@ main() {
   # From curl | bash there is no file on disk: clone first (plan Section 2).
   if [[ $RUNNING_FROM_FILE != true ]]; then
     _bootstrap
+  fi
+  # After _bootstrap: a first run from curl | bash shows it once, from the clone.
+  if [[ $cmd != help ]]; then
+    _banner
   fi
   if [[ ${DOTFILES_FIRST_RUN:-} == 1 ]]; then
     _first_run_setup
