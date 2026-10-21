@@ -1045,6 +1045,15 @@ _render_copy() {
 #   differs  something else is there (changed by hand, or a symlink)
 #   folder   a folder is in the way
 #   missing  nothing at dest
+# SHA-256 of stdin, hex only. sha256sum (Linux) or shasum (macOS).
+_sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | cut -d' ' -f1
+  else
+    shasum -a 256 | cut -d' ' -f1
+  fi
+}
+
 _copy_state() {
   local src_path="$1" dest_path="$2"
   if [[ -d $dest_path && ! -L $dest_path ]]; then
@@ -1366,19 +1375,52 @@ set_enabled() {
 }
 
 # Tools to act on: the ones named, or every tool with enabled: true.
+# "true" when linking (link) or unlinking (unlink) a tool would change a
+# system file: for link, a copy is missing or differs, or its unit isn't
+# enabled yet; for unlink, a copy is there to remove.
+_system_needs_root() {
+  local tool="$1" mode="$2" src dest state
+  while IFS=$'\t' read -r src dest; do
+    if [[ $(tool_link_copy "$tool" "$src") != true ]]; then
+      continue
+    fi
+    state="$(_copy_state "$(_src_path "$src")" "$dest")"
+    if [[ $mode == unlink ]]; then
+      if [[ $state != missing ]]; then
+        echo true
+        return 0
+      fi
+    elif [[ $state != copied ]]; then
+      echo true
+      return 0
+    elif [[ $dest == /etc/systemd/* && $(tool_link_enable "$tool" "$src") == true ]] &&
+      command -v systemctl >/dev/null 2>&1 &&
+      ! systemctl is-enabled --quiet "$(basename "$dest")" 2>/dev/null; then
+      echo true
+      return 0
+    fi
+  done < <(tool_links "$tool")
+  echo false
+}
+
 # Sets TOOLS. Unknown names stop the run before anything changes.
 TOOLS=()
 # Tools with system files (copy: true links) need root for them. Before
 # changing anything, ask for the sudo password (sudo -v); refused = stop,
 # nothing changed. Later sudo calls in this run don't ask again. A dry run
 # changes nothing, so it doesn't ask.
+# Only tools whose system files would actually change count: a link run
+# where every copy is already in place (and its unit enabled) doesn't ask,
+# so update can run from a shell's startup file without a password prompt.
+#   _require_sudo link|unlink <tool...>
 _require_sudo() {
-  local tool need=""
+  local mode="$1" tool need=""
+  shift
   if [[ $DRY_RUN == true || $EUID -eq 0 ]]; then
     return 0
   fi
   for tool in "$@"; do
-    if [[ $(tool_has_system "$tool") == true ]]; then
+    if [[ $(_system_needs_root "$tool" "$mode") == true ]]; then
       need="${need:+$need, }$tool"
     fi
   done
@@ -1618,12 +1660,23 @@ _uncopy_path() {
 # to dest, outside the repo, owner-only. The result is written next to dest
 # and renamed into place, so an old symlink is replaced, never written
 # through (that would put the real values into the repo).
+#
+# The header records the source's SHA-256. When it still matches, the file
+# is left alone without calling op (no 1Password unlock prompt on every
+# update); --force fills it in again anyway, for values changed in 1Password.
 _inject_path() {
   local tool="$1" src_path="$2" dest="$3"
-  local dest_path="$HOME/$3" shown="~/$3" tmp err
+  local dest_path="$HOME/$3" shown="~/$3" tmp err src_hash
+  local first="# GENERATED FILE: do not edit. Changes here are overwritten."
   if [[ ! -f $src_path ]]; then
     log error "$tool: source ${src_path#"$DOTFILES"/} doesn't exist"
     return 1
+  fi
+  src_hash="$(_sha256 <"$src_path")"
+  if [[ $FORCE != true && -f $dest_path && ! -L $dest_path && $(head -n 1 "$dest_path") == "$first" ]] &&
+    head -n 5 "$dest_path" | grep -qxF "# Source-SHA256: $src_hash"; then
+    log success "$tool: already up to date: $shown (source unchanged; --force fills it in from 1Password again)"
+    return 0
   fi
   if ! command -v op >/dev/null 2>&1; then
     log warn "$tool: $shown needs the 1Password CLI (op) to fill in its op:// references; skipped"
@@ -1653,11 +1706,11 @@ _inject_path() {
   fi
   chmod 600 "$tmp"
 
-  # Up to date = same content under the 4-line header (the header's time is
-  # when the content last changed, so it isn't compared).
-  local first="# GENERATED FILE: do not edit. Changes here are overwritten."
+  # Up to date = same content and source under the 5-line header (the
+  # header's time is when the content last changed, so it isn't compared).
   if [[ -f $dest_path && ! -L $dest_path && $(head -n 1 "$dest_path") == "$first" ]] &&
-    tail -n +5 "$dest_path" | cmp -s - "$tmp"; then
+    head -n 5 "$dest_path" | grep -qxF "# Source-SHA256: $src_hash" &&
+    tail -n +6 "$dest_path" | cmp -s - "$tmp"; then
     rm -f "$tmp"
     CHANGED=false
     log success "$tool: already up to date: $shown (filled in from 1Password)"
@@ -1669,6 +1722,7 @@ _inject_path() {
   {
     printf '%s\n' "$first" \
       "# Source: $(_tilde "$src_path") (op:// references filled in by op inject)" \
+      "# Source-SHA256: $src_hash" \
       "# Edit the source, then run: dotfiles link $tool" \
       "# Generated: $(_timestamp)"
     cat "$tmp"
@@ -1839,7 +1893,7 @@ _link_configs() {
 cmd_link() {
   _require_config
   _pick_tools link "$@"
-  _require_sudo ${TOOLS[@]+"${TOOLS[@]}"}
+  _require_sudo link ${TOOLS[@]+"${TOOLS[@]}"}
   local tool good="" bad="" manual=""
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
     CHANGED=false
@@ -1940,7 +1994,7 @@ cmd_unlink() {
   fi
   _require_config
   _pick_tools unlink "$@"
-  _require_sudo ${TOOLS[@]+"${TOOLS[@]}"}
+  _require_sudo unlink ${TOOLS[@]+"${TOOLS[@]}"}
   local tool good="" bad=""
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
     CHANGED=false
@@ -2276,7 +2330,7 @@ _screen_packages() {
 _interactive_link() {
   _require_config
   # shellcheck disable=SC2046
-  _require_sudo $(manifest_tools)
+  _require_sudo link $(manifest_tools)
   _require_tty
   QUIET=true
   INTERACTIVE_FAILED=false
@@ -2291,7 +2345,7 @@ _interactive_link() {
 _interactive_unlink() {
   _require_config
   # shellcheck disable=SC2046
-  _require_sudo $(_enabled_tools)
+  _require_sudo unlink $(_enabled_tools)
   _require_tty
   QUIET=true
   local -a names=()
@@ -2410,7 +2464,7 @@ cmd_wipe() {
     fi
     _log_to_file "INFO" "wipe confirmed"
   fi
-  _require_sudo ${tools[@]+"${tools[@]}"}
+  _require_sudo unlink ${tools[@]+"${tools[@]}"}
 
   KEEP_ENABLED=true
   for tool in ${tools[@]+"${tools[@]}"}; do
@@ -2493,11 +2547,12 @@ cmd_update() {
     log error "$DOTFILES isn't a git repo; nothing to pull"
     exit 1
   fi
-  # shellcheck disable=SC2046
-  _require_sudo $(_enabled_tools)
   if ! _update_pull; then
     exit 1
   fi
+  # After the pull: the new commits decide whether a system file changes.
+  # shellcheck disable=SC2046
+  _require_sudo link $(_enabled_tools)
 
   # Install what's missing (no upgrades) and relink every enabled package.
   local tool good="" bad=""
