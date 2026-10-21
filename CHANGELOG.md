@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.2.0](https://github.com/PaleBluDot/dotfiles/compare/v2.1.7...v2.2.0) (2026-10-21)
+
+
+### Features
+
+* **script:** show a dotfiles banner ([#21](https://github.com/PaleBluDot/dotfiles/issues/21)) ([f5b4069](https://github.com/PaleBluDot/dotfiles/commit/f5b40691098fb691191930b6de4e0973d41d7319))
+
 ## [2.1.7](https://github.com/PaleBluDot/dotfiles/compare/v2.1.6...v2.1.7) (2026-10-21)
 
 
