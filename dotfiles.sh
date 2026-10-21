@@ -6,10 +6,6 @@
 set -euo pipefail
 set -o errtrace
 
-# ─── Metadata ───────────────────────────────────────────────────────────
-readonly DOTFILES_VERSION="2.0.0"
-export DOTFILES_VERSION
-
 # ─── First run (plan Section 2) ─────────────────────────────────────────
 # A bare machine's first run asks where to clone; this is only the suggested
 # answer. DOTFILES / DOTFILES_REPO / DOTFILES_BRANCH in the environment skip
@@ -1016,8 +1012,9 @@ EOF
       cat <<'EOF'
 dotfiles version
 
-Print the release this repo is at: its latest git tag (e.g. v2.1.7). Without
-the repo, the version written in the script.
+Print the release this repo is at: its latest git tag (e.g. v2.1.7), which
+the release workflow creates. Before the repo is cloned, the newest tag on
+GitHub; offline, "unknown".
 EOF
       ;;
     *)
@@ -1064,15 +1061,24 @@ More: dotfiles help <command>
 EOF
 }
 
-# The release this repo is at: the latest git tag (the release workflow
-# tags each version), e.g. v2.1.7. Without the repo or its tags, the
-# version written in this script.
+# The release this repo is at: the latest git tag, which the release
+# workflow creates for each version (e.g. v2.1.7). No version is written in
+# the script. Without a clone (curl | bash before cloning), the newest tag
+# on GitHub; offline, "unknown".
 _version() {
   local tag=""
-  if [[ -n ${DOTFILES:-} ]] && command -v git >/dev/null 2>&1; then
+  if ! command -v git >/dev/null 2>&1; then
+    echo "unknown"
+    return 0
+  fi
+  if [[ -n ${DOTFILES:-} ]]; then
     tag="$(git -C "$DOTFILES" describe --tags --abbrev=0 2>/dev/null)" || tag=""
   fi
-  echo "${tag:-v$DOTFILES_VERSION}"
+  if [[ -z $tag ]]; then
+    tag="$(git ls-remote --tags --refs --sort=-v:refname "${DOTFILES_REPO:-$DEFAULT_DOTFILES_REPO}" 'v*' 2>/dev/null |
+      head -n 1 | sed 's|.*refs/tags/||')" || tag=""
+  fi
+  echo "${tag:-unknown}"
 }
 
 cmd_version() {
@@ -3491,7 +3497,7 @@ main() {
     *) PATH="$HOME/.local/bin:$PATH" ;;
   esac
   init_log
-  _log_to_file "DEBUG" "──── run start: dotfiles.sh $DOTFILES_VERSION, args: $*"
+  _log_to_file "DEBUG" "──── run start: dotfiles.sh, args: $*"
 
   parse_args "$@"
   # "${ARGS[@]}" on an empty array is an "unbound variable" error in
