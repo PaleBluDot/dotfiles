@@ -28,6 +28,25 @@ default: []
 #   enable:   on a copied systemd unit: systemctl enable --now it
 #   os:       on a link: only use it on that OS (linux, macos, windows)
 packages:
+  1password:
+    enabled: true
+    locked: true
+    links:
+      - src: 1password
+        dest: .config/1Password
+
+  aerospace:
+    enabled: true
+    pacman: none
+    apt: none
+    dnf: none
+    brew: nikitabobko/tap/aerospace
+    winget: none
+    links:
+      - src: aerospace
+        dest: .config/aerospace
+        os: macos
+
   aether:
     enabled: true
     manual: "Not auto-installed. Install by hand: git clone https://github.com/omacom/aether.git && cd aether && make build"
@@ -269,8 +288,6 @@ packages:
       - src: omarchy
         dest: .config/omarchy
         os: linux
-      # Boot menu, disk-password screen and screensaver follow the theme and
-      # branding/settings.toml: the .path unit runs the apply script on change.
       - src: omarchy/system/surface-boot-theme-apply
         dest: /usr/local/sbin/surface-boot-theme-apply
         copy: true
