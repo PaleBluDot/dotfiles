@@ -14,7 +14,8 @@ default: []
 # brew, winget) where its package name differs from the key; "none" = not there.
 #   command:  only when the command isn't the key (can also be per manager)
 #   manual:   no package manager installs it; this message says how
-#   links:    src is a path under config/, dest a path under $HOME;
+#   links:    src is a path under config/, dest a path under $HOME (none =
+#             install only);
 #             add windows:/macos:/linux: when that OS needs another dest
 #   enabled:  written by link (true) and unlink (false)
 #   locked:   true = unlink removes the links but never the package
@@ -31,9 +32,6 @@ packages:
   1password:
     enabled: true
     locked: true
-    links:
-      - src: 1password
-        dest: .config/1Password
 
   aerospace:
     enabled: true
@@ -161,10 +159,31 @@ packages:
 
   gh:
     enabled: true
-    manual: "Installed by mise (see config/mise/config.toml)"
+    pacman: github-cli
+    winget: GitHub.cli
     links:
       - src: gh/config.yml
         dest: .config/gh/config.yml
+
+  gitlogue:
+    enabled: true
+    apt: none
+    dnf: none
+    winget: none
+    links:
+      - src: gitlogue/config.toml
+        dest: .config/gitlogue/config.toml
+
+  go:
+    enabled: true
+    apt: golang-go
+    dnf: golang
+    winget: GoLang.Go
+    links:
+      - src: go/env
+        dest: .config/go/env
+        macos: Library/Application Support/go/env
+        windows: AppData/Roaming/go/env
 
   gobuster:
     enabled: true
@@ -172,6 +191,15 @@ packages:
     links:
       - src: gobuster
         dest: .config/gobuster
+
+  herdr:
+    enabled: true
+    apt: none
+    dnf: none
+    winget: none
+    links:
+      - src: herdr/config.toml
+        dest: .config/herdr/config.toml
 
   hypr:
     enabled: true
@@ -208,6 +236,17 @@ packages:
       - src: komorebi
         dest: .config/komorebi
         os: windows
+
+  lazydocker:
+    enabled: true
+    apt: none
+    dnf: none
+    winget: JesseDuffield.Lazydocker
+    links:
+      - src: lazydocker/config.yml
+        dest: .config/lazydocker/config.yml
+        macos: Library/Application Support/jesseduffield/lazydocker/config.yml
+        windows: AppData/Roaming/jesseduffield/lazydocker/config.yml
 
   lazygit:
     enabled: true
@@ -272,10 +311,21 @@ packages:
 
   npm:
     enabled: true
-    manual: "Comes with Node.js, installed by mise"
+    brew: node
+    winget: OpenJS.NodeJS
     links:
       - src: npm
         dest: .config/npm
+
+  obsidian:
+    enabled: true
+    apt: none
+    dnf: none
+    winget: Obsidian.Obsidian
+    links:
+      - src: obsidian/user-flags.conf
+        dest: .config/obsidian/user-flags.conf
+        os: linux
 
   omarchy:
     enabled: true
@@ -301,6 +351,18 @@ packages:
         copy: true
         enable: true
         os: linux
+
+  op:
+    enabled: true
+    locked: true
+    pacman: 1password-cli
+    apt: none
+    dnf: none
+    brew: 1password-cli
+    winget: AgileBits.1Password.CLI
+    links:
+      - src: op/server.json
+        dest: .config/op/server.json
 
   ranger:
     enabled: true
@@ -356,6 +418,19 @@ packages:
       - src: tmux
         dest: .config/tmux
 
+  top:
+    enabled: true
+    locked: true
+    pacman: procps-ng
+    apt: procps
+    dnf: procps-ng
+    brew: none
+    winget: none
+    links:
+      - src: top/toprc
+        dest: .config/procps/toprc
+        os: linux
+
   vim:
     enabled: true
     dnf: vim-enhanced
@@ -372,11 +447,8 @@ packages:
     brew: visual-studio-code
     winget: Microsoft.VisualStudioCode
     command: code
-    links:
-      - src: vscode/settings.json
-        dest: .config/Code/User/settings.json
-        macos: Library/Application Support/Code/User/settings.json
-        windows: AppData/Roaming/Code/User/settings.json
+    # No links: settings, snippets and extensions come from VS Code Settings
+    # Sync (sign in, then Backup and Sync Settings).
 
   warp:
     enabled: true
@@ -405,6 +477,17 @@ packages:
     links:
       - src: xdg-terminals.list
         dest: .config/xdg-terminals.list
+        os: linux
+
+  yay:
+    enabled: true
+    apt: none
+    dnf: none
+    brew: none
+    winget: none
+    links:
+      - src: yay/config.json
+        dest: .config/yay/config.json
         os: linux
 
   yazi:

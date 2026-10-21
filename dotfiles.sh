@@ -2972,9 +2972,15 @@ _doctor_tool() {
 
   # A missing manager name falls back to the key, so an empty package here
   # is a deliberate none: the tool is linked, nothing is installed.
+  local unused=false
   if [[ -z $package && -z $manual ]]; then
-    log info "$tool: not available on ${PKG_MANAGER:-this OS} (none); links only"
-    DOCTOR_LINKS_ONLY=$((DOCTOR_LINKS_ONLY + 1))
+    if [[ -n $(tool_links "$tool") ]]; then
+      log info "$tool: not available on ${PKG_MANAGER:-this OS} (none); links only"
+      DOCTOR_LINKS_ONLY=$((DOCTOR_LINKS_ONLY + 1))
+    else
+      log info "$tool: not used on ${DOTFILES_OS:-this OS} (no package, nothing to link)"
+      unused=true
+    fi
   fi
   while IFS=$'\t' read -r src dest; do
     count=$((count + 1))
@@ -2998,9 +3004,14 @@ _doctor_tool() {
       fi
     fi
   done < <(tool_links "$tool")
-  if [[ $count -eq 0 ]]; then
-    log error "$tool: no links (every entry under packages: needs links)"
-    problems=$((problems + 1))
+  # No links is fine: an install-only tool (the app syncs its own settings),
+  # or a tool whose links are all for another OS.
+  if [[ $count -eq 0 && $unused == false ]]; then
+    if [[ $(_yq ".packages[\"$tool\"].links // [] | length") -gt 0 ]]; then
+      log info "$tool: nothing to link on ${DOTFILES_OS:-this OS}"
+    else
+      log info "$tool: install only, no links"
+    fi
   fi
   return "$problems"
 }

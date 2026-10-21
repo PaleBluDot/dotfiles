@@ -1,0 +1,7 @@
+# Go settings. "go env -w NAME=value" writes here too.
+# Paths (GOPATH, GOBIN, GOMODCACHE) must be absolute, so they're left at
+# their defaults instead of naming a home folder.
+# All settings: go help environment
+GOPROXY=https://proxy.golang.org,direct
+GOSUMDB=sum.golang.org
+GOTOOLCHAIN=auto
