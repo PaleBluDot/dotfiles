@@ -410,11 +410,8 @@ packages:
     brew: visual-studio-code
     winget: Microsoft.VisualStudioCode
     command: code
-    links:
-      - src: vscode/settings.json
-        dest: .config/Code/User/settings.json
-        macos: Library/Application Support/Code/User/settings.json
-        windows: AppData/Roaming/Code/User/settings.json
+    # No links: settings, snippets and extensions come from VS Code Settings
+    # Sync (sign in, then Backup and Sync Settings).
 
   warp:
     enabled: true
