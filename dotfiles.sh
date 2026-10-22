@@ -275,6 +275,7 @@ detect_os() {
 # ════════════════════════════════════════════════════════════════════════
 
 BACKUP_SUFFIX=".bak"
+THEME=""   # settings.theme: the theme machines without Omarchy use
 
 # Run one yq query against the config file.
 _yq() {
@@ -287,6 +288,7 @@ load_settings() {
     return 0
   fi
   local value
+  THEME="$(_yq '.settings.theme // ""' 2>/dev/null)" || THEME=""
   value="$(_yq '.settings.backup_suffix // ""' 2>/dev/null)" || value=""
   if [[ -n $value ]]; then
     BACKUP_SUFFIX="$value"
@@ -2168,6 +2170,98 @@ _link_configs() {
   [[ $ok == true ]]
 }
 
+# ─── Theme templates on machines without Omarchy ────────────────────────
+# Omarchy renders config/omarchy/themed/*.tpl on every theme change and runs
+# the theme-set hooks. Elsewhere (macOS, Windows, other Linux), link and
+# update do the same for settings.theme: fill each template from that
+# theme's colors.toml (in the repo) into the same folder Omarchy uses, so
+# every config points at one place, then run the dotfiles theme hook. Only
+# when the theme, its colours or a template changed.
+THEME_STATE_DIR="$HOME/.local/state/omarchy/current/theme"
+THEME_CHANGED=false
+_render_theme() {
+  THEME_CHANGED=false
+  # Omarchy records its current theme here (dotfiles never writes it).
+  if [[ -f $HOME/.local/state/omarchy/current/theme.name ]]; then
+    log debug "theme: Omarchy renders the theme here; settings.theme is ignored"
+    return 0
+  fi
+  if [[ -z $THEME ]]; then
+    log debug "theme: no settings.theme in config.yaml; nothing to render"
+    return 0
+  fi
+  local colors="$DOTFILES/config/omarchy/themes/$THEME/colors.toml"
+  local themed="$DOTFILES/config/omarchy/themed"
+  if [[ ! -f $colors ]]; then
+    log warn "theme: settings.theme is $THEME, but config/omarchy/themes/$THEME/colors.toml doesn't exist"
+    return 0
+  fi
+  local stamp tpl
+  stamp="$( { echo "$THEME"; cat "$colors"; for tpl in "$themed"/*.tpl; do [[ -f $tpl ]] && cat "$tpl"; done; } | _sha256)"
+  if [[ -f $THEME_STATE_DIR/.dotfiles-stamp && $(<"$THEME_STATE_DIR/.dotfiles-stamp") == "$stamp" ]]; then
+    log debug "theme: $THEME already rendered"
+    return 0
+  fi
+  if [[ $DRY_RUN == true ]]; then
+    log info "dry run, would render the theme templates for $THEME and run the theme hook"
+    THEME_CHANGED=true
+    return 0
+  fi
+
+  # key = "#rrggbb" lines; selection_* get Omarchy's defaults when missing.
+  local -a keys=() values=()
+  local key value line
+  while IFS= read -r line; do
+    if [[ $line =~ ^([a-z_0-9]+)[[:space:]]*=[[:space:]]*\"(#[0-9a-fA-F]{6})\" ]]; then
+      keys+=("${BASH_REMATCH[1]}")
+      values+=("${BASH_REMATCH[2]}")
+    fi
+  done <"$colors"
+  _theme_value() {
+    local i
+    for ((i = 0; i < ${#keys[@]}; i++)); do
+      if [[ ${keys[i]} == "$1" ]]; then
+        echo "${values[i]}"
+        return 0
+      fi
+    done
+    return 1
+  }
+  if ! _theme_value selection_background >/dev/null && value="$(_theme_value selection)"; then
+    keys+=(selection_background); values+=("$value")
+  fi
+  if ! _theme_value selection_foreground >/dev/null && value="$(_theme_value bright_foreground)"; then
+    keys+=(selection_foreground); values+=("$value")
+  fi
+
+  mkdir -p "$THEME_STATE_DIR"
+  cp "$colors" "$THEME_STATE_DIR/colors.toml"
+  local content out count=0 i hex r g b
+  for tpl in "$themed"/*.tpl; do
+    [[ -f $tpl ]] || continue
+    content="$(<"$tpl")"
+    for ((i = 0; i < ${#keys[@]}; i++)); do
+      hex="${values[i]#\#}"
+      r=$((16#${hex:0:2})); g=$((16#${hex:2:2})); b=$((16#${hex:4:2}))
+      content="${content//"{{ ${keys[i]}_strip }}"/$hex}"
+      content="${content//"{{ ${keys[i]}_rgb }}"/$r,$g,$b}"
+      content="${content//"{{ ${keys[i]} }}"/${values[i]}}"
+    done
+    out="$THEME_STATE_DIR/$(basename "$tpl" .tpl)"
+    printf '%s\n' "$content" >"$out"
+    if grep -q '{{ ' "$out"; then
+      log warn "theme: $(basename "$tpl") uses a colour $THEME doesn't define: $(grep -o '{{ [a-z_0-9]* }}' "$out" | sort -u | tr '\n' ' ')"
+    fi
+    count=$((count + 1))
+  done
+  if [[ -x $DOTFILES/config/omarchy/hooks/theme-set.d/60-dotfiles-theme ]]; then
+    bash "$DOTFILES/config/omarchy/hooks/theme-set.d/60-dotfiles-theme" "$THEME"
+  fi
+  printf '%s\n' "$stamp" >"$THEME_STATE_DIR/.dotfiles-stamp"
+  THEME_CHANGED=true
+  log success "theme: rendered $count templates for $THEME"
+}
+
 # link [tool...]: install each tool's package if it's missing, link its
 # configs, set enabled: true. No tool = every enabled tool.
 cmd_link() {
@@ -2189,6 +2283,7 @@ cmd_link() {
       good="${good:+$good, }$(_tool_with_version "$tool")"
     fi
   done
+  _render_theme
   _summary linked "$good" "$bad"
   if [[ -n $manual && ${#TOOLS[@]} -gt 1 ]]; then
     out "  install by hand: $manual"
@@ -2895,6 +2990,10 @@ cmd_update() {
       good="${good:+$good, }$(_tool_with_version "$tool")"
     fi
   done
+  _render_theme
+  if [[ $THEME_CHANGED == true ]]; then
+    changed=true
+  fi
   _summary "installed or linked" "$good" "$bad"
   if [[ $changed != true && -z $bad ]]; then
     log info "update: nothing to change"
