@@ -1,0 +1,45 @@
+{
+  "name": "Tails Night",
+  "palette": {
+    "colors": [
+      "#1c1206",
+      "#d9771a",
+      "#e0a040",
+      "#ffc86b",
+      "#c7802a",
+      "#f0b060",
+      "#ffd99a",
+      "#ffe8c8",
+      "#6b4a24",
+      "#f09540",
+      "#f5bd66",
+      "#ffdca0",
+      "#e89a45",
+      "#ffc888",
+      "#ffecc4",
+      "#fff6e8"
+    ],
+    "mode": "dark",
+    "extendedColors": {
+      "accent": "#ff9f1c",
+      "bright_fg": "#fff6e8",
+      "brown": "#6e4a22",
+      "cursor": "#fff6e8",
+      "dark_bg": "#140d04",
+      "dark_fg": "#b07a38",
+      "darker_bg": "#0c0802",
+      "light_fg": "#f5d4a6",
+      "lighter_bg": "#2e1f0c",
+      "muted": "#6b4a24",
+      "orange": "#ff9f1c",
+      "selection": "#5c3a10",
+      "selection_background": "#5c3a10"
+    },
+    "nativeColors": {
+      "active_border_color": "#ff9f1c",
+      "active_tab_background": "#ff9f1c"
+    }
+  },
+  "settings": {},
+  "timestamp": 1792639320429
+}

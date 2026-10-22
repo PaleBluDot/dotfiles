@@ -1,0 +1,45 @@
+{
+  "name": "Sonic Night",
+  "palette": {
+    "colors": [
+      "#0a1230",
+      "#3d5fd1",
+      "#4a7dff",
+      "#8fb0ff",
+      "#2f6bff",
+      "#7596f0",
+      "#a9c4ff",
+      "#d4e0ff",
+      "#2a3f7a",
+      "#6384ea",
+      "#7aa0ff",
+      "#b8cdff",
+      "#5a8cff",
+      "#a2b8f5",
+      "#d0e0ff",
+      "#f0f5ff"
+    ],
+    "mode": "dark",
+    "extendedColors": {
+      "accent": "#2f6bff",
+      "bright_fg": "#f0f5ff",
+      "brown": "#34487f",
+      "cursor": "#f0f5ff",
+      "dark_bg": "#070d24",
+      "dark_fg": "#4a68c2",
+      "darker_bg": "#040818",
+      "light_fg": "#b8cbff",
+      "lighter_bg": "#13204d",
+      "muted": "#2a3f7a",
+      "orange": "#6a90ff",
+      "selection": "#1c3380",
+      "selection_background": "#1c3380"
+    },
+    "nativeColors": {
+      "active_border_color": "#2f6bff",
+      "active_tab_background": "#2f6bff"
+    }
+  },
+  "settings": {},
+  "timestamp": 1792639384662
+}
