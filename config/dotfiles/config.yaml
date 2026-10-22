@@ -67,8 +67,6 @@ packages:
     enabled: true
     manual: "Not auto-installed. Install by hand: git clone https://github.com/omacom/aether.git && cd aether && make build"
     links:
-      - src: aether/aclu-theme.yaml
-        dest: .config/aether/aclu-theme.yaml
       # Blueprints: wallpaper paths in the repo are relative to it
       # (config/omarchy/...); fill writes copies with this machine's path.
       - src: aether/blueprints
