@@ -1,0 +1,60 @@
+{
+  "name": "Knuckles",
+  "palette": {
+    "colors": [
+      "#1c0808",
+      "#e0262e",
+      "#c94a48",
+      "#ff9a94",
+      "#b83036",
+      "#e8807c",
+      "#ffbcb8",
+      "#ffd8d6",
+      "#6b2a2a",
+      "#ff5a5f",
+      "#e27470",
+      "#ffc4c0",
+      "#e04a50",
+      "#f5a5a2",
+      "#ffdcda",
+      "#fff0ef"
+    ],
+    "wallpaper": "~/.config/omarchy/themes/knuckles-night/backgrounds/1-emerald-speed.png",
+    "extendedColors": {
+      "accent": "#e0262e",
+      "bright_fg": "#fff0ef",
+      "brown": "#6e2c2a",
+      "cursor": "#fff0ef",
+      "dark_bg": "#140505",
+      "dark_fg": "#b04a4a",
+      "darker_bg": "#0c0303",
+      "light_fg": "#f5bdbb",
+      "lighter_bg": "#2e0f0f",
+      "muted": "#6b2a2a",
+      "orange": "#f06a64",
+      "selection": "#5c1418",
+      "selection_background": "#5c1418",
+      "selection_foreground": "#1c0808"
+    },
+    "nativeColors": {
+      "active_border_color": "#e0262e",
+      "active_tab_background": "#e0262e"
+    }
+  },
+  "adjustments": {
+    "blackPoint": 0,
+    "brightness": 0,
+    "contrast": 0,
+    "gamma": 1,
+    "highlights": 0,
+    "hueShift": 0,
+    "saturation": 0,
+    "shadows": 0,
+    "temperature": 0,
+    "tint": 0,
+    "vibrance": 0,
+    "whitePoint": 0
+  },
+  "settings": {},
+  "timestamp": 1792636823951
+}
