@@ -1,27 +1,31 @@
 "$schema" = 'https://starship.rs/config-schema.json'
 
-# color scheme
-# yellow #cef542
-# blue #0a63c9
-# red #d40f51
-# organge #db490b
-# pink #c91e7a
-# purple #9a348e
-# green #417e37
-# aqua #06969a
-# teal #33658a
+# Colours are named (bg:os, bg:user…) and come from the palette at the
+# bottom of this file: one [palettes.<name>] per theme. Which one is used:
+# on Omarchy, the current theme's (dotfiles writes a copy of this file with
+# palette = "<theme>" to ~/.cache/starship/starship.toml on every theme
+# change; STARSHIP_CONFIG points there); elsewhere, settings.theme in
+# config.yaml (default starburst). Setting an Omarchy theme with no palette
+# here adds one, built from its colors.toml. Without the copy, palette below
+# is used.
+#
+# Palette keys: os (first segment), os_text (its text), user, directory,
+# git, language, docker, time, root (username when root).
+
+# Must stay above the first [table]: TOML would put it inside that table.
+palette = "starburst"
 
 format = """
-[](#cef542)\
+[](os)\
 $os\
-[](fg:#cef542 bg:#0a63c9)\
+[](fg:os bg:user)\
 $username\
-[](fg:#0a63c9 bg:#c91e7a)\
+[](fg:user bg:directory)\
 ${custom.directory}\
-[](fg:#c91e7a bg:#9a348e)\
+[](fg:directory bg:git)\
 $git_branch\
 $git_status\
-[](fg:#9a348e bg:#417e37)\
+[](fg:git bg:language)\
 $c\
 $elixir\
 $elm\
@@ -34,11 +38,11 @@ $nodejs\
 $nim\
 $rust\
 $scala\
-[](fg:#417e37 bg:#06969a)\
+[](fg:language bg:docker)\
 $docker_context\
-[](fg:#06969a bg:#33658a)\
+[](fg:docker bg:time)\
 $time\
-[ ](fg:#33658a)\
+[ ](fg:time)\
 """
 
 # Disable the blank line at the start of the prompt
@@ -47,7 +51,7 @@ $time\
 # An alternative to the username module which displays a symbol that
 # represents the current operating system
 [os]
-style = "bg:#cef542 fg:#151515"
+style = "bg:os fg:os_text"
 format = "[ $symbol $path ]($style)"
 disabled = false # Disabled by default
 
@@ -64,13 +68,13 @@ Windows = ""
 [username]
 show_always = true
 # symbol = ""
-style_user = "bg:#0a63c9"
-style_root = "bg:#db490b"
+style_user = "bg:user"
+style_root = "bg:root"
 format = '[ $user ]($style)'
 disabled = false
 
 [directory]
-style = "bold bg:#c91e7a"
+style = "bold bg:directory"
 # home_symbol = ""
 format = "[ 󰉋 $path ]($style)"
 truncation_length = 3
@@ -113,7 +117,7 @@ case "$PWD" in
     ;;
 esac
 '''
-style = "bold bg:#c91e7a"
+style = "bold bg:directory"
 format = "[ $output ]($style)"
 
 # Here is how you can shorten some long paths by text replacement
@@ -127,84 +131,140 @@ format = "[ $output ]($style)"
 
 [git_branch]
 symbol = "󰊢"
-style = "bold bg:#9a348e"
+style = "bold bg:git"
 format = '[ $symbol $branch ]($style)'
 
 [git_status]
-style = "bold bg:#9a348e"
+style = "bold bg:git"
 format = '[$all_status$ahead_behind ]($style)'
 
 [c]
 symbol = ""
-style = "bold bg:#417e37"
+style = "bold bg:language"
 format = '[ $symbol ($version) ]($style)'
 
 [cpp]
 symbol = ""
-style = "bold bg:#417e37"
+style = "bold bg:language"
 format = '[ $symbol ($version) ]($style)'
 
 [elixir]
 symbol = ""
-style = "bold bg:#417e37"
+style = "bold bg:language"
 format = '[ $symbol ($version) ]($style)'
 
 [elm]
 symbol = ""
-style = "bold bg:#417e37"
+style = "bold bg:language"
 format = '[ $symbol ($version) ]($style)'
 
 [golang]
 symbol = "󰟓"
-style = "bold bg:#417e37"
+style = "bold bg:language"
 format = '[ $symbol ($version) ]($style)'
 
 [gradle]
-style = "bold bg:#417e37"
+style = "bold bg:language"
 format = '[ $symbol ($version) ]($style)'
 
 [haskell]
 symbol = " "
-style = "bold bg:#417e37"
+style = "bold bg:language"
 format = '[ $symbol ($version) ]($style)'
 
 [java]
 symbol = " "
-style = "bold bg:#417e37"
+style = "bold bg:language"
 format = '[ $symbol ($version) ]($style)'
 
 [julia]
 symbol = " "
-style = "bold bg:#417e37"
+style = "bold bg:language"
 format = '[ $symbol ($version) ]($style)'
 
 [nodejs]
 symbol = "󰎙"
-style = "bold bg:#417e37"
+style = "bold bg:language"
 format = '[ $symbol ($version) ]($style)'
 
 [nim]
 symbol = "󰆥"
-style = "bold bg:#417e37"
+style = "bold bg:language"
 format = '[ $symbol ($version) ]($style)'
 
 [rust]
 symbol = ""
-style = " bold bg:#417e37"
+style = " bold bg:language"
 format = '[ $symbol ($version) ]($style)'
 
 [scala]
 symbol = " "
-style = "bold bg:#417e37"
+style = "bold bg:language"
 format = '[ $symbol ($version) ]($style)'
 
 [docker_context]
 symbol = "󰡨"
-style = "bold bg:#06969a"
+style = "bold bg:docker"
 format = '[ $symbol $context ]($style)'
 
 [time]
 disabled = true
 time_format = "%R"
-style = "bold bg:#33658a"
+style = "bold bg:time"
 format = '[  $time ]($style)'
+
+# ─── Palettes (palette = "<name>" at the top picks one) ──────────────────
+[palettes.starburst]
+os = "#cef542"
+os_text = "#151515"
+user = "#0a63c9"
+directory = "#c91e7a"
+git = "#9a348e"
+language = "#417e37"
+docker = "#06969a"
+time = "#33658a"
+root = "#db490b"
+
+[palettes.knuckles-night]
+os = "#e0262e"
+os_text = "#1c0808"
+user = "#b83036"
+directory = "#e8807c"
+git = "#e0262e"
+language = "#c94a48"
+docker = "#ffbcb8"
+time = "#e04a50"
+root = "#f06a64"
+
+[palettes.sonic-night]
+os = "#2f6bff"
+os_text = "#0a1230"
+user = "#2f6bff"
+directory = "#7596f0"
+git = "#3d5fd1"
+language = "#4a7dff"
+docker = "#a9c4ff"
+time = "#5a8cff"
+root = "#6a90ff"
+
+[palettes.tails-night]
+os = "#ff9f1c"
+os_text = "#1c1206"
+user = "#c7802a"
+directory = "#f0b060"
+git = "#d9771a"
+language = "#e0a040"
+docker = "#ffd99a"
+time = "#e89a45"
+root = "#ff9f1c"
+
+[palettes.aclu-brand]
+os = "#146cd2"
+os_text = "#1c1c1e"
+user = "#146cd2"
+directory = "#862dcb"
+git = "#d9192b"
+language = "#499764"
+docker = "#6cffff"
+time = "#146cd2"
+root = "#ff7d00"

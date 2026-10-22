@@ -5,6 +5,10 @@
 settings:
   # log_file: ~/.local/state/dotfiles/dotfiles.log
   # backup_suffix: .bak
+  # Theme for machines without Omarchy (a folder in config/omarchy/themes):
+  # link/update fill config/omarchy/themed/*.tpl from its colors.toml. On
+  # Omarchy the current theme is used instead.
+  theme: starburst
 
 # Installed by "dotfiles.sh default", nothing linked (for quick machines).
 # A name that is also under packages: uses that entry's package names.
@@ -29,6 +33,10 @@ default: []
 #             the file are filled in for you. Linking the tool needs sudo.
 #   enable:   on a copied systemd unit: systemctl enable --now it
 #   os:       on a link: only use it on that OS (linux, macos, windows)
+#   fill:     on a link to a folder of .json files: dest is a real folder of
+#             copies with every "config/..." path filled in as this machine's
+#             full repo path. Files saved in dest that the repo doesn't have
+#             are copied back (paths made relative again) for you to commit.
 packages:
   1password:
     enabled: true
@@ -59,8 +67,11 @@ packages:
     enabled: true
     manual: "Not auto-installed. Install by hand: git clone https://github.com/omacom/aether.git && cd aether && make build"
     links:
-      - src: aether
-        dest: .config/aether
+      # Blueprints: wallpaper paths in the repo are relative to it
+      # (config/omarchy/...); fill writes copies with this machine's path.
+      - src: aether/blueprints
+        dest: .config/aether/blueprints
+        fill: true
 
   bash:
     enabled: true

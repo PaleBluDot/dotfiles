@@ -275,6 +275,7 @@ detect_os() {
 # ════════════════════════════════════════════════════════════════════════
 
 BACKUP_SUFFIX=".bak"
+THEME="starburst"   # settings.theme: the theme machines without Omarchy use
 
 # Run one yq query against the config file.
 _yq() {
@@ -287,6 +288,8 @@ load_settings() {
     return 0
   fi
   local value
+  value="$(_yq '.settings.theme // ""' 2>/dev/null)" || value=""
+  THEME="${value:-$THEME}"
   value="$(_yq '.settings.backup_suffix // ""' 2>/dev/null)" || value=""
   if [[ -n $value ]]; then
     BACKUP_SUFFIX="$value"
@@ -315,7 +318,7 @@ load_settings() {
 #                           a list of package names is stored space-separated
 #   CFG_<id>_C_<key>        "=value" for a command: map entry
 #   CFG_<id>_CMAP           1 when command: is a map
-#   CFG_<id>_L              links: "src dest os linux macos windows copy inject enable"
+#   CFG_<id>_L              links: "src dest os linux macos windows copy inject enable fill"
 #   CFG_<id>_K              clones: "repo dest"
 # Records use the unit separator (\x1f) between fields: tabs would collapse
 # empty fields when read.
@@ -353,7 +356,7 @@ _cfg_load() {
     ( ($v // {} | to_entries | .[] | select((.value | tag) != "!!seq" and (.value | tag) != "!!map" and (.value | tag) != "!!null") | "S\t" + $t + "\t" + .key + "\t" + (.value | tostring)),
       ($v // {} | to_entries | .[] | select((.key == "pacman" or .key == "apt" or .key == "dnf" or .key == "brew" or .key == "winget") and (.value | tag) == "!!seq") | "S\t" + $t + "\t" + .key + "\t" + (.value | join(" "))),
       ($v.command // "" | select(tag == "!!map") | to_entries | .[] | "C\t" + $t + "\t" + .key + "\t" + (.value | tostring)),
-      ($v.links // [] | .[] | "L\t" + $t + "\t" + (.src // "") + "\t" + (.dest // "") + "\t" + (.os // "") + "\t" + (.linux // "") + "\t" + (.macos // "") + "\t" + (.windows // "") + "\t" + ((.copy // false) | tostring) + "\t" + ((.inject // false) | tostring) + "\t" + ((.enable // false) | tostring)),
+      ($v.links // [] | .[] | "L\t" + $t + "\t" + (.src // "") + "\t" + (.dest // "") + "\t" + (.os // "") + "\t" + (.linux // "") + "\t" + (.macos // "") + "\t" + (.windows // "") + "\t" + ((.copy // false) | tostring) + "\t" + ((.inject // false) | tostring) + "\t" + ((.enable // false) | tostring) + "\t" + ((.fill // false) | tostring)),
       ($v.clone // [] | .[] | "K\t" + $t + "\t" + (.repo // "") + "\t" + (.dest // "")),
       ("T\t" + $t) )' 2>/dev/null)" || return 0
   while IFS= read -r line; do
@@ -474,13 +477,14 @@ tool_links() {
 _link_flag() {
   _cfg_load
   _cfg_id "$1"
-  local var="CFG_${CFG_ID}_L" src dest os linux macos windows copy inject enable value=""
-  while IFS="$CFG_SEP" read -r src dest os linux macos windows copy inject enable; do
+  local var="CFG_${CFG_ID}_L" src dest os linux macos windows copy inject enable fill value=""
+  while IFS="$CFG_SEP" read -r src dest os linux macos windows copy inject enable fill; do
     if [[ -n $src && $src == "$2" ]]; then
       case "$3" in
         copy) value="$copy" ;;
         inject) value="$inject" ;;
         enable) value="$enable" ;;
+        fill) value="$fill" ;;
       esac
       break
     fi
@@ -552,6 +556,10 @@ tool_unused_here() {
 }
 
 tool_link_inject() { _link_flag "$1" "$2" inject; }
+
+# fill: true on a link to a folder of .json files: dest gets copies with the
+# repo-relative paths ("config/...") filled in as this machine's full path.
+tool_link_fill() { _link_flag "$1" "$2" fill; }
 
 # "true" or "false"; anything else counts as false.
 tool_enabled() {
@@ -1233,6 +1241,8 @@ _tool_link_state() {
   dest_path="$(_dest_path "$3")"
   if [[ $(tool_link_copy "$tool" "$src") == true ]]; then
     _copy_state "$(_src_path "$src")" "$dest_path"
+  elif [[ $(tool_link_fill "$tool" "$src") == true ]]; then
+    _fill_state "$(_src_path "$src")" "$dest_path"
   elif [[ $(tool_link_inject "$tool" "$src") != true ]]; then
     _link_state "$(_src_path "$src")" "$dest_path"
   elif [[ -L $dest_path ]]; then
@@ -1289,6 +1299,8 @@ _link_state_text() {
     copied)        echo "copied (root-owned)" ;;
     differs)       echo "differs from the repo; dotfiles link copies it again" ;;
     injected)      echo "filled in from 1Password" ;;
+    filled)        echo "copies with this machine's paths filled in" ;;
+    stale)         echo "copies out of date; dotfiles link writes them again" ;;
     symlink)       echo "still a symlink; dotfiles link fills it in from 1Password" ;;
     linked)        echo "linked" ;;
     linked-parent) echo "linked (through a linked parent folder)" ;;
@@ -1372,7 +1384,7 @@ _tool_linked() {
     state="$(_tool_link_state "$tool" "$src" "$dest")"
     log debug "$tool: ~/$dest is $state"
     case "$state" in
-      linked | linked-parent | injected | copied) ;;
+      linked | linked-parent | injected | copied | filled) ;;
       *) result=false ;;
     esac
   done < <(tool_links "$tool")
@@ -1476,13 +1488,15 @@ _status_tool() {
     out "    source:   config/$src"
     if [[ $(tool_link_copy "$tool" "$src") == true ]]; then
       out "    copy:     $dest  (root-owned)"
+    elif [[ $(tool_link_fill "$tool" "$src") == true ]]; then
+      out "    copies:   ~/$dest  (this machine's paths filled in)"
     elif [[ $(tool_link_inject "$tool" "$src") == true ]]; then
       out "    filled:   ~/$dest  (op inject)"
     else
       out "    symlink:  ~/$dest"
     fi
     case "$state" in
-      linked | linked-parent | injected | copied) ;;
+      linked | linked-parent | injected | copied | filled) ;;
       *) out "    problem:  $(_link_state_text "$state" "$(_dest_path "$dest")")" ;;
     esac
   done < <(tool_links "$tool")
@@ -1744,10 +1758,118 @@ _link_one() {
   elif [[ $dest == /* ]]; then
     log error "$tool: $dest is a system path; mark that link copy: true in config.yaml"
     return 1
+  elif [[ $(tool_link_fill "$tool" "$src") == true ]]; then
+    _fill_path "$tool" "$(_src_path "$src")" "$dest"
   elif [[ $(tool_link_inject "$tool" "$src") == true ]]; then
     _inject_path "$tool" "$(_src_path "$src")" "$dest"
   else
     _link_path "$tool" "$(_src_path "$src")" "$dest"
+  fi
+}
+
+# ─── fill: true (folders of .json copies with this machine's paths) ─────
+# The repo keeps paths relative to itself ("config/omarchy/..."), so the
+# same file works on every machine; the copies in dest get the full path
+# ("/home/<user>/.../dotfiles/config/omarchy/..."). Aether reads blueprint
+# wallpaper paths as written, and the repo stays clean.
+
+# A repo file as this machine's copy.
+_fill_render() {
+  sed "s|\"config/|\"$DOTFILES/config/|g" "$1"
+}
+
+# A copy saved by the app, as the repo keeps it: this repo's full path and
+# the ~/.config/omarchy link (where Omarchy's own files appear) made relative.
+_fill_unrender() {
+  sed -e "s|\"$DOTFILES/config/|\"config/|g" -e "s|\"$HOME/.config/omarchy/|\"config/omarchy/|g" "$1"
+}
+
+# filled (every repo file has its up-to-date copy), stale, folder (in the
+# way: not a folder), missing.
+_fill_state() {
+  local src_dir="$1" dest_dir="$2" file
+  if [[ -L $dest_dir || ( -e $dest_dir && ! -d $dest_dir ) ]]; then
+    echo "folder"
+    return 0
+  fi
+  if [[ ! -d $dest_dir ]]; then
+    echo "missing"
+    return 0
+  fi
+  for file in "$src_dir"/*.json; do
+    [[ -f $file ]] || continue
+    if [[ ! -f $dest_dir/$(basename "$file") ]] || ! _fill_render "$file" | cmp -s - "$dest_dir/$(basename "$file")"; then
+      echo "stale"
+      return 0
+    fi
+  done
+  echo "filled"
+}
+
+# Copy files the app saved in dest (and the repo doesn't have yet) back into
+# the repo, with paths made relative. They show up in git to commit.
+_fill_copy_back() {
+  local tool="$1" src_dir="$2" dest_dir="$3" file name
+  [[ -d $dest_dir && ! -L $dest_dir ]] || return 0
+  for file in "$dest_dir"/*.json; do
+    [[ -f $file ]] || continue
+    name="$(basename "$file")"
+    if [[ ! -e $src_dir/$name ]]; then
+      if [[ $DRY_RUN == true ]]; then
+        log info "dry run, would copy $(_tilde "$file") into the repo"
+      else
+        _fill_unrender "$file" >"$src_dir/$name"
+        log success "$tool: copied $name into the repo (new; commit it)"
+      fi
+      CHANGED=true
+    fi
+  done
+}
+
+_fill_path() {
+  local tool="$1" src_dir="$2" dest="$3"
+  local dest_dir shown file name tmp written=0
+  dest_dir="$(_dest_path "$dest")"
+  shown="$(_dest_shown "$dest")"
+  if [[ ! -d $src_dir ]]; then
+    log error "$tool: source ${src_dir#"$DOTFILES"/} isn't a folder (fill: true needs one)"
+    return 1
+  fi
+  if [[ $DRY_RUN == true && $'\n'$UNFOLDED == *$'\n'"$(dirname "$dest_dir")"$'\n'* ]]; then
+    log info "dry run, would write the copies in $shown with this machine's paths"
+    return 0
+  fi
+  if _inside_repo "$(dirname "$dest_dir")" || _inside_repo "$dest_dir"; then
+    log error "$tool: $shown is inside the repo; the copies would end up in git"
+    return 1
+  fi
+  if [[ -L $dest_dir || ( -e $dest_dir && ! -d $dest_dir ) ]]; then
+    log warn "$tool: $shown is a link or a file, not a folder; left it alone"
+    return 1
+  fi
+  _fill_copy_back "$tool" "$src_dir" "$dest_dir"
+  if [[ ! -d $dest_dir ]]; then
+    run_cmd mkdir -p "$dest_dir"
+  fi
+  for file in "$src_dir"/*.json; do
+    [[ -f $file ]] || continue
+    name="$(basename "$file")"
+    if [[ -f $dest_dir/$name ]] && _fill_render "$file" | cmp -s - "$dest_dir/$name"; then
+      continue
+    fi
+    CHANGED=true
+    written=$((written + 1))
+    if [[ $DRY_RUN == true ]]; then
+      log info "dry run, would write $shown/$name with this machine's paths"
+      continue
+    fi
+    tmp="$dest_dir/.$name.tmp"
+    _fill_render "$file" >"$tmp" && mv -f "$tmp" "$dest_dir/$name"
+  done
+  if [[ $written -eq 0 ]]; then
+    log success "$tool: already up to date: $shown (copies with this machine's paths)"
+  elif [[ $DRY_RUN != true ]]; then
+    log success "$tool: wrote $written file(s) in $shown with this machine's paths"
   fi
 }
 
@@ -2145,9 +2267,34 @@ _clone_one() {
   fi
 }
 
+# A tool that used to link its whole folder (~/.config/aether -> config/aether)
+# and now links parts of it: the old folder link is replaced by a real folder,
+# or the new links would land inside the repo.
+UNFOLDED=""   # dry run: folder links that would have been replaced
+_unfold_tool_link() {
+  local tool="$1" src dest parent target
+  while IFS=$'\t' read -r src dest; do
+    [[ $dest == /* || -z $dest ]] && continue
+    parent="$(dirname "$HOME/$dest")"
+    [[ $'\n'$UNFOLDED$'\n' == *$'\n'"$parent"$'\n'* ]] && continue
+    if [[ -L $parent ]]; then
+      target="$(_physical "$parent")"
+      if [[ $target == "$(_physical "$DOTFILES/config/$tool")" ]]; then
+        run_cmd rm "$parent"
+        run_cmd mkdir -p "$parent"
+        UNFOLDED+="$parent"$'\n'
+        if [[ $DRY_RUN != true ]]; then
+          log info "$tool: $(_tilde "$parent") linked the whole folder; it's a real folder now, with links and copies inside"
+        fi
+      fi
+    fi
+  done < <(tool_links "$tool")
+}
+
 # Link one tool and set enabled: true. Returns 1 when a link isn't in place.
 _link_configs() {
   local tool="$1" src dest repo ok=true
+  _unfold_tool_link "$tool"
   while IFS=$'\t' read -r src dest; do
     if ! _link_one "$tool" "$src" "$dest"; then
       ok=false
@@ -2166,6 +2313,98 @@ _link_configs() {
     ok=false
   fi
   [[ $ok == true ]]
+}
+
+# ─── Theme templates on machines without Omarchy ────────────────────────
+# Omarchy renders config/omarchy/themed/*.tpl on every theme change and runs
+# the theme-set hooks. Elsewhere (macOS, Windows, other Linux), link and
+# update do the same for settings.theme: fill each template from that
+# theme's colors.toml (in the repo) into the same folder Omarchy uses, so
+# every config points at one place, then run the dotfiles theme hook. Only
+# when the theme, its colours or a template changed.
+THEME_STATE_DIR="$HOME/.local/state/omarchy/current/theme"
+THEME_CHANGED=false
+_render_theme() {
+  THEME_CHANGED=false
+  # Omarchy records its current theme here (dotfiles never writes it).
+  if [[ -f $HOME/.local/state/omarchy/current/theme.name ]]; then
+    log debug "theme: Omarchy renders the theme here; settings.theme is ignored"
+    return 0
+  fi
+  if [[ -z $THEME ]]; then
+    log debug "theme: no settings.theme in config.yaml; nothing to render"
+    return 0
+  fi
+  local colors="$DOTFILES/config/omarchy/themes/$THEME/colors.toml"
+  local themed="$DOTFILES/config/omarchy/themed"
+  if [[ ! -f $colors ]]; then
+    log warn "theme: settings.theme is $THEME, but config/omarchy/themes/$THEME/colors.toml doesn't exist"
+    return 0
+  fi
+  local stamp tpl
+  stamp="$( { echo "$THEME"; cat "$colors"; for tpl in "$themed"/*.tpl; do [[ -f $tpl ]] && cat "$tpl"; done; } | _sha256)"
+  if [[ -f $THEME_STATE_DIR/.dotfiles-stamp && $(<"$THEME_STATE_DIR/.dotfiles-stamp") == "$stamp" ]]; then
+    log debug "theme: $THEME already rendered"
+    return 0
+  fi
+  if [[ $DRY_RUN == true ]]; then
+    log info "dry run, would render the theme templates for $THEME and run the theme hook"
+    THEME_CHANGED=true
+    return 0
+  fi
+
+  # key = "#rrggbb" lines; selection_* get Omarchy's defaults when missing.
+  local -a keys=() values=()
+  local key value line
+  while IFS= read -r line; do
+    if [[ $line =~ ^([a-z_0-9]+)[[:space:]]*=[[:space:]]*\"(#[0-9a-fA-F]{6})\" ]]; then
+      keys+=("${BASH_REMATCH[1]}")
+      values+=("${BASH_REMATCH[2]}")
+    fi
+  done <"$colors"
+  _theme_value() {
+    local i
+    for ((i = 0; i < ${#keys[@]}; i++)); do
+      if [[ ${keys[i]} == "$1" ]]; then
+        echo "${values[i]}"
+        return 0
+      fi
+    done
+    return 1
+  }
+  if ! _theme_value selection_background >/dev/null && value="$(_theme_value selection)"; then
+    keys+=(selection_background); values+=("$value")
+  fi
+  if ! _theme_value selection_foreground >/dev/null && value="$(_theme_value bright_foreground)"; then
+    keys+=(selection_foreground); values+=("$value")
+  fi
+
+  mkdir -p "$THEME_STATE_DIR"
+  cp "$colors" "$THEME_STATE_DIR/colors.toml"
+  local content out count=0 i hex r g b
+  for tpl in "$themed"/*.tpl; do
+    [[ -f $tpl ]] || continue
+    content="$(<"$tpl")"
+    for ((i = 0; i < ${#keys[@]}; i++)); do
+      hex="${values[i]#\#}"
+      r=$((16#${hex:0:2})); g=$((16#${hex:2:2})); b=$((16#${hex:4:2}))
+      content="${content//"{{ ${keys[i]}_strip }}"/$hex}"
+      content="${content//"{{ ${keys[i]}_rgb }}"/$r,$g,$b}"
+      content="${content//"{{ ${keys[i]} }}"/${values[i]}}"
+    done
+    out="$THEME_STATE_DIR/$(basename "$tpl" .tpl)"
+    printf '%s\n' "$content" >"$out"
+    if grep -q '{{ ' "$out"; then
+      log warn "theme: $(basename "$tpl") uses a colour $THEME doesn't define: $(grep -o '{{ [a-z_0-9]* }}' "$out" | sort -u | tr '\n' ' ')"
+    fi
+    count=$((count + 1))
+  done
+  if [[ -x $DOTFILES/config/omarchy/hooks/theme-set.d/60-dotfiles-theme ]]; then
+    bash "$DOTFILES/config/omarchy/hooks/theme-set.d/60-dotfiles-theme" "$THEME"
+  fi
+  printf '%s\n' "$stamp" >"$THEME_STATE_DIR/.dotfiles-stamp"
+  THEME_CHANGED=true
+  log success "theme: rendered $count templates for $THEME"
 }
 
 # link [tool...]: install each tool's package if it's missing, link its
@@ -2189,6 +2428,7 @@ cmd_link() {
       good="${good:+$good, }$(_tool_with_version "$tool")"
     fi
   done
+  _render_theme
   _summary linked "$good" "$bad"
   if [[ -n $manual && ${#TOOLS[@]} -gt 1 ]]; then
     out "  install by hand: $manual"
@@ -2204,6 +2444,10 @@ _unlink_one() {
   local src_path dest_path state shown
   if [[ $(tool_link_copy "$tool" "$src") == true ]]; then
     _uncopy_path "$tool" "$src" "$dest"
+    return
+  fi
+  if [[ $(tool_link_fill "$tool" "$src") == true ]]; then
+    _unfill_path "$tool" "$src" "$dest"
     return
   fi
   src_path="$(_src_path "$src")"
@@ -2241,6 +2485,27 @@ _unlink_one() {
       log warn "$tool: $shown isn't a link to the repo ($(_link_state_text "$state" "$dest_path")); left it alone"
       ;;
   esac
+}
+
+# Remove fill copies: new files the app saved go back to the repo first,
+# then the copies of the repo's files are removed (the folder too, if empty).
+_unfill_path() {
+  local tool="$1" src="$2" dest="$3" src_dir dest_dir file
+  src_dir="$(_src_path "$src")"
+  dest_dir="$(_dest_path "$dest")"
+  if [[ ! -d $dest_dir || -L $dest_dir ]]; then
+    log info "$tool: $(_dest_shown "$dest") isn't there; nothing to do"
+    return 0
+  fi
+  _fill_copy_back "$tool" "$src_dir" "$dest_dir"
+  for file in "$src_dir"/*.json; do
+    [[ -f $file && -f $dest_dir/$(basename "$file") ]] || continue
+    run_cmd rm "$dest_dir/$(basename "$file")"
+  done
+  if [[ $DRY_RUN != true ]]; then
+    rmdir "$dest_dir" 2>/dev/null || true
+    log success "$tool: removed the copies in $(_dest_shown "$dest")"
+  fi
 }
 
 # Unlink one tool and set enabled: false. Returns 1 on failure.
@@ -2895,6 +3160,10 @@ cmd_update() {
       good="${good:+$good, }$(_tool_with_version "$tool")"
     fi
   done
+  _render_theme
+  if [[ $THEME_CHANGED == true ]]; then
+    changed=true
+  fi
   _summary "installed or linked" "$good" "$bad"
   if [[ $changed != true && -z $bad ]]; then
     log info "update: nothing to change"

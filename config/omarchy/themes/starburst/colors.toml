@@ -1,0 +1,38 @@
+mode = "dark"
+
+# Starburst — from the Starburst Dark VS Code theme
+# (github.com/PaleBluDot/starburst-theme, psanchez.starburst-theme).
+# dark_background, darker_background and selection are derived (the editor
+# background is already near black; selection = foreground at 24%, as in VS Code).
+accent = "#eb5a47"
+selection = "#414141"
+muted = "#474c52"
+
+background = "#0d0d0d"
+dark_background = "#0a0a0a"
+darker_background = "#060606"
+lighter_background = "#191919"
+
+foreground = "#e6e6e6"
+dark_foreground = "#65737e"
+light_foreground = "#b2ccd6"
+bright_foreground = "#eeffff"
+
+active_border_color = "#eb5a47"
+active_tab_background = "#eb5a47"
+
+red = "#dd656d"
+yellow = "#d9df34"
+orange = "#bd7d4e"
+green = "#4ebd8f"
+cyan = "#5fb3b3"
+blue = "#0076a9"
+magenta = "#d37fac"
+brown = "#c17e70"
+
+bright_red = "#ff5370"
+bright_yellow = "#f5e93d"
+bright_green = "#4ebd8f"
+bright_cyan = "#89ddff"
+bright_blue = "#4e97bd"
+bright_magenta = "#c792ea"

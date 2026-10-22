@@ -1,0 +1,46 @@
+{
+  "name": "Starburst",
+  "palette": {
+    "colors": [
+      "#0d0d0d",
+      "#dd656d",
+      "#4ebd8f",
+      "#d9df34",
+      "#0076a9",
+      "#d37fac",
+      "#5fb3b3",
+      "#e6e6e6",
+      "#474c52",
+      "#ff5370",
+      "#4ebd8f",
+      "#f5e93d",
+      "#4e97bd",
+      "#c792ea",
+      "#89ddff",
+      "#eeffff"
+    ],
+    "mode": "dark",
+    "extendedColors": {
+      "accent": "#eb5a47",
+      "bright_fg": "#eeffff",
+      "brown": "#c17e70",
+      "cursor": "#eeffff",
+      "dark_bg": "#0a0a0a",
+      "dark_fg": "#65737e",
+      "darker_bg": "#060606",
+      "light_fg": "#b2ccd6",
+      "lighter_bg": "#191919",
+      "muted": "#474c52",
+      "orange": "#bd7d4e",
+      "selection": "#414141",
+      "selection_background": "#414141"
+    },
+    "nativeColors": {
+      "active_border_color": "#eb5a47",
+      "active_tab_background": "#eb5a47"
+    },
+    "wallpaper": "config/omarchy/themes/starburst/backgrounds/1-burst.png"
+  },
+  "settings": {},
+  "timestamp": 1792641693036
+}

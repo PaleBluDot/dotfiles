@@ -1,0 +1,36 @@
+mode = "dark"
+
+# ACLU Brand — from the ACLU Base16 scheme (was config/aether/aclu-theme.yaml).
+# Accent is ACLU blue. dark_background and darker_background are derived.
+accent = "#146cd2"
+selection = "#001e3d"
+muted = "#888888"
+
+background = "#1c1c1e"
+dark_background = "#161618"
+darker_background = "#101012"
+lighter_background = "#2c2c2e"
+
+foreground = "#f3f3f3"
+dark_foreground = "#696968"
+light_foreground = "#f7f9fd"
+bright_foreground = "#ffffff"
+
+active_border_color = "#146cd2"
+active_tab_background = "#146cd2"
+
+red = "#d9192b"
+yellow = "#fdc221"
+orange = "#ff7d00"
+green = "#499764"
+cyan = "#6cffff"
+blue = "#146cd2"
+magenta = "#862dcb"
+brown = "#3e020e"
+
+bright_red = "#d9192b"
+bright_yellow = "#fdc221"
+bright_green = "#499764"
+bright_cyan = "#6cffff"
+bright_blue = "#146cd2"
+bright_magenta = "#862dcb"

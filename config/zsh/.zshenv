@@ -28,7 +28,25 @@ export ZSH_CACHE_DIR="$XDG_CACHE_HOME/oh-my-zsh"
 _dotfiles_link="$XDG_CONFIG_HOME/dotfiles"
 [[ -L $_dotfiles_link ]] && export DOTFILES="${_dotfiles_link:A:h:h}"
 unset _dotfiles_link
-export STARSHIP_CONFIG="$HOME/.config/starship/starship.toml"
+# Starship: a copy of starship.toml with the current theme's palette picked
+# (the theme hook writes the palette's name to ~/.cache/starship/palette).
+# The copy is redone whenever starship.toml changes, so edits show at once.
+# No palette file (theme never set here) = the repo file as is.
+_starship_src="$HOME/.config/starship/starship.toml"
+_starship_copy="$XDG_CACHE_HOME/starship/starship.toml"
+if [[ -r $XDG_CACHE_HOME/starship/palette && -f $_starship_src ]]; then
+  if [[ ! -f $_starship_copy || $_starship_src -nt $_starship_copy ]]; then
+    sed "s/^palette = .*/palette = \"$(<$XDG_CACHE_HOME/starship/palette)\"/" "$_starship_src" >"$_starship_copy"
+  fi
+  export STARSHIP_CONFIG="$_starship_copy"
+else
+  export STARSHIP_CONFIG="$_starship_src"
+fi
+unset _starship_src _starship_copy
+
+# bat: the current theme's colours once the theme hook has installed them
+# as bat's "omarchy" theme; otherwise --theme in bat's config (knuckles).
+[[ -f $HOME/.config/bat/themes/omarchy.tmTheme ]] && export BAT_THEME="omarchy"
 
 # LANGUAGE RUNTIMES
 # Go and NVM directories
