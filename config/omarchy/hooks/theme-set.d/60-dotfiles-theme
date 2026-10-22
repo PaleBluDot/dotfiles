@@ -1,0 +1,64 @@
+#!/bin/bash
+# Omarchy theme-set hook (also run by dotfiles on machines without Omarchy,
+# after it renders the templates): point starship, bat and tmux at the new
+# theme. $1 = the theme's slug (sonic-night).
+#
+# Templates in ~/.config/omarchy/themed/ are already rendered into
+# ~/.local/state/omarchy/current/theme/ when this runs.
+
+theme="${1:-}"
+THEME_DIR="$HOME/.local/state/omarchy/current/theme"
+COLORS="$THEME_DIR/colors.toml"
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}"
+
+# One colour from colors.toml: key = "#rrggbb".
+color() {
+  awk -F'"' -v key="$1" '$0 ~ "^" key "[[:space:]]*=" { print $2; exit }' "$COLORS"
+}
+
+# ─── starship ────────────────────────────────────────────────────────────
+# ~/.config/starship/starship.toml (the repo file, through the link) has one
+# [palettes.<theme>] per theme. A theme without one gets it here, built from
+# its colors.toml (a repo change to commit). starship reads a copy with
+# palette = "<theme>"; .zshenv redoes the copy when starship.toml changes.
+starship_src="$HOME/.config/starship/starship.toml"
+if [[ -n $theme && -f $starship_src ]]; then
+  if [[ -f $COLORS ]] && ! grep -q "^\[palettes\.$theme\]" "$starship_src"; then
+    {
+      printf '\n[palettes.%s]\n' "$theme"
+      printf 'os = "%s"\n' "$(color accent)"
+      printf 'os_text = "%s"\n' "$(color background)"
+      printf 'user = "%s"\n' "$(color blue)"
+      printf 'directory = "%s"\n' "$(color magenta)"
+      printf 'git = "%s"\n' "$(color red)"
+      printf 'language = "%s"\n' "$(color green)"
+      printf 'docker = "%s"\n' "$(color cyan)"
+      printf 'time = "%s"\n' "$(color bright_blue)"
+      printf 'root = "%s"\n' "$(color orange)"
+    } >>"$starship_src"
+  fi
+  palette="starship"
+  if grep -q "^\[palettes\.$theme\]" "$starship_src"; then
+    palette="$theme"
+  fi
+  mkdir -p "$CACHE/starship"
+  printf '%s\n' "$palette" >"$CACHE/starship/palette"
+  sed "s/^palette = .*/palette = \"$palette\"/" "$starship_src" >"$CACHE/starship/starship.toml"
+fi
+
+# ─── bat ─────────────────────────────────────────────────────────────────
+# bat only reads themes from its own themes folder, after a cache rebuild.
+# The rendered theme is copied in as "omarchy" (gitignored in the repo).
+bat_cmd="$(command -v bat || command -v batcat)"
+if [[ -n $bat_cmd && -f $THEME_DIR/bat.tmTheme ]]; then
+  bat_themes="$("$bat_cmd" --config-dir)/themes"
+  mkdir -p "$bat_themes"
+  cp "$THEME_DIR/bat.tmTheme" "$bat_themes/omarchy.tmTheme"
+  "$bat_cmd" cache --build >/dev/null 2>&1 || true
+fi
+
+# ─── tmux ────────────────────────────────────────────────────────────────
+# A running tmux re-reads its config, which sources the rendered tmux.conf.
+if command -v tmux >/dev/null 2>&1 && tmux list-sessions >/dev/null 2>&1; then
+  tmux source-file "$HOME/.config/tmux/tmux.conf" >/dev/null 2>&1 || true
+fi
