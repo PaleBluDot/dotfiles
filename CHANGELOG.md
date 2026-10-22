@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.4.1](https://github.com/PaleBluDot/dotfiles/compare/v2.4.0...v2.4.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* **script:** speed up the interactive screens, status and doctor ([#42](https://github.com/PaleBluDot/dotfiles/issues/42)) ([eee035b](https://github.com/PaleBluDot/dotfiles/commit/eee035b2e17b1bc24e8614cd7dd517fe79861145)), closes [#41](https://github.com/PaleBluDot/dotfiles/issues/41)
+
 # [2.4.0](https://github.com/PaleBluDot/dotfiles/compare/v2.3.0...v2.4.0) (2026-10-22)
 
 
