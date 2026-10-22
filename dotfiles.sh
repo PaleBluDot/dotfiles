@@ -283,18 +283,21 @@ _yq() {
 }
 
 # Settings from the config, once it can be read. Unset = built-in default.
+# Also reads the whole config into the shell (_cfg_load) here, in the main
+# shell: a first read inside $(…) or < <(…) would be lost with the subshell.
 load_settings() {
   if [[ -z $DOTFILES_CONFIG || ! -f $DOTFILES_CONFIG ]] || ! command -v yq >/dev/null 2>&1; then
     return 0
   fi
+  _cfg_load
   local value
-  value="$(_yq '.settings.theme // ""' 2>/dev/null)" || value=""
+  value="$(_cfg_setting theme)"
   THEME="${value:-$THEME}"
-  value="$(_yq '.settings.backup_suffix // ""' 2>/dev/null)" || value=""
+  value="$(_cfg_setting backup_suffix)"
   if [[ -n $value ]]; then
     BACKUP_SUFFIX="$value"
   fi
-  value="$(_yq '.settings.log_file // ""' 2>/dev/null)" || value=""
+  value="$(_cfg_setting log_file)"
   # "~" in YAML is plain text; ${value/#\~/$HOME} turns a leading ~ into $HOME.
   value="${value/#\~/$HOME}"
   if [[ -n $value && $value != "$LOG_FILE" ]]; then
@@ -309,11 +312,15 @@ load_settings() {
 }
 
 # ─── config.yaml, read once per run ─────────────────────────────────────
-# Every packages: field the script needs comes out of one yq call and is
-# kept in shell variables, so asking for a tool's package or links costs
-# nothing (one yq call per question made update take ~17 s). set_enabled
-# updates the copy when it writes the file.
+# Every packages: field the script needs, settings: and default: come out
+# of one yq call and are kept in shell variables, so asking for a tool's
+# package or links costs nothing (one yq call per question made update take
+# ~17 s, and the interactive screens ~3 min). load_settings reads it in the
+# main shell, so every $(…) after that has the copy. set_enabled updates
+# the copy when it writes the file.
 #   CFG_TOOLS               tool names, in config.yaml order
+#   CFG_DEFAULT             default: names, one per line
+#   CFG_SET_<key>           "=value" for a settings: entry
 #   CFG_<id>_S_<field>      "=value" for a plain field (enabled, manual, brew…);
 #                           a list of package names is stored space-separated
 #   CFG_<id>_C_<key>        "=value" for a command: map entry
@@ -324,6 +331,7 @@ load_settings() {
 # empty fields when read.
 CFG_LOADED=false
 CFG_TOOLS=""
+CFG_DEFAULT=""
 readonly CFG_SEP=$'\x1f'
 
 # A tool name as a variable-name part: letters and digits kept, anything
@@ -350,18 +358,34 @@ _cfg_load() {
   if [[ $CFG_LOADED == true ]]; then
     return 0
   fi
-  CFG_LOADED=true
   local dump line kind tool a b rest var
-  dump="$(_yq '.packages // {} | to_entries | .[] | .key as $t | .value as $v |
+  # Marked loaded only once yq has read the file: doctor installs yq first.
+  dump="$(_yq '(.packages // {} | to_entries | .[] | .key as $t | .value as $v |
     ( ($v // {} | to_entries | .[] | select((.value | tag) != "!!seq" and (.value | tag) != "!!map" and (.value | tag) != "!!null") | "S\t" + $t + "\t" + .key + "\t" + (.value | tostring)),
       ($v // {} | to_entries | .[] | select((.key == "pacman" or .key == "apt" or .key == "dnf" or .key == "brew" or .key == "winget") and (.value | tag) == "!!seq") | "S\t" + $t + "\t" + .key + "\t" + (.value | join(" "))),
       ($v.command // "" | select(tag == "!!map") | to_entries | .[] | "C\t" + $t + "\t" + .key + "\t" + (.value | tostring)),
       ($v.links // [] | .[] | "L\t" + $t + "\t" + (.src // "") + "\t" + (.dest // "") + "\t" + (.os // "") + "\t" + (.linux // "") + "\t" + (.macos // "") + "\t" + (.windows // "") + "\t" + ((.copy // false) | tostring) + "\t" + ((.inject // false) | tostring) + "\t" + ((.enable // false) | tostring) + "\t" + ((.fill // false) | tostring)),
       ($v.clone // [] | .[] | "K\t" + $t + "\t" + (.repo // "") + "\t" + (.dest // "")),
-      ("T\t" + $t) )' 2>/dev/null)" || return 0
+      ("T\t" + $t) )),
+    (.settings // {} | to_entries | .[] | select((.value | tag) != "!!null") | "G\t" + .key + "\t" + (.value | tostring)),
+    (.default // [] | .[] | "D\t" + (. | tostring))' 2>/dev/null)" || return 0
+  CFG_LOADED=true
   while IFS= read -r line; do
     line="${line//$'\t'/$CFG_SEP}"
     IFS="$CFG_SEP" read -r kind tool a b <<<"$line"
+    case "$kind" in
+      G)
+        # Only names a variable can have (settings keys are plain words).
+        if [[ $tool =~ ^[A-Za-z0-9_]+$ ]]; then
+          printf -v "CFG_SET_$tool" '=%s' "$a"
+        fi
+        continue
+        ;;
+      D)
+        CFG_DEFAULT+="$tool"$'\n'
+        continue
+        ;;
+    esac
     _cfg_id "$tool"
     case "$kind" in
       T)
@@ -381,6 +405,14 @@ _cfg_load() {
         ;;
     esac
   done <<<"$dump"
+}
+
+# A settings: value, or nothing when it isn't set.
+_cfg_setting() {
+  _cfg_load
+  local var="CFG_SET_$1" value
+  value="${!var:-}"
+  echo "${value#=}"
 }
 
 # A plain field's value; returns 1 when the tool doesn't have it.
@@ -581,7 +613,8 @@ tool_locked() {
 
 # Names in the default: list, one per line.
 default_list() {
-  _yq '.default // [] | .[]'
+  _cfg_load
+  printf '%s' "$CFG_DEFAULT"
 }
 
 # Package name for a default: entry. A name that is also under packages:
