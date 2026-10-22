@@ -311,7 +311,8 @@ load_settings() {
 # nothing (one yq call per question made update take ~17 s). set_enabled
 # updates the copy when it writes the file.
 #   CFG_TOOLS               tool names, in config.yaml order
-#   CFG_<id>_S_<field>      "=value" for a plain field (enabled, manual, brew…)
+#   CFG_<id>_S_<field>      "=value" for a plain field (enabled, manual, brew…);
+#                           a list of package names is stored space-separated
 #   CFG_<id>_C_<key>        "=value" for a command: map entry
 #   CFG_<id>_CMAP           1 when command: is a map
 #   CFG_<id>_L              links: "src dest os linux macos windows copy inject enable"
@@ -350,6 +351,7 @@ _cfg_load() {
   local dump line kind tool a b rest var
   dump="$(_yq '.packages // {} | to_entries | .[] | .key as $t | .value as $v |
     ( ($v // {} | to_entries | .[] | select((.value | tag) != "!!seq" and (.value | tag) != "!!map" and (.value | tag) != "!!null") | "S\t" + $t + "\t" + .key + "\t" + (.value | tostring)),
+      ($v // {} | to_entries | .[] | select((.key == "pacman" or .key == "apt" or .key == "dnf" or .key == "brew" or .key == "winget") and (.value | tag) == "!!seq") | "S\t" + $t + "\t" + .key + "\t" + (.value | join(" "))),
       ($v.command // "" | select(tag == "!!map") | to_entries | .[] | "C\t" + $t + "\t" + .key + "\t" + (.value | tostring)),
       ($v.links // [] | .[] | "L\t" + $t + "\t" + (.src // "") + "\t" + (.dest // "") + "\t" + (.os // "") + "\t" + (.linux // "") + "\t" + (.macos // "") + "\t" + (.windows // "") + "\t" + ((.copy // false) | tostring) + "\t" + ((.inject // false) | tostring) + "\t" + ((.enable // false) | tostring)),
       ($v.clone // [] | .[] | "K\t" + $t + "\t" + (.repo // "") + "\t" + (.dest // "")),
@@ -403,7 +405,9 @@ _tool_exists() {
 
 # Package name on this machine: the manager's own name if one is set,
 # else the key. Empty = nothing to install here (a manual-only tool, or
-# "none" for this manager).
+# "none" for this manager). A list in config.yaml (brew: [1password,
+# 1password-cli]) comes out space-separated; package_version, pm_install
+# and pm_remove handle each name.
 tool_package() {
   local tool="$1" value=""
   if [[ -n $PKG_MANAGER ]] && value="$(_cfg_field "$tool" "$PKG_MANAGER")"; then
@@ -585,7 +589,23 @@ default_package() {
 # Print the installed version of a package, or return 1 if it isn't
 # installed. Asks the package manager, because a package name often isn't
 # a command (bind provides dig and nslookup).
+# Several names (a list in config.yaml): all must be installed; prints the
+# first one's version.
 package_version() {
+  local name first="" version
+  for name in $1; do
+    if ! version="$(_package_version_one "$name")"; then
+      return 1
+    fi
+    first="${first:-$version}"
+  done
+  if [[ -z $first ]]; then
+    return 1
+  fi
+  echo "$first"
+}
+
+_package_version_one() {
   local package="$1" output
   case "$PKG_MANAGER" in
     pacman)
@@ -623,7 +643,7 @@ package_version() {
 # Print the version the package manager would install, or nothing.
 # Used by dry runs, before anything is installed.
 package_available_version() {
-  local package="$1" output
+  local package="${1%% *}" output
   case "$PKG_MANAGER" in
     pacman)
       output="$(pacman -Si "$package" 2>/dev/null)" || return 0
@@ -749,8 +769,27 @@ _pm() {
   return "$code"
 }
 
-pm_install() { _pm install "$1"; }
-pm_remove()  { _pm remove "$1"; }
+# Several names: each one that's missing is installed (each installed one
+# removed), one package manager call per name.
+pm_install() {
+  local name
+  for name in $1; do
+    if [[ $1 == *" "* ]] && _package_version_one "$name" >/dev/null; then
+      log debug "package $name: already installed"
+      continue
+    fi
+    _pm install "$name" || return 1
+  done
+}
+pm_remove() {
+  local name
+  for name in $1; do
+    if [[ $1 == *" "* ]] && ! _package_version_one "$name" >/dev/null; then
+      continue
+    fi
+    _pm remove "$name" || return 1
+  done
+}
 
 # ════════════════════════════════════════════════════════════════════════
 # ARGUMENTS (plan Section 7)
@@ -1294,13 +1333,22 @@ _tool_version() {
 # manager's record ("brew package 1password"). Apps like the 1Password
 # desktop app have no command on PATH, but the package manager knows them.
 # Returns 1 when neither finds it.
+# A tool with several packages (1password: the app and the CLI) counts as
+# installed only when the package manager has every one of them.
 _tool_location() {
   local tool="$1" path package
+  package="$(tool_package "$tool")"
+  if [[ $package == *" "* ]]; then
+    if package_version "$package" >/dev/null; then
+      echo "$PKG_MANAGER packages ${package// /, }"
+      return 0
+    fi
+    return 1
+  fi
   if path="$(command -v "$(tool_command "$tool")" 2>/dev/null)"; then
     echo "$path"
     return 0
   fi
-  package="$(tool_package "$tool")"
   if [[ -n $package ]] && package_version "$package" >/dev/null; then
     echo "$PKG_MANAGER package $package"
     return 0
@@ -2264,7 +2312,17 @@ _install_package() {
     return 0
   fi
 
-  log info "$tool: not installed, installing package $package"
+  if [[ $package == *" "* ]]; then
+    local name missing=""
+    for name in $package; do
+      if ! _package_version_one "$name" >/dev/null; then
+        missing="${missing:+$missing, }$name"
+      fi
+    done
+    log info "$tool: not installed ($missing missing), installing it"
+  else
+    log info "$tool: not installed, installing package $package"
+  fi
   # -v: the package manager's output in its own block, easy to tell apart.
   if [[ $VERBOSE == true ]]; then
     printf '\n%s\n' "$(_rule "installing $tool ($PKG_MANAGER)")"
@@ -2329,7 +2387,18 @@ _remove_package() {
     log warn "$tool: no package to remove here; if you installed it by hand, remove it the same way"
     return 0
   fi
-  if [[ $(_tool_installed "$tool") != true ]]; then
+  # Several packages: remove whichever are installed (pm_remove skips the rest).
+  local name any=false
+  if [[ $package == *" "* ]]; then
+    for name in $package; do
+      if _package_version_one "$name" >/dev/null; then
+        any=true
+      fi
+    done
+  elif [[ $(_tool_installed "$tool") == true ]]; then
+    any=true
+  fi
+  if [[ $any != true ]]; then
     log info "$tool: $cmd_name isn't installed; nothing to remove"
     return 0
   fi
