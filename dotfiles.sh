@@ -646,10 +646,35 @@ package_version() {
   echo "$first"
 }
 
+# Every installed pacman package and its version, read once in the main
+# shell (pkg_cache_load) so each $(…) check is a lookup instead of a pacman
+# call (~60 ms each, once per tool on every screen). A name that isn't in
+# it still asks pacman: pacman -Q also finds provided names (sh -> bash).
+# Needs an associative array (Bash 4); pacman machines have Bash 5.
+PKG_CACHE_LOADED=false
+pkg_cache_load() {
+  PKG_CACHE_LOADED=false
+  if [[ $PKG_MANAGER != pacman ]] || ((BASH_VERSINFO[0] < 4)) || ! command -v pacman >/dev/null 2>&1; then
+    return 0
+  fi
+  local list name version
+  list="$(pacman -Q 2>/dev/null)" || return 0
+  unset PKG_VERSIONS
+  declare -gA PKG_VERSIONS=()
+  while read -r name version; do
+    PKG_VERSIONS[$name]="$version"
+  done <<<"$list"
+  PKG_CACHE_LOADED=true
+}
+
 _package_version_one() {
   local package="$1" output
   case "$PKG_MANAGER" in
     pacman)
+      if [[ $PKG_CACHE_LOADED == true && -n ${PKG_VERSIONS[$package]:-} ]]; then
+        echo "${PKG_VERSIONS[$package]}"
+        return 0
+      fi
       output="$(pacman -Q "$package" 2>/dev/null)" || return 1
       echo "${output#* }"
       ;;
@@ -807,6 +832,10 @@ _pm() {
   local code=0
   run_cmd "${cmd[@]}" || code=$?
   HIDE_OUTPUT=false
+  # The installed packages changed: read the list again.
+  if [[ $PKG_CACHE_LOADED == true && $DRY_RUN != true ]]; then
+    pkg_cache_load
+  fi
   return "$code"
 }
 
@@ -3902,6 +3931,10 @@ main() {
   elif [[ $cmd != doctor ]]; then
     load_settings
   fi
+  case "$cmd" in
+    help | version) ;;
+    *) pkg_cache_load ;;
+  esac
   warn_unused_flags "$cmd"
 
   case "$cmd" in
