@@ -8,7 +8,7 @@ settings:
   # Theme for machines without Omarchy (a folder in config/omarchy/themes):
   # link/update fill config/omarchy/themed/*.tpl from its colors.toml. On
   # Omarchy the current theme is used instead.
-  # theme: sonic-night
+  theme: starburst
 
 # Installed by "dotfiles.sh default", nothing linked (for quick machines).
 # A name that is also under packages: uses that entry's package names.

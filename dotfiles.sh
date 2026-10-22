@@ -275,7 +275,7 @@ detect_os() {
 # ════════════════════════════════════════════════════════════════════════
 
 BACKUP_SUFFIX=".bak"
-THEME=""   # settings.theme: the theme machines without Omarchy use
+THEME="starburst"   # settings.theme: the theme machines without Omarchy use
 
 # Run one yq query against the config file.
 _yq() {
@@ -288,7 +288,8 @@ load_settings() {
     return 0
   fi
   local value
-  THEME="$(_yq '.settings.theme // ""' 2>/dev/null)" || THEME=""
+  value="$(_yq '.settings.theme // ""' 2>/dev/null)" || value=""
+  THEME="${value:-$THEME}"
   value="$(_yq '.settings.backup_suffix // ""' 2>/dev/null)" || value=""
   if [[ -n $value ]]; then
     BACKUP_SUFFIX="$value"
