@@ -349,6 +349,12 @@ _cfg_id() {
     return 0
   fi
   local name="$1" id="" char i
+  # Most names are letters and digits only: nothing to convert.
+  if [[ $name != *[!A-Za-z0-9]* ]]; then
+    CFG_ID_FOR="$1"
+    CFG_ID="t_$name"
+    return 0
+  fi
   for ((i = 0; i < ${#name}; i++)); do
     char="${name:i:1}"
     case "$char" in
@@ -423,13 +429,23 @@ _cfg_setting() {
 
 # A plain field's value; returns 1 when the tool doesn't have it.
 _cfg_field() {
+  _cfg_get "$1" "$2" || return 1
+  echo "$CFG_VALUE"
+}
+
+# The same into CFG_VALUE, without a $(…) subshell. The helpers called for
+# every line of a list (…_get) set a variable instead of printing: each
+# $(…) is a fork, ~20 of them per tool made the lists show line by line.
+CFG_VALUE=""
+_cfg_get() {
   _cfg_load
   _cfg_id "$1"
   local var="CFG_${CFG_ID}_S_$2"
+  CFG_VALUE=""
   if [[ -z ${!var:-} ]]; then
     return 1
   fi
-  echo "${!var#=}"
+  CFG_VALUE="${!var#=}"
 }
 
 # Every package name under packages:, one per line.
@@ -450,21 +466,35 @@ _tool_exists() {
 # 1password-cli]) comes out space-separated; package_version, pm_install
 # and pm_remove handle each name.
 tool_package() {
+  _tool_package_get "$1"
+  echo "$TOOL_PACKAGE"
+}
+
+# tool_package into TOOL_PACKAGE.
+TOOL_PACKAGE=""
+_tool_package_get() {
   local tool="$1" value=""
-  if [[ -n $PKG_MANAGER ]] && value="$(_cfg_field "$tool" "$PKG_MANAGER")"; then
-    :
-  elif ! _cfg_field "$tool" manual >/dev/null; then
+  if [[ -n $PKG_MANAGER ]] && _cfg_get "$tool" "$PKG_MANAGER"; then
+    value="$CFG_VALUE"
+  elif ! _cfg_get "$tool" manual; then
     value="$tool"
   fi
   if [[ $value == none ]]; then
     value=""
   fi
-  echo "$value"
+  TOOL_PACKAGE="$value"
 }
 
 # Command that proves the tool is installed: command:, else the key.
 # A command: map picks this machine's entry: manager, then OS, then default.
 tool_command() {
+  _tool_command_get "$1"
+  echo "$TOOL_COMMAND"
+}
+
+# tool_command into TOOL_COMMAND.
+TOOL_COMMAND=""
+_tool_command_get() {
   local tool="$1" value="" key var
   _cfg_load
   _cfg_id "$tool"
@@ -477,10 +507,10 @@ tool_command() {
         break
       fi
     done
-  else
-    value="$(_cfg_field "$tool" command)" || value=""
+  elif _cfg_get "$tool" command; then
+    value="$CFG_VALUE"
   fi
-  echo "${value:-$tool}"
+  TOOL_COMMAND="${value:-$tool}"
 }
 
 # The manual: message (how to install by hand), or nothing.
@@ -513,25 +543,35 @@ tool_links() {
 
 # One true/false field of the link with this src (inject, copy, enable).
 _link_flag() {
-  _cfg_load
-  _cfg_id "$1"
-  local var="CFG_${CFG_ID}_L" src dest os linux macos windows copy inject enable fill value=""
-  while IFS="$CFG_SEP" read -r src dest os linux macos windows copy inject enable fill; do
-    if [[ -n $src && $src == "$2" ]]; then
-      case "$3" in
-        copy) value="$copy" ;;
-        inject) value="$inject" ;;
-        enable) value="$enable" ;;
-        fill) value="$fill" ;;
-      esac
-      break
-    fi
-  done <<<"${!var:-}"
+  local value=""
+  _link_flags_get "$1" "$2"
+  case "$3" in
+    copy) value="$LINK_COPY" ;;
+    inject) value="$LINK_INJECT" ;;
+    enable) value="$LINK_ENABLE" ;;
+    fill) value="$LINK_FILL" ;;
+  esac
   if [[ $value == true ]]; then
     echo true
   else
     echo false
   fi
+}
+
+# Every flag of the link with this src at once, into LINK_COPY,
+# LINK_INJECT, LINK_ENABLE and LINK_FILL ("true" or something else).
+LINK_COPY="" LINK_INJECT="" LINK_ENABLE="" LINK_FILL=""
+_link_flags_get() {
+  _cfg_load
+  _cfg_id "$1"
+  local var="CFG_${CFG_ID}_L" src dest os linux macos windows copy inject enable fill
+  LINK_COPY="" LINK_INJECT="" LINK_ENABLE="" LINK_FILL=""
+  while IFS="$CFG_SEP" read -r src dest os linux macos windows copy inject enable fill; do
+    if [[ -n $src && $src == "$2" ]]; then
+      LINK_COPY="$copy" LINK_INJECT="$inject" LINK_ENABLE="$enable" LINK_FILL="$fill"
+      break
+    fi
+  done <<<"${!var:-}"
 }
 
 # copy: true = a system file: dest is an absolute path that gets a
@@ -1283,7 +1323,9 @@ _link_state() {
       /*) ;;
       *) target="$(dirname "$dest_path")/$target" ;;
     esac
-    if [[ $(_physical "$target") == "$(_physical "$src_path")" ]]; then
+    # Most links point straight at the repo path: no need to resolve both.
+    if [[ ${target%/} == "${src_path%/}" ]] ||
+      [[ $(_physical "$target") == "$(_physical "$src_path")" ]]; then
       echo "linked"
     else
       echo "elsewhere"
@@ -1305,22 +1347,33 @@ _link_state() {
 # symlink: "injected" when it's there, "symlink" when an old link is still
 # in its place.
 _tool_link_state() {
-  local tool="$1" src="$2" dest="$3" dest_path
-  dest_path="$(_dest_path "$3")"
-  if [[ $(tool_link_copy "$tool" "$src") == true ]]; then
-    _copy_state "$(_src_path "$src")" "$dest_path"
-  elif [[ $(tool_link_fill "$tool" "$src") == true ]]; then
-    _fill_state "$(_src_path "$src")" "$dest_path"
-  elif [[ $(tool_link_inject "$tool" "$src") != true ]]; then
-    _link_state "$(_src_path "$src")" "$dest_path"
+  _tool_link_state_get "$@"
+  echo "$LINK_STATE"
+}
+
+# _tool_link_state into LINK_STATE.
+LINK_STATE=""
+_tool_link_state_get() {
+  local tool="$1" src="$2" dest_path src_path="$DOTFILES/config/$2"
+  case "$3" in
+    /*) dest_path="$3" ;;
+    *) dest_path="$HOME/$3" ;;
+  esac
+  _link_flags_get "$tool" "$src"
+  if [[ $LINK_COPY == true ]]; then
+    LINK_STATE="$(_copy_state "$src_path" "$dest_path")"
+  elif [[ $LINK_FILL == true ]]; then
+    LINK_STATE="$(_fill_state "$src_path" "$dest_path")"
+  elif [[ $LINK_INJECT != true ]]; then
+    LINK_STATE="$(_link_state "$src_path" "$dest_path")"
   elif [[ -L $dest_path ]]; then
-    echo "symlink"
+    LINK_STATE="symlink"
   elif [[ -f $dest_path ]]; then
-    echo "injected"
+    LINK_STATE="injected"
   elif [[ -e $dest_path ]]; then
-    echo "folder"
+    LINK_STATE="folder"
   else
-    echo "missing"
+    LINK_STATE="missing"
   fi
 }
 
@@ -1438,25 +1491,50 @@ _tool_location() {
 
 # "true" when the tool is installed (_tool_location finds it).
 _tool_installed() {
-  if _tool_location "$1" >/dev/null; then
+  if _tool_is_installed "$1"; then
     echo true
   else
     echo false
   fi
 }
 
+# The same test as _tool_location, as a return code, without its $(…).
+_tool_is_installed() {
+  local tool="$1" package
+  _tool_package_get "$tool"
+  package="$TOOL_PACKAGE"
+  if [[ $package == *" "* ]]; then
+    package_version "$package" >/dev/null
+    return
+  fi
+  _tool_command_get "$tool"
+  if command -v "$TOOL_COMMAND" >/dev/null 2>&1; then
+    return 0
+  fi
+  [[ -n $package ]] && package_version "$package" >/dev/null
+}
+
 # "true" when every link is in place (directly or through a linked parent).
 _tool_linked() {
-  local tool="$1" src dest state result=true
+  if _tool_is_linked "$1"; then
+    echo true
+  else
+    echo false
+  fi
+}
+
+# _tool_linked as a return code.
+_tool_is_linked() {
+  local tool="$1" src dest result=0
   while IFS=$'\t' read -r src dest; do
-    state="$(_tool_link_state "$tool" "$src" "$dest")"
-    log debug "$tool: ~/$dest is $state"
-    case "$state" in
+    _tool_link_state_get "$tool" "$src" "$dest"
+    log debug "$tool: ~/$dest is $LINK_STATE"
+    case "$LINK_STATE" in
       linked | linked-parent | injected | copied | filled) ;;
-      *) result=false ;;
+      *) result=1 ;;
     esac
   done < <(tool_links "$tool")
-  echo "$result"
+  return "$result"
 }
 
 # A tool counts as enabled when it's installed and linked.
@@ -2824,15 +2902,13 @@ _parse_picks() {
 
 # Short state of a tool for the lists: installed / linked.
 _state_text() {
-  local tool="$1" text="" installed linked
-  installed="$(_tool_installed "$tool")"
-  linked="$(_tool_linked "$tool")"
-  if [[ $installed == true ]]; then
+  local tool="$1" text=""
+  if _tool_is_installed "$tool"; then
     text="installed"
-  elif [[ -z $(tool_package "$tool") ]]; then
+  elif _tool_package_get "$tool" && [[ -z $TOOL_PACKAGE ]]; then
     text="install by hand"
   fi
-  if [[ $linked == true ]]; then
+  if _tool_is_linked "$tool"; then
     text="${text:+$text, }linked"
   fi
   echo "${text:--}"
