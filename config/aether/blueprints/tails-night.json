@@ -38,7 +38,8 @@
     "nativeColors": {
       "active_border_color": "#ff9f1c",
       "active_tab_background": "#ff9f1c"
-    }
+    },
+    "wallpaper": "~/.config/omarchy/themes/tails-night/backgrounds/1-twin-tails-speed.png"
   },
   "settings": {},
   "timestamp": 1792639320429

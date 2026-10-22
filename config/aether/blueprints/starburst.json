@@ -38,7 +38,8 @@
     "nativeColors": {
       "active_border_color": "#eb5a47",
       "active_tab_background": "#eb5a47"
-    }
+    },
+    "wallpaper": "~/.config/omarchy/themes/starburst/backgrounds/1-burst.png"
   },
   "settings": {},
   "timestamp": 1792641693036

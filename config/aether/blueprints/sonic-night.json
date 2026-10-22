@@ -38,7 +38,8 @@
     "nativeColors": {
       "active_border_color": "#2f6bff",
       "active_tab_background": "#2f6bff"
-    }
+    },
+    "wallpaper": "~/.config/omarchy/themes/sonic-night/backgrounds/1-rings-speed.png"
   },
   "settings": {},
   "timestamp": 1792639384662
