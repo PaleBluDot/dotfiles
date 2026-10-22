@@ -44,6 +44,10 @@ else
 fi
 unset _starship_src _starship_copy
 
+# bat: the current theme's colours once the theme hook has installed them
+# as bat's "omarchy" theme; otherwise --theme in bat's config (knuckles).
+[[ -f $HOME/.config/bat/themes/omarchy.tmTheme ]] && export BAT_THEME="omarchy"
+
 # LANGUAGE RUNTIMES
 # Go and NVM directories
 # -----------------------

@@ -62,3 +62,6 @@ config/composer/composer.lock
 config/composer/.htaccess
 config/composer/config.json
 config/cspell/node_modules/
+
+# bat: the current theme, installed by the omarchy theme-set hook (generated)
+config/bat/themes/omarchy.tmTheme
