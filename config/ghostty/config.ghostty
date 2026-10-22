@@ -3,7 +3,11 @@
 # https://github.com/PaleBluDot/dotfiles
 # Last updated: 20261007
 
+# Colors follow the current theme: Omarchy generates ghostty.conf on every
+# theme change (on other machines, dotfiles does from settings.theme).
+# Starburst stays as the fallback when that file isn't there.
 theme = Starburst
+config-file = ?"~/.local/state/omarchy/current/theme/ghostty.conf"
 working-directory = home
 auto-update = check
 copy-on-select = true
