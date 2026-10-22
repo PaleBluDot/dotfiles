@@ -34,9 +34,15 @@ LOG_CMD="main"
 
 # ISO 8601 time with a colon in the offset: 2026-10-12T16:20:01-04:00.
 # BSD date (macOS) has no -I flag, so build it from +%z (-0400).
+# Bash 4.2+ formats the time itself (printf %(…)T): no date process for
+# every log line. macOS's /bin/bash 3.2 still uses date.
 _timestamp() {
   local ts
-  ts="$(date '+%Y-%m-%dT%H:%M:%S%z')"
+  if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 2))); then
+    printf -v ts '%(%Y-%m-%dT%H:%M:%S%z)T' -1
+  else
+    ts="$(date '+%Y-%m-%dT%H:%M:%S%z')"
+  fi
   printf '%s:%s' "${ts%??}" "${ts: -2}"
 }
 
