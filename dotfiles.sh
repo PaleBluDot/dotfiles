@@ -318,7 +318,7 @@ load_settings() {
 #                           a list of package names is stored space-separated
 #   CFG_<id>_C_<key>        "=value" for a command: map entry
 #   CFG_<id>_CMAP           1 when command: is a map
-#   CFG_<id>_L              links: "src dest os linux macos windows copy inject enable"
+#   CFG_<id>_L              links: "src dest os linux macos windows copy inject enable fill"
 #   CFG_<id>_K              clones: "repo dest"
 # Records use the unit separator (\x1f) between fields: tabs would collapse
 # empty fields when read.
@@ -356,7 +356,7 @@ _cfg_load() {
     ( ($v // {} | to_entries | .[] | select((.value | tag) != "!!seq" and (.value | tag) != "!!map" and (.value | tag) != "!!null") | "S\t" + $t + "\t" + .key + "\t" + (.value | tostring)),
       ($v // {} | to_entries | .[] | select((.key == "pacman" or .key == "apt" or .key == "dnf" or .key == "brew" or .key == "winget") and (.value | tag) == "!!seq") | "S\t" + $t + "\t" + .key + "\t" + (.value | join(" "))),
       ($v.command // "" | select(tag == "!!map") | to_entries | .[] | "C\t" + $t + "\t" + .key + "\t" + (.value | tostring)),
-      ($v.links // [] | .[] | "L\t" + $t + "\t" + (.src // "") + "\t" + (.dest // "") + "\t" + (.os // "") + "\t" + (.linux // "") + "\t" + (.macos // "") + "\t" + (.windows // "") + "\t" + ((.copy // false) | tostring) + "\t" + ((.inject // false) | tostring) + "\t" + ((.enable // false) | tostring)),
+      ($v.links // [] | .[] | "L\t" + $t + "\t" + (.src // "") + "\t" + (.dest // "") + "\t" + (.os // "") + "\t" + (.linux // "") + "\t" + (.macos // "") + "\t" + (.windows // "") + "\t" + ((.copy // false) | tostring) + "\t" + ((.inject // false) | tostring) + "\t" + ((.enable // false) | tostring) + "\t" + ((.fill // false) | tostring)),
       ($v.clone // [] | .[] | "K\t" + $t + "\t" + (.repo // "") + "\t" + (.dest // "")),
       ("T\t" + $t) )' 2>/dev/null)" || return 0
   while IFS= read -r line; do
@@ -477,13 +477,14 @@ tool_links() {
 _link_flag() {
   _cfg_load
   _cfg_id "$1"
-  local var="CFG_${CFG_ID}_L" src dest os linux macos windows copy inject enable value=""
-  while IFS="$CFG_SEP" read -r src dest os linux macos windows copy inject enable; do
+  local var="CFG_${CFG_ID}_L" src dest os linux macos windows copy inject enable fill value=""
+  while IFS="$CFG_SEP" read -r src dest os linux macos windows copy inject enable fill; do
     if [[ -n $src && $src == "$2" ]]; then
       case "$3" in
         copy) value="$copy" ;;
         inject) value="$inject" ;;
         enable) value="$enable" ;;
+        fill) value="$fill" ;;
       esac
       break
     fi
@@ -555,6 +556,10 @@ tool_unused_here() {
 }
 
 tool_link_inject() { _link_flag "$1" "$2" inject; }
+
+# fill: true on a link to a folder of .json files: dest gets copies with the
+# repo-relative paths ("config/...") filled in as this machine's full path.
+tool_link_fill() { _link_flag "$1" "$2" fill; }
 
 # "true" or "false"; anything else counts as false.
 tool_enabled() {
@@ -1236,6 +1241,8 @@ _tool_link_state() {
   dest_path="$(_dest_path "$3")"
   if [[ $(tool_link_copy "$tool" "$src") == true ]]; then
     _copy_state "$(_src_path "$src")" "$dest_path"
+  elif [[ $(tool_link_fill "$tool" "$src") == true ]]; then
+    _fill_state "$(_src_path "$src")" "$dest_path"
   elif [[ $(tool_link_inject "$tool" "$src") != true ]]; then
     _link_state "$(_src_path "$src")" "$dest_path"
   elif [[ -L $dest_path ]]; then
@@ -1292,6 +1299,8 @@ _link_state_text() {
     copied)        echo "copied (root-owned)" ;;
     differs)       echo "differs from the repo; dotfiles link copies it again" ;;
     injected)      echo "filled in from 1Password" ;;
+    filled)        echo "copies with this machine's paths filled in" ;;
+    stale)         echo "copies out of date; dotfiles link writes them again" ;;
     symlink)       echo "still a symlink; dotfiles link fills it in from 1Password" ;;
     linked)        echo "linked" ;;
     linked-parent) echo "linked (through a linked parent folder)" ;;
@@ -1375,7 +1384,7 @@ _tool_linked() {
     state="$(_tool_link_state "$tool" "$src" "$dest")"
     log debug "$tool: ~/$dest is $state"
     case "$state" in
-      linked | linked-parent | injected | copied) ;;
+      linked | linked-parent | injected | copied | filled) ;;
       *) result=false ;;
     esac
   done < <(tool_links "$tool")
@@ -1479,13 +1488,15 @@ _status_tool() {
     out "    source:   config/$src"
     if [[ $(tool_link_copy "$tool" "$src") == true ]]; then
       out "    copy:     $dest  (root-owned)"
+    elif [[ $(tool_link_fill "$tool" "$src") == true ]]; then
+      out "    copies:   ~/$dest  (this machine's paths filled in)"
     elif [[ $(tool_link_inject "$tool" "$src") == true ]]; then
       out "    filled:   ~/$dest  (op inject)"
     else
       out "    symlink:  ~/$dest"
     fi
     case "$state" in
-      linked | linked-parent | injected | copied) ;;
+      linked | linked-parent | injected | copied | filled) ;;
       *) out "    problem:  $(_link_state_text "$state" "$(_dest_path "$dest")")" ;;
     esac
   done < <(tool_links "$tool")
@@ -1747,10 +1758,118 @@ _link_one() {
   elif [[ $dest == /* ]]; then
     log error "$tool: $dest is a system path; mark that link copy: true in config.yaml"
     return 1
+  elif [[ $(tool_link_fill "$tool" "$src") == true ]]; then
+    _fill_path "$tool" "$(_src_path "$src")" "$dest"
   elif [[ $(tool_link_inject "$tool" "$src") == true ]]; then
     _inject_path "$tool" "$(_src_path "$src")" "$dest"
   else
     _link_path "$tool" "$(_src_path "$src")" "$dest"
+  fi
+}
+
+# ─── fill: true (folders of .json copies with this machine's paths) ─────
+# The repo keeps paths relative to itself ("config/omarchy/..."), so the
+# same file works on every machine; the copies in dest get the full path
+# ("/home/<user>/.../dotfiles/config/omarchy/..."). Aether reads blueprint
+# wallpaper paths as written, and the repo stays clean.
+
+# A repo file as this machine's copy.
+_fill_render() {
+  sed "s|\"config/|\"$DOTFILES/config/|g" "$1"
+}
+
+# A copy saved by the app, as the repo keeps it: this repo's full path and
+# the ~/.config/omarchy link (where Omarchy's own files appear) made relative.
+_fill_unrender() {
+  sed -e "s|\"$DOTFILES/config/|\"config/|g" -e "s|\"$HOME/.config/omarchy/|\"config/omarchy/|g" "$1"
+}
+
+# filled (every repo file has its up-to-date copy), stale, folder (in the
+# way: not a folder), missing.
+_fill_state() {
+  local src_dir="$1" dest_dir="$2" file
+  if [[ -L $dest_dir || ( -e $dest_dir && ! -d $dest_dir ) ]]; then
+    echo "folder"
+    return 0
+  fi
+  if [[ ! -d $dest_dir ]]; then
+    echo "missing"
+    return 0
+  fi
+  for file in "$src_dir"/*.json; do
+    [[ -f $file ]] || continue
+    if [[ ! -f $dest_dir/$(basename "$file") ]] || ! _fill_render "$file" | cmp -s - "$dest_dir/$(basename "$file")"; then
+      echo "stale"
+      return 0
+    fi
+  done
+  echo "filled"
+}
+
+# Copy files the app saved in dest (and the repo doesn't have yet) back into
+# the repo, with paths made relative. They show up in git to commit.
+_fill_copy_back() {
+  local tool="$1" src_dir="$2" dest_dir="$3" file name
+  [[ -d $dest_dir && ! -L $dest_dir ]] || return 0
+  for file in "$dest_dir"/*.json; do
+    [[ -f $file ]] || continue
+    name="$(basename "$file")"
+    if [[ ! -e $src_dir/$name ]]; then
+      if [[ $DRY_RUN == true ]]; then
+        log info "dry run, would copy $(_tilde "$file") into the repo"
+      else
+        _fill_unrender "$file" >"$src_dir/$name"
+        log success "$tool: copied $name into the repo (new; commit it)"
+      fi
+      CHANGED=true
+    fi
+  done
+}
+
+_fill_path() {
+  local tool="$1" src_dir="$2" dest="$3"
+  local dest_dir shown file name tmp written=0
+  dest_dir="$(_dest_path "$dest")"
+  shown="$(_dest_shown "$dest")"
+  if [[ ! -d $src_dir ]]; then
+    log error "$tool: source ${src_dir#"$DOTFILES"/} isn't a folder (fill: true needs one)"
+    return 1
+  fi
+  if [[ $DRY_RUN == true && $'\n'$UNFOLDED == *$'\n'"$(dirname "$dest_dir")"$'\n'* ]]; then
+    log info "dry run, would write the copies in $shown with this machine's paths"
+    return 0
+  fi
+  if _inside_repo "$(dirname "$dest_dir")" || _inside_repo "$dest_dir"; then
+    log error "$tool: $shown is inside the repo; the copies would end up in git"
+    return 1
+  fi
+  if [[ -L $dest_dir || ( -e $dest_dir && ! -d $dest_dir ) ]]; then
+    log warn "$tool: $shown is a link or a file, not a folder; left it alone"
+    return 1
+  fi
+  _fill_copy_back "$tool" "$src_dir" "$dest_dir"
+  if [[ ! -d $dest_dir ]]; then
+    run_cmd mkdir -p "$dest_dir"
+  fi
+  for file in "$src_dir"/*.json; do
+    [[ -f $file ]] || continue
+    name="$(basename "$file")"
+    if [[ -f $dest_dir/$name ]] && _fill_render "$file" | cmp -s - "$dest_dir/$name"; then
+      continue
+    fi
+    CHANGED=true
+    written=$((written + 1))
+    if [[ $DRY_RUN == true ]]; then
+      log info "dry run, would write $shown/$name with this machine's paths"
+      continue
+    fi
+    tmp="$dest_dir/.$name.tmp"
+    _fill_render "$file" >"$tmp" && mv -f "$tmp" "$dest_dir/$name"
+  done
+  if [[ $written -eq 0 ]]; then
+    log success "$tool: already up to date: $shown (copies with this machine's paths)"
+  elif [[ $DRY_RUN != true ]]; then
+    log success "$tool: wrote $written file(s) in $shown with this machine's paths"
   fi
 }
 
@@ -2148,9 +2267,34 @@ _clone_one() {
   fi
 }
 
+# A tool that used to link its whole folder (~/.config/aether -> config/aether)
+# and now links parts of it: the old folder link is replaced by a real folder,
+# or the new links would land inside the repo.
+UNFOLDED=""   # dry run: folder links that would have been replaced
+_unfold_tool_link() {
+  local tool="$1" src dest parent target
+  while IFS=$'\t' read -r src dest; do
+    [[ $dest == /* || -z $dest ]] && continue
+    parent="$(dirname "$HOME/$dest")"
+    [[ $'\n'$UNFOLDED$'\n' == *$'\n'"$parent"$'\n'* ]] && continue
+    if [[ -L $parent ]]; then
+      target="$(_physical "$parent")"
+      if [[ $target == "$(_physical "$DOTFILES/config/$tool")" ]]; then
+        run_cmd rm "$parent"
+        run_cmd mkdir -p "$parent"
+        UNFOLDED+="$parent"$'\n'
+        if [[ $DRY_RUN != true ]]; then
+          log info "$tool: $(_tilde "$parent") linked the whole folder; it's a real folder now, with links and copies inside"
+        fi
+      fi
+    fi
+  done < <(tool_links "$tool")
+}
+
 # Link one tool and set enabled: true. Returns 1 when a link isn't in place.
 _link_configs() {
   local tool="$1" src dest repo ok=true
+  _unfold_tool_link "$tool"
   while IFS=$'\t' read -r src dest; do
     if ! _link_one "$tool" "$src" "$dest"; then
       ok=false
@@ -2302,6 +2446,10 @@ _unlink_one() {
     _uncopy_path "$tool" "$src" "$dest"
     return
   fi
+  if [[ $(tool_link_fill "$tool" "$src") == true ]]; then
+    _unfill_path "$tool" "$src" "$dest"
+    return
+  fi
   src_path="$(_src_path "$src")"
   dest_path="$HOME/$dest"
   shown="~/$dest"
@@ -2337,6 +2485,27 @@ _unlink_one() {
       log warn "$tool: $shown isn't a link to the repo ($(_link_state_text "$state" "$dest_path")); left it alone"
       ;;
   esac
+}
+
+# Remove fill copies: new files the app saved go back to the repo first,
+# then the copies of the repo's files are removed (the folder too, if empty).
+_unfill_path() {
+  local tool="$1" src="$2" dest="$3" src_dir dest_dir file
+  src_dir="$(_src_path "$src")"
+  dest_dir="$(_dest_path "$dest")"
+  if [[ ! -d $dest_dir || -L $dest_dir ]]; then
+    log info "$tool: $(_dest_shown "$dest") isn't there; nothing to do"
+    return 0
+  fi
+  _fill_copy_back "$tool" "$src_dir" "$dest_dir"
+  for file in "$src_dir"/*.json; do
+    [[ -f $file && -f $dest_dir/$(basename "$file") ]] || continue
+    run_cmd rm "$dest_dir/$(basename "$file")"
+  done
+  if [[ $DRY_RUN != true ]]; then
+    rmdir "$dest_dir" 2>/dev/null || true
+    log success "$tool: removed the copies in $(_dest_shown "$dest")"
+  fi
 }
 
 # Unlink one tool and set enabled: false. Returns 1 on failure.
