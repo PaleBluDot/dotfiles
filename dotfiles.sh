@@ -2713,7 +2713,14 @@ _install_package() {
   package="$(tool_package "$tool")"
 
   if path="$(_tool_location "$tool")"; then
-    log success "$tool: already installed: $path ($(_tool_installed_version "$tool"))"
+    # The interactive screens hide this line (log file only), so skip the
+    # version there: for a tool without a package it means starting the
+    # program (cspell --version takes ~1 s).
+    if [[ $QUIET == true && $VERBOSE != true ]]; then
+      log success "$tool: already installed: $path"
+    else
+      log success "$tool: already installed: $path ($(_tool_installed_version "$tool"))"
+    fi
     return 0
   fi
   if [[ -z $package ]]; then
