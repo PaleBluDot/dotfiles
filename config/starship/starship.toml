@@ -5,14 +5,15 @@
 # on Omarchy, the current theme's (dotfiles writes a copy of this file with
 # palette = "<theme>" to ~/.cache/starship/starship.toml on every theme
 # change; STARSHIP_CONFIG points there); elsewhere, settings.theme in
-# config.yaml. Setting an Omarchy theme with no palette here adds one,
-# built from its colors.toml. Without the copy, palette below is used.
+# config.yaml (default starburst). Setting an Omarchy theme with no palette
+# here adds one, built from its colors.toml. Without the copy, palette below
+# is used.
 #
 # Palette keys: os (first segment), os_text (its text), user, directory,
 # git, language, docker, time, root (username when root).
 
 # Must stay above the first [table]: TOML would put it inside that table.
-palette = "starship"
+palette = "starburst"
 
 format = """
 [](os)\
@@ -213,7 +214,7 @@ style = "bold bg:time"
 format = '[  $time ]($style)'
 
 # ─── Palettes (palette = "<name>" at the top picks one) ──────────────────
-[palettes.starship]
+[palettes.starburst]
 os = "#cef542"
 os_text = "#151515"
 user = "#0a63c9"
@@ -223,17 +224,6 @@ language = "#417e37"
 docker = "#06969a"
 time = "#33658a"
 root = "#db490b"
-
-[palettes.knuckles]
-os = "#ffdfde"
-os_text = "#240809"
-user = "#a48685"
-directory = "#c0303e"
-git = "#c0303e"
-language = "#a48685"
-docker = "#a48685"
-time = "#a48685"
-root = "#da4a52"
 
 [palettes.knuckles-night]
 os = "#e0262e"

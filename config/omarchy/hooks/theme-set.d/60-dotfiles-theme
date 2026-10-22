@@ -37,7 +37,7 @@ if [[ -n $theme && -f $starship_src ]]; then
       printf 'root = "%s"\n' "$(color orange)"
     } >>"$starship_src"
   fi
-  palette="starship"
+  palette="starburst"
   if grep -q "^\[palettes\.$theme\]" "$starship_src"; then
     palette="$theme"
   fi
