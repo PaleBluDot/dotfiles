@@ -12,6 +12,7 @@ default: []
 
 # The key is the config/ folder name. Add a manager (pacman, apt, dnf,
 # brew, winget) where its package name differs from the key; "none" = not there.
+# A list ([app, app-cli]) installs several packages for one tool.
 #   command:  only when the command isn't the key (can also be per manager)
 #   manual:   no package manager installs it; this message says how
 #   links:    src is a path under config/, dest a path under $HOME (none =
@@ -32,6 +33,15 @@ packages:
   1password:
     enabled: true
     locked: true
+    # The desktop app and the CLI (op), installed together.
+    pacman: [1password, 1password-cli]
+    apt: none
+    dnf: none
+    brew: [1password, 1password-cli]
+    winget: [AgileBits.1Password, AgileBits.1Password.CLI]
+    links:
+      - src: op/server.json
+        dest: .config/op/server.json
 
   aerospace:
     enabled: true
@@ -351,18 +361,6 @@ packages:
         copy: true
         enable: true
         os: linux
-
-  op:
-    enabled: true
-    locked: true
-    pacman: 1password-cli
-    apt: none
-    dnf: none
-    brew: 1password-cli
-    winget: AgileBits.1Password.CLI
-    links:
-      - src: op/server.json
-        dest: .config/op/server.json
 
   ranger:
     enabled: true
