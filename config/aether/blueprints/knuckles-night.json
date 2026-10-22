@@ -19,7 +19,7 @@
       "#ffdcda",
       "#fff0ef"
     ],
-    "wallpaper": "~/.config/omarchy/themes/knuckles-night/backgrounds/1-emerald-speed.png",
+    "wallpaper": "config/omarchy/themes/knuckles-night/backgrounds/1-emerald-speed.png",
     "extendedColors": {
       "accent": "#e0262e",
       "bright_fg": "#fff0ef",
