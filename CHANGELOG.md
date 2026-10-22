@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.3.0](https://github.com/PaleBluDot/dotfiles/compare/v2.2.0...v2.3.0) (2026-10-22)
+
+
+### Features
+
+* **script:** install the 1Password app and CLI from one entry ([#22](https://github.com/PaleBluDot/dotfiles/issues/22)) ([5ee01b6](https://github.com/PaleBluDot/dotfiles/commit/5ee01b6ebcbc70543270e79754b5d568fbb52b66))
+
 # [2.2.0](https://github.com/PaleBluDot/dotfiles/compare/v2.1.7...v2.2.0) (2026-10-21)
 
 
