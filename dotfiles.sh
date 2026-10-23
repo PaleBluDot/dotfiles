@@ -717,6 +717,8 @@ _package_version_one() {
   local package="$1" output
   case "$PKG_MANAGER" in
     pacman)
+      # aur/<name>: installed from the AUR, but pacman -Q knows it all the same.
+      package="${package#aur/}"
       if [[ $PKG_CACHE_LOADED == true && -n ${PKG_VERSIONS[$package]:-} ]]; then
         echo "${PKG_VERSIONS[$package]}"
         return 0
@@ -758,7 +760,11 @@ package_available_version() {
   local package="${1%% *}" output
   case "$PKG_MANAGER" in
     pacman)
-      output="$(pacman -Si "$package" 2>/dev/null)" || return 0
+      if [[ $package == aur/* ]]; then
+        output="$(yay -Si "${package#aur/}" 2>/dev/null)" || return 0
+      else
+        output="$(pacman -Si "$package" 2>/dev/null)" || return 0
+      fi
       awk -F': ' '/^Version/ { print $2; exit }' <<<"$output"
       ;;
     apt)
@@ -828,8 +834,16 @@ _pm() {
   local -a cmd
 
   case "$action:$PKG_MANAGER" in
-    install:pacman) cmd=(pacman -S --needed --noconfirm "$package") ;;
-    remove:pacman)  cmd=(pacman -R --noconfirm "$package") ;;
+    # aur/<name> (config.yaml): an AUR package, installed with yay. yay
+    # runs as you and asks for sudo itself; pacman removes it like any other.
+    install:pacman)
+      if [[ $package == aur/* ]]; then
+        cmd=(yay -S --needed --noconfirm --answerdiff None --answerclean None "${package#aur/}")
+      else
+        cmd=(pacman -S --needed --noconfirm "$package")
+      fi
+      ;;
+    remove:pacman)  cmd=(pacman -R --noconfirm "${package#aur/}") ;;
     # apt (not apt-get), as used by hand on Debian/Ubuntu. The -o option turns
     # off apt's "no stable CLI interface" warning, printed when its output is
     # piped (run_cmd pipes it into the log).
@@ -854,8 +868,17 @@ _pm() {
     return 1
   fi
 
+  if [[ ${cmd[0]} == yay ]]; then
+    if ! command -v yay >/dev/null 2>&1; then
+      log error "can't $action $package: it's an AUR package and yay isn't installed"
+      return 1
+    fi
+    if [[ $EUID -eq 0 ]]; then
+      log error "can't $action $package: yay doesn't run as root"
+      return 1
+    fi
   # Linux package managers need root. $EUID is 0 when already root (VMs, containers).
-  if [[ $DOTFILES_OS == linux && $EUID -ne 0 ]]; then
+  elif [[ $DOTFILES_OS == linux && $EUID -ne 0 ]]; then
     if ! command -v sudo >/dev/null 2>&1; then
       log error "can't $action $package: needs root, and sudo isn't installed"
       return 1
