@@ -450,26 +450,17 @@ packages:
 
   vscode:
     enabled: true
+    # Stable and Insiders, installed together (Insiders is the main one:
+    # the code alias opens it). Arch has Insiders only in the AUR, which
+    # pacman can't install: omarchy pkg aur add visual-studio-code-insiders-bin
     pacman: visual-studio-code-bin
     apt: none
     dnf: none
-    brew: visual-studio-code
-    winget: Microsoft.VisualStudioCode
+    brew: [visual-studio-code, visual-studio-code@insiders]
+    winget: [Microsoft.VisualStudioCode, Microsoft.VisualStudioCode.Insiders]
     command: code
     # No links: settings, snippets and extensions come from VS Code Settings
     # Sync (sign in, then Backup and Sync Settings).
-
-  # The main VS Code (the code alias opens it); stable stays installed too.
-  # Arch has it only in the AUR, which dotfiles doesn't install from.
-  vscode-insiders:
-    enabled: true
-    pacman: none
-    apt: none
-    dnf: none
-    brew: visual-studio-code@insiders
-    winget: Microsoft.VisualStudioCode.Insiders
-    command: code-insiders
-    manual: "AUR package: omarchy pkg aur add visual-studio-code-insiders-bin"
 
   warp:
     enabled: true
