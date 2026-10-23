@@ -21,6 +21,9 @@ The first run asks where to clone the repo, links itself as `dotfiles`
 (`~/.local/bin`), then opens the interactive setup.
 To skip the question: `curl … | DOTFILES=<path> bash`.
 
+`dotfiles.sh` runs on Bash 3.2 and newer, so macOS's own `/bin/bash` works
+before Homebrew is installed.
+
 On Windows, turn on Developer Mode first (Settings > System > For developers),
 or the config symlinks can't be made.
 

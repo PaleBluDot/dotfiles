@@ -117,18 +117,28 @@ init_log() {
 
 # Runs when the script exits for any reason.
 _on_exit() {
-  local code="$1"
+  local code="$1" command="$2"
+  # set -e stopped the run: say where. Not for "exit N" (the script already
+  # said why), and only when the last command is the failure _on_error saw.
+  if [[ $code -ne 0 && -n $ERR_LINE && $command == "$ERR_COMMAND" &&
+    $command != exit && $command != "exit "* ]]; then
+    log error "command failed (exit $code) at line $ERR_LINE: $ERR_COMMAND"
+  fi
   log debug "run finished, exit code $code"
 }
 
-# Runs when a command fails under set -e, so the log says where it died.
+# Runs when a command fails: remembers where, for _on_exit. It doesn't log
+# itself: Bash 3.2 (macOS /bin/bash) also runs it for failures inside
+# if/|| tests in functions and $(…), which aren't errors (Bash 4+ doesn't).
+ERR_LINE=""
+ERR_COMMAND=""
 _on_error() {
-  local code="$1" line="$2" command="$3"
-  log error "command failed (exit $code) at line $line: $command"
+  ERR_LINE="$1"
+  ERR_COMMAND="$2"
 }
 
-trap '_on_exit $?' EXIT
-trap '_on_error $? $LINENO "$BASH_COMMAND"' ERR
+trap '_on_exit $? "$BASH_COMMAND"' EXIT
+trap '_on_error $LINENO "$BASH_COMMAND"' ERR
 
 # ════════════════════════════════════════════════════════════════════════
 # ENVIRONMENT (plan Section 3)
