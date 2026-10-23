@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.4.4](https://github.com/PaleBluDot/dotfiles/compare/v2.4.3...v2.4.4) (2026-10-23)
+
+
+### Bug Fixes
+
+* **config:** real starburst theme for massCode ([#45](https://github.com/PaleBluDot/dotfiles/issues/45)) ([d2b7ce5](https://github.com/PaleBluDot/dotfiles/commit/d2b7ce584378715359c5ac228e00a9fdad4b88fe)), closes [#35](https://github.com/PaleBluDot/dotfiles/issues/35) [#eb5a47](https://github.com/PaleBluDot/dotfiles/issues/eb5a47) [#0d0d0](https://github.com/PaleBluDot/dotfiles/issues/0d0d0) [#c792](https://github.com/PaleBluDot/dotfiles/issues/c792) [#4e97](https://github.com/PaleBluDot/dotfiles/issues/4e97) [#4ebd8](https://github.com/PaleBluDot/dotfiles/issues/4ebd8) [#474c52](https://github.com/PaleBluDot/dotfiles/issues/474c52)
+
 ## [2.4.3](https://github.com/PaleBluDot/dotfiles/compare/v2.4.2...v2.4.3) (2026-10-23)
 
 
