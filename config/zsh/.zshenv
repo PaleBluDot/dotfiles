@@ -6,7 +6,9 @@ if [[ -n $SSH_CONNECTION ]]; then
   export VISUAL='nvim'
 else
   export EDITOR='nvim'
-  export VISUAL='code-insiders'
+  # --wait: git commit waits for the file to be closed (.aliases falls back
+  # to code when Insiders isn't installed).
+  export VISUAL='code-insiders --wait'
 fi
 
 # CORE DIRECTORIES
