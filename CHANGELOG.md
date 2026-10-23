@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.4.6](https://github.com/PaleBluDot/dotfiles/compare/v2.4.5...v2.4.6) (2026-10-23)
+
+
+### Bug Fixes
+
+* **config:** vs code insiders installed next to vs code ([#48](https://github.com/PaleBluDot/dotfiles/issues/48)) ([f82a65f](https://github.com/PaleBluDot/dotfiles/commit/f82a65fc03d7039cade2576e81370c2aa46ecbef)), closes [#38](https://github.com/PaleBluDot/dotfiles/issues/38)
+
 ## [2.4.5](https://github.com/PaleBluDot/dotfiles/compare/v2.4.4...v2.4.5) (2026-10-23)
 
 
