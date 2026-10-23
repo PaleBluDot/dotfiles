@@ -65,7 +65,9 @@ packages:
 
   aether:
     enabled: true
-    manual: "Not auto-installed. Install by hand: git clone https://github.com/omacom/aether.git && cd aether && make build"
+    # Packaged in the Omarchy pacman repo; built by hand anywhere else.
+    pacman: aether
+    manual: "Not packaged for this OS. Install by hand: git clone https://github.com/omacom/aether.git && cd aether && make build"
     links:
       # Blueprints: wallpaper paths in the repo are relative to it
       # (config/omarchy/...); fill writes copies with this machine's path.
