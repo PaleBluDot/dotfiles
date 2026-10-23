@@ -247,7 +247,9 @@ packages:
         os: linux
 
   komorebi:
-    enabled: true
+    # Off: the files are komorebi for Mac + skhd, not Windows komorebi
+    # (whkd). Kept in the repo for later.
+    enabled: false
     pacman: none
     apt: none
     dnf: none
