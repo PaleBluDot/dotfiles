@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.4.2](https://github.com/PaleBluDot/dotfiles/compare/v2.4.1...v2.4.2) (2026-10-23)
+
+
+### Bug Fixes
+
+* **config:** composer reads its settings from config.json ([#43](https://github.com/PaleBluDot/dotfiles/issues/43)) ([e49aff8](https://github.com/PaleBluDot/dotfiles/commit/e49aff8cf1ee4606a7064fa96c552a4606e81b2b)), closes [#33](https://github.com/PaleBluDot/dotfiles/issues/33)
+
 ## [2.4.1](https://github.com/PaleBluDot/dotfiles/compare/v2.4.0...v2.4.1) (2026-10-22)
 
 
