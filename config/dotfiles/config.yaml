@@ -459,6 +459,18 @@ packages:
     # No links: settings, snippets and extensions come from VS Code Settings
     # Sync (sign in, then Backup and Sync Settings).
 
+  # The main VS Code (the code alias opens it); stable stays installed too.
+  # Arch has it only in the AUR, which dotfiles doesn't install from.
+  vscode-insiders:
+    enabled: true
+    pacman: none
+    apt: none
+    dnf: none
+    brew: visual-studio-code@insiders
+    winget: Microsoft.VisualStudioCode.Insiders
+    command: code-insiders
+    manual: "AUR package: omarchy pkg aur add visual-studio-code-insiders-bin"
+
   warp:
     enabled: true
     manual: "Not auto-installed. Install the Warp app by hand"
