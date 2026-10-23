@@ -17,6 +17,7 @@ default: []
 # The key is the config/ folder name. Add a manager (pacman, apt, dnf,
 # brew, winget) where its package name differs from the key; "none" = not there.
 # A list ([app, app-cli]) installs several packages for one tool.
+# aur/<name> under pacman: is installed from the AUR with yay.
 #   command:  only when the command isn't the key (can also be per manager)
 #   manual:   no package manager installs it; this message says how
 #   links:    src is a path under config/, dest a path under $HOME (none =
@@ -455,11 +456,13 @@ packages:
 
   vscode:
     enabled: true
-    pacman: visual-studio-code-bin
+    # Stable and Insiders, installed together (Insiders is the main one:
+    # the code alias opens it). aur/ = from the AUR, with yay.
+    pacman: [visual-studio-code-bin, aur/visual-studio-code-insiders-bin]
     apt: none
     dnf: none
-    brew: visual-studio-code
-    winget: Microsoft.VisualStudioCode
+    brew: [visual-studio-code, visual-studio-code@insiders]
+    winget: [Microsoft.VisualStudioCode, Microsoft.VisualStudioCode.Insiders]
     command: code
     # No links: settings, snippets and extensions come from VS Code Settings
     # Sync (sign in, then Backup and Sync Settings).

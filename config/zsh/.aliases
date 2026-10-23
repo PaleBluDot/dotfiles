@@ -197,5 +197,12 @@ alias group="cat /etc/group"
 # !------------------------------------
 # @@@ VS CODE
 # !------------------------------------
-alias code="code-insiders"
+# Insiders is the main VS Code. Until it's installed (AUR on Arch), plain
+# code stays code and is the editor. Here, not in .zshenv: Homebrew's PATH
+# (.zprofile) isn't set yet there.
+if (( $+commands[code-insiders] )); then
+  alias code="code-insiders"
+elif [[ $VISUAL == code-insiders* ]] && (( $+commands[code] )); then
+  export VISUAL='code --wait'
+fi
 alias teach="code --extensions-dir ~/code_profiles/teach/exts --user-data-dir ~/code_profiles/teach/data"
