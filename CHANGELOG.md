@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.4.7](https://github.com/PaleBluDot/dotfiles/compare/v2.4.6...v2.4.7) (2026-10-23)
+
+
+### Bug Fixes
+
+* **script:** no false errors on bash 3.2 ([#49](https://github.com/PaleBluDot/dotfiles/issues/49)) ([148e513](https://github.com/PaleBluDot/dotfiles/commit/148e5130c8e22d9aa5190667c67a0b7b7b8f5dbf)), closes [#39](https://github.com/PaleBluDot/dotfiles/issues/39)
+
 ## [2.4.6](https://github.com/PaleBluDot/dotfiles/compare/v2.4.5...v2.4.6) (2026-10-23)
 
 
