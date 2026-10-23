@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.4.3](https://github.com/PaleBluDot/dotfiles/compare/v2.4.2...v2.4.3) (2026-10-23)
+
+
+### Bug Fixes
+
+* **config:** turn komorebi off, keep its files ([#44](https://github.com/PaleBluDot/dotfiles/issues/44)) ([df70dfa](https://github.com/PaleBluDot/dotfiles/commit/df70dfae37a2d4f73c116914d16e34762d54b6d6)), closes [#34](https://github.com/PaleBluDot/dotfiles/issues/34)
+
 ## [2.4.2](https://github.com/PaleBluDot/dotfiles/compare/v2.4.1...v2.4.2) (2026-10-23)
 
 
