@@ -463,8 +463,12 @@ packages:
     enabled: true
     manual: "Not auto-installed. Install the Warp app by hand"
     links:
+      # Warp's theme folder: ~/.warp/themes on macOS,
+      # $XDG_DATA_HOME/warp-terminal/themes on Linux, %APPDATA%\warp\Warp\data\themes on Windows.
       - src: warp/starburst.yml
         dest: .warp/themes/starburst.yml
+        linux: .local/share/warp-terminal/themes/starburst.yml
+        windows: AppData/Roaming/warp/Warp/data/themes/starburst.yml
 
   wezterm:
     enabled: true
