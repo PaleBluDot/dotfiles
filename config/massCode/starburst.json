@@ -1,0 +1,32 @@
+{
+  "name": "Starburst",
+  "author": "Pavel Sanchez",
+  "type": "dark",
+  "colors": {
+    "color-primary": "#eb5a47",
+    "color-bg": "#0d0d0d",
+    "color-fg": "#e6e6e6",
+    "color-text": "#e6e6e6",
+    "color-text-muted": "#65737e",
+    "color-border": "#191919",
+    "color-button": "#191919",
+    "color-button-hover": "#212121",
+    "color-list-selection": "#eb5a4750",
+    "color-list-selection-fg": "#e6e6e6",
+    "color-scrollbar": "#212121b3"
+  },
+  "editorColors": {
+    "editor-keyword": "#c792ea",
+    "editor-string": "#4e97bd",
+    "editor-comment": "#474c52",
+    "editor-number": "#4ebd8f",
+    "editor-atom": "#4ebd8f",
+    "editor-variable": "#eeffff",
+    "editor-def": "#4ebd8f",
+    "editor-property": "#b2ccd6",
+    "editor-tag": "#d37fac",
+    "editor-attribute": "#d9df34",
+    "editor-operator": "#89ddff",
+    "editor-bracket": "#e6e6e6"
+  }
+}

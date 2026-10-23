@@ -299,8 +299,9 @@ packages:
     enabled: true
     manual: "Not auto-installed. Install the massCode app by hand"
     links:
-      - src: massCode/startburst.yml
-        dest: .massCode/themes/startburst.yml
+      # massCode loads every .json in ~/.massCode/themes (same path on every OS).
+      - src: massCode/starburst.json
+        dest: .massCode/themes/starburst.json
 
   mise:
     enabled: true
