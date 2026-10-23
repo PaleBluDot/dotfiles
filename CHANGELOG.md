@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.4.5](https://github.com/PaleBluDot/dotfiles/compare/v2.4.4...v2.4.5) (2026-10-23)
+
+
+### Bug Fixes
+
+* **config:** install aether with pacman ([#47](https://github.com/PaleBluDot/dotfiles/issues/47)) ([b68b3ea](https://github.com/PaleBluDot/dotfiles/commit/b68b3ea83e6c0d83873f12389e810a52dc6a0904)), closes [#37](https://github.com/PaleBluDot/dotfiles/issues/37)
+
 ## [2.4.4](https://github.com/PaleBluDot/dotfiles/compare/v2.4.3...v2.4.4) (2026-10-23)
 
 
