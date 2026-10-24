@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.5.1](https://github.com/PaleBluDot/dotfiles/compare/v2.5.0...v2.5.1) (2026-10-24)
+
+
+### Bug Fixes
+
+* **config:** get espanso working ([#56](https://github.com/PaleBluDot/dotfiles/issues/56)) ([103b0c8](https://github.com/PaleBluDot/dotfiles/commit/103b0c845f1731e6ef34f9a7e5eb5e5ee1dface0)), closes [#52](https://github.com/PaleBluDot/dotfiles/issues/52) [#57](https://github.com/PaleBluDot/dotfiles/issues/57) [#58](https://github.com/PaleBluDot/dotfiles/issues/58) [#53](https://github.com/PaleBluDot/dotfiles/issues/53) [#52](https://github.com/PaleBluDot/dotfiles/issues/52) [#57](https://github.com/PaleBluDot/dotfiles/issues/57) [#54](https://github.com/PaleBluDot/dotfiles/issues/54) [#58](https://github.com/PaleBluDot/dotfiles/issues/58) [#53](https://github.com/PaleBluDot/dotfiles/issues/53) [#55](https://github.com/PaleBluDot/dotfiles/issues/55) [#53](https://github.com/PaleBluDot/dotfiles/issues/53)
+
 # [2.5.0](https://github.com/PaleBluDot/dotfiles/compare/v2.4.7...v2.5.0) (2026-10-24)
 
 
