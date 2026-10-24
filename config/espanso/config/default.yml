@@ -12,3 +12,7 @@ search_trigger: off
 show_icon: false
 show_notifications: false
 
+# Wayland can't tell espanso the layout (it warns on every start and can
+# type wrong characters). macOS and Windows ignore this.
+keyboard_layout:
+  layout: us
