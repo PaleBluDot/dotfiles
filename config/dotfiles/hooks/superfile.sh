@@ -24,12 +24,17 @@ if [[ ${DOTFILES_PLATFORM:-} == windows ]]; then
   exit 0
 fi
 if ! command -v curl >/dev/null 2>&1; then
-  echo "next: install superfile (needs curl): bash -c \"\$(curl -sLo- https://superfile.dev/install.sh)\""
+  echo "next: install superfile (needs curl): https://superfile.dev/install.sh"
   exit 0
 fi
 if [[ $dry == true ]]; then
-  echo "dry run, would run superfile's installer: bash -c \"\$(curl -sLo- https://superfile.dev/install.sh)\""
+  echo "dry run, would run superfile's installer: https://superfile.dev/install.sh"
   exit 0
 fi
 echo "superfile: not installed, running its installer (https://superfile.dev/install.sh)"
-bash -c "$(curl -sLo- https://superfile.dev/install.sh)"
+# Saved to a file first (not piped into bash): a failed or cut-off download
+# stops here instead of running half a script.
+installer="$(mktemp)"
+trap 'rm -f "$installer"' EXIT
+curl -fsSL -o "$installer" https://superfile.dev/install.sh
+bash "$installer"
