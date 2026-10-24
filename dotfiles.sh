@@ -125,6 +125,11 @@ _on_exit() {
     $command != exit && $command != "exit "* ]]; then
     log error "command failed (exit $code) at line $ERR_LINE: $ERR_COMMAND"
   fi
+  # What's installed now, for the next run's config.yml check: after
+  # wipe, the tools it removed are still listed for link to set up again.
+  case "${LOG_CMD:-}" in
+    link | unlink | update | wipe | interactive) _installed_state_save ;;
+  esac
   log debug "run finished, exit code $code"
 }
 
@@ -858,7 +863,9 @@ _config_template() {
   cat <<EOF
 # This machine's dotfiles setup: never in the repo. dotfiles rewrites
 # required: and tools: (alphabetical); everything else here, and your own
-# edits, are kept.
+# edits, are kept. Every run, a tool installed here goes into tools: and
+# one removed outside dotfiles comes off; one you add by hand stays until
+# link installs it.
 
 settings:
 ${1:-  # theme: starburst}
@@ -958,7 +965,8 @@ _config_set() {
 # is a real one, and config.yml is written from those values (enabled =
 # used here, locked = required), so nothing gets switched off. The old file
 # comes from the working tree, or from git once the pull removed it. No old
-# file = a new machine: an empty config.yml.
+# file = a new machine: empty lists. Either way _config_sync then lists
+# only what's installed here.
 _config_migrate() {
   if [[ -z $DOTFILES ]]; then
     return 0
@@ -1031,7 +1039,7 @@ _config_migrate() {
       _config_write "$required" "$used" || return 0
       log success "wrote $shown/config.yml from $from ($counts)"
     else
-      log info "new machine: wrote an empty $shown/config.yml; pick tools with: dotfiles (or dotfiles link <tool>)"
+      log info "new machine: wrote $shown/config.yml (the tools installed here go in it); pick more with: dotfiles (or dotfiles link <tool>)"
     fi
   fi
   # This run uses the new lists (a dry run has no file to read them from).
@@ -1042,6 +1050,105 @@ _config_migrate() {
     [[ $line =~ ^\ \ ([A-Za-z0-9_]+):\ (.*)$ ]] || continue
     printf -v "CFG_SET_${BASH_REMATCH[1]}" '=%s' "${BASH_REMATCH[2]}"
   done <<<"$settings"
+}
+
+# ─── config.yml follows the machine (every run) ─────────────────────────
+# config.yml lists the tools installed here: one installed outside dotfiles
+# goes into tools:, one removed outside dotfiles comes off. INSTALLED_STATE
+# remembers what was installed at the end of the last run, so a tool added
+# to the file by hand (not installed yet: link installs it) isn't mistaken
+# for one that was removed. Names that aren't tools used here, and which
+# list a tool is in, are left as they are.
+INSTALLED_STATE="$LOG_DIR/installed"
+SYNC_READY=false
+
+# "name" is one of the lines in $2.
+_in_lines() {
+  [[ $'\n'$2$'\n' == *$'\n'"$1"$'\n'* ]]
+}
+
+# The tools used here that are installed now, one per line.
+_installed_now() {
+  local tool
+  while IFS= read -r tool; do
+    if _tool_is_used_here "$tool" && _tool_is_installed "$tool"; then
+      echo "$tool"
+    fi
+  done < <(manifest_tools)
+}
+
+_config_sync() {
+  if [[ $MACHINE_LOADED != true || -z $DOTFILES_TOOLS || ! -f $DOTFILES_TOOLS ]]; then
+    return 0
+  fi
+  if [[ ! -f $DOTFILES_CONFIG && $DRY_RUN != true ]]; then
+    return 0
+  fi
+  SYNC_READY=true
+  local now before="" have_state=false name required="" used="" added="" dropped=""
+  now="$(_installed_now)"
+  if [[ -f $INSTALLED_STATE ]]; then
+    have_state=true
+    before="$(<"$INSTALLED_STATE")"
+  fi
+  # Listed but not installed: removed outside dotfiles when it was
+  # installed last time (or there's no last time yet); otherwise added by
+  # hand, and kept for link to install.
+  local list kept
+  for list in required used; do
+    kept=""
+    while IFS= read -r name; do
+      [[ -n $name ]] || continue
+      if _tool_exists "$name" && _tool_is_used_here "$name" && ! _in_lines "$name" "$now" &&
+        { [[ $have_state != true ]] || _in_lines "$name" "$before"; }; then
+        dropped="${dropped:+$dropped }$name"
+        continue
+      fi
+      kept+="$name"$'\n'
+    done <<<"$(if [[ $list == required ]]; then printf '%s' "$CFG_REQUIRED"; else printf '%s' "$CFG_USED"; fi)"
+    if [[ $list == required ]]; then required="$kept"; else used="$kept"; fi
+  done
+  # Installed but not listed: into tools:.
+  while IFS= read -r name; do
+    [[ -n $name ]] || continue
+    if ! _in_lines "$name" "$required$used"; then
+      used+="$name"$'\n'
+      added="${added:+$added }$name"
+    fi
+  done <<<"$now"
+
+  if [[ -n $added || -n $dropped ]]; then
+    if [[ $DRY_RUN == true ]]; then
+      [[ -z $added ]] || log info "dry run, config.yml: would add (installed here): $added"
+      [[ -z $dropped ]] || log info "dry run, config.yml: would take off (not installed): $dropped"
+    elif _config_write "$required" "$used"; then
+      [[ -z $added ]] || log info "config.yml: added (installed here): $added"
+      [[ -z $dropped ]] || log info "config.yml: took off (not installed any more): $dropped"
+    else
+      return 0
+    fi
+    CFG_REQUIRED="$required"
+    CFG_USED="$used"
+  fi
+  _installed_state_save "$now"
+}
+
+# Write INSTALLED_STATE (not in a dry run). No argument: look again, with a
+# fresh package list (the run may have installed or removed packages).
+_installed_state_save() {
+  if [[ $DRY_RUN == true || ${SYNC_READY:-} != true ]]; then
+    return 0
+  fi
+  local now
+  if [[ $# -gt 0 ]]; then
+    now="$1"
+  else
+    pkg_cache_load
+    now="$(_installed_now)"
+  fi
+  if mkdir -p "$(dirname "$INSTALLED_STATE")" 2>/dev/null; then
+    printf '%s\n' "$now" >"$INSTALLED_STATE" 2>/dev/null || true
+  fi
 }
 
 # Print the installed version of a package, or return 1 if it isn't
@@ -4200,6 +4307,7 @@ cmd_doctor() {
   _doctor_yq
   _doctor_config
   load_settings
+  _config_sync
   _doctor_machine
   _doctor_self_links
   _doctor_tools
@@ -4324,6 +4432,11 @@ main() {
   case "$cmd" in
     help | version) ;;
     *) pkg_cache_load ;;
+  esac
+  # config.yml follows what's installed (doctor does it after its checks).
+  case "$cmd" in
+    help | version | doctor) ;;
+    *) _config_sync ;;
   esac
   warn_unused_flags "$cmd"
 
