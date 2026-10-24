@@ -23,6 +23,11 @@ VERBOSE=false
 NO_COLOR_FLAG=false   # --no-color: the banner without colour
 REQUIRED_FLAG=false   # --required: link adds the tools to required: in config.yml
 QUIET=false   # interactive mode: info/success and command output go to the log only
+# link/update (#24): a tool's success lines wait in TOOL_HELD while
+# TOOL_HOLD is true. The first other line prints them (something is
+# happening); a tool where nothing changed gets one line instead.
+TOOL_HOLD=false
+TOOL_HELD=""
 
 # ─── Logging state ──────────────────────────────────────────────────────
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
@@ -80,6 +85,7 @@ log() {
 
   case "$level" in
     error | warn)
+      _tool_release
       printf '[%s] %s\n' "$label" "$message" >&2
       ;;
     debug)
@@ -88,11 +94,59 @@ log() {
       fi
       ;;
     *)
-      if [[ $QUIET != true || $VERBOSE == true ]]; then
+      if [[ $TOOL_HOLD == true && $level == success ]]; then
+        TOOL_HELD+="[$label] $message"$'\n'
+      elif [[ $QUIET != true || $VERBOSE == true ]]; then
+        _tool_release
         printf '[%s] %s\n' "$label" "$message"
       fi
       ;;
   esac
+}
+
+# link/update: start holding one tool's success lines (not with -v, and
+# not on the interactive screens, which print their own line per tool).
+_tool_hold() {
+  TOOL_HELD=""
+  TOOL_HOLD=false
+  if [[ $VERBOSE != true && $QUIET != true ]]; then
+    TOOL_HOLD=true
+  fi
+}
+
+# Print the held lines and stop holding: something is happening.
+_tool_release() {
+  if [[ $TOOL_HOLD == true ]]; then
+    TOOL_HOLD=false
+    printf '%s' "$TOOL_HELD"
+    TOOL_HELD=""
+  fi
+}
+
+# End of one tool: nothing changed = one line, as on the interactive
+# screen ("bat  installed, linked"); a change = the held lines.
+TOOL_WIDTH=0
+_tool_done() {
+  local tool="$1" line name
+  if [[ $TOOL_HOLD != true ]]; then
+    return 0
+  fi
+  if [[ $CHANGED == true ]]; then
+    _tool_release
+    return 0
+  fi
+  TOOL_HOLD=false
+  TOOL_HELD=""
+  # The name column is as wide as the longest name in this run.
+  if [[ $TOOL_WIDTH -eq 0 ]]; then
+    for name in ${TOOLS[@]+"${TOOLS[@]}"}; do
+      if [[ ${#name} -gt $TOOL_WIDTH ]]; then
+        TOOL_WIDTH=${#name}
+      fi
+    done
+  fi
+  printf -v line '  %-*s  %s' "$TOOL_WIDTH" "$tool" "$(_state_text "$tool")"
+  out "$line"
 }
 
 # A full-width rule with a title, for -v: "===== installing x (brew) =====".
@@ -2834,6 +2888,7 @@ _run_hook() {
       *)
         printed=true
         if [[ $QUIET != true || $VERBOSE == true ]]; then
+          _tool_release
           printf '%s\n' "$line"
         fi
         _log_to_file "INFO" "  $tool hook> $line"
@@ -2986,10 +3041,15 @@ cmd_link() {
       fi
       continue
     fi
+    _tool_hold
     if ! _link_tool "$tool" "$as"; then
+      _tool_release
       bad="${bad:+$bad, }$tool"
-    elif [[ $CHANGED == true ]]; then
-      good="${good:+$good, }$(_tool_with_version "$tool")"
+    else
+      _tool_done "$tool"
+      if [[ $CHANGED == true ]]; then
+        good="${good:+$good, }$(_tool_with_version "$tool")"
+      fi
     fi
   done
   _render_theme
@@ -3329,7 +3389,8 @@ _state_text() {
   elif _tool_package_get "$tool" && [[ -z $TOOL_PACKAGE ]] && ! _tool_has_hook "$tool"; then
     text="install by hand"
   fi
-  if _tool_is_linked "$tool"; then
+  # Only a tool with links (aether and vscode have none).
+  if [[ -n $(tool_links "$tool") ]] && _tool_is_linked "$tool"; then
     text="${text:+$text, }linked"
   fi
   echo "${text:--}"
@@ -3745,11 +3806,16 @@ cmd_update() {
   local changed=$PULLED
   for tool in "${TOOLS[@]}"; do
     CHANGED=false
+    _tool_hold
     if ! _link_tool "$tool" keep; then
+      _tool_release
       bad="${bad:+$bad, }$tool"
-    elif [[ $CHANGED == true ]]; then
-      changed=true
-      good="${good:+$good, }$(_tool_with_version "$tool")"
+    else
+      _tool_done "$tool"
+      if [[ $CHANGED == true ]]; then
+        changed=true
+        good="${good:+$good, }$(_tool_with_version "$tool")"
+      fi
     fi
   done
   _render_theme
