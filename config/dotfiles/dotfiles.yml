@@ -107,7 +107,8 @@ tools:
     links:
       cspell: $HOME/.config/cspell
 
-  # Debian and Fedora: no package yet (#54).
+  # hooks/espanso.sh makes it start at boot (a service). Debian and Fedora:
+  # no package yet (#54).
   espanso:
     package:
       arch: aur/espanso-wayland
