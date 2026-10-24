@@ -99,13 +99,20 @@ tools:
     links:
       composer: $HOME/.config/composer
 
-  # No package: hooks/cspell.sh installs cspell (npm) and its dictionaries.
+  # Only brew packages cspell: hooks/cspell.sh installs it with npm
+  # everywhere else, and its dictionaries everywhere.
   cspell:
+    package:
+      mac: cspell
     links:
       cspell: $HOME/.config/cspell
 
-  # No package yet (#54).
+  # Debian and Fedora: no package yet (#54).
   espanso:
+    package:
+      arch: aur/espanso-wayland
+      mac: espanso
+      windows: Espanso.Espanso
     links:
       espanso: $HOME/.config/espanso
 
@@ -239,9 +246,14 @@ tools:
       limine/hooks/40-shim-limine-sync: /etc/boot/hooks/post.d/40-shim-limine-sync
       limine/hooks/50-omarchy-limine-style: /etc/boot/hooks/post.d/50-omarchy-limine-style
 
-  # No package: hooks/massCode.sh says where to get the app. massCode loads
-  # every .json in ~/.massCode/themes (same path on every OS).
+  # Debian and Fedora: hooks/massCode.sh installs the AppImage. massCode
+  # loads every .json in ~/.massCode/themes (same path on every OS).
   massCode:
+    package:
+      arch: aur/masscode
+      mac: masscode
+      windows: AntonReshetov.massCode
+    command: masscode
     links:
       massCode/starburst.json: $HOME/.massCode/themes/starburst.json
 
@@ -325,8 +337,12 @@ tools:
     links:
       starship: $HOME/.config/starship
 
-  # No package: hooks/superfile.sh runs its installer when spf is missing.
+  # Debian and Fedora: hooks/superfile.sh runs superfile's installer.
   superfile:
+    package:
+      arch: superfile
+      mac: superfile
+      windows: yorukot.superfile
     command: spf
     links:
       superfile: $HOME/.config/superfile
@@ -371,8 +387,14 @@ tools:
       windows: [Microsoft.VisualStudioCode, Microsoft.VisualStudioCode.Insiders]
     command: code
 
-  # No package: hooks/warp.sh says where to get the app.
+  # Debian and Fedora: hooks/warp.sh adds Warp's apt or dnf repo and
+  # installs it from there.
   warp:
+    package:
+      arch: aur/warp-terminal-bin
+      mac: warp
+      windows: Warp.Warp
+    command: warp-terminal
     links:
       warp/starburst.yml:
         mac: $HOME/.warp/themes/starburst.yml

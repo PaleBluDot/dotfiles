@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
-# dotfiles hook: superfile (spf). Runs after its links (link, update,
-# interactive). No package manager has it everywhere, so this runs
+# dotfiles hook: superfile (spf). Runs after its package and links (link,
+# update, interactive). Arch, Mac and Windows get superfile from package:
+# in dotfiles.yml; Debian and Fedora have no package, so this runs
 # superfile's own installer when spf is missing.
 #
 # Flags from dotfiles: --dry-run, --verbose, --force. Prints nothing when
@@ -16,11 +17,11 @@ for arg in "$@"; do
   esac
 done
 
+case "${DOTFILES_PLATFORM:-}" in
+  debian | fedora) ;;
+  *) exit 0 ;;
+esac
 if command -v spf >/dev/null 2>&1; then
-  exit 0
-fi
-if [[ ${DOTFILES_PLATFORM:-} == windows ]]; then
-  echo "next: install superfile: powershell -ExecutionPolicy Bypass -Command \"Invoke-Expression (Invoke-WebRequest -UseBasicParsing -Uri https://superfile.dev/install.ps1).Content\""
   exit 0
 fi
 if ! command -v curl >/dev/null 2>&1; then
