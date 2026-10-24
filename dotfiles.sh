@@ -21,6 +21,7 @@ DRY_RUN=false
 FORCE=false
 VERBOSE=false
 NO_COLOR_FLAG=false   # --no-color: the banner without colour
+REQUIRED_FLAG=false   # --required: link adds the tools to required: in config.yml
 QUIET=false   # interactive mode: info/success and command output go to the log only
 
 # ─── Logging state ──────────────────────────────────────────────────────
@@ -124,6 +125,11 @@ _on_exit() {
     $command != exit && $command != "exit "* ]]; then
     log error "command failed (exit $code) at line $ERR_LINE: $ERR_COMMAND"
   fi
+  # What's installed now, for the next run's config.yml check: after
+  # wipe, the tools it removed are still listed for link to set up again.
+  case "${LOG_CMD:-}" in
+    link | unlink | update | wipe | interactive) _installed_state_save ;;
+  esac
   log debug "run finished, exit code $code"
 }
 
@@ -176,18 +182,19 @@ resolve_dotfiles() {
     fi
   fi
 
-  # The config file: ~/.config/dotfiles/config.yaml (linked from the repo),
-  # else the repo's own copy (a new machine, before anything is linked).
-  local user_config="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/config.yaml"
-  if [[ -f $user_config ]]; then
-    DOTFILES_CONFIG="$user_config"
-  elif [[ -n $DOTFILES ]]; then
-    DOTFILES_CONFIG="$DOTFILES/config/dotfiles/config.yaml"
+  # Two files: every tool (dotfiles.yml, in the repo), and what this machine
+  # uses (config.yml, a real file in ~/.config/dotfiles, never committed).
+  if [[ -n $DOTFILES ]]; then
+    DOTFILES_TOOLS="$DOTFILES/config/dotfiles/dotfiles.yml"
+    HOOKS_DIR="$DOTFILES/config/dotfiles/hooks"
   else
-    DOTFILES_CONFIG=""
+    DOTFILES_TOOLS=""
+    HOOKS_DIR=""
   fi
+  CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles"
+  DOTFILES_CONFIG="$CONFIG_DIR/config.yml"
   export DOTFILES DOTFILES_CONFIG
-  log debug "DOTFILES_CONFIG: ${DOTFILES_CONFIG:-<none>}"
+  log debug "DOTFILES_TOOLS: ${DOTFILES_TOOLS:-<none>} DOTFILES_CONFIG: $DOTFILES_CONFIG"
 }
 
 # ════════════════════════════════════════════════════════════════════════
@@ -197,7 +204,9 @@ resolve_dotfiles() {
 DOTFILES_OS=""      # macos | linux | windows
 DOTFILES_DISTRO=""  # display only, Linux only: "<NAME> <kernel>"
 DISTRO_ID=""        # internal, Linux only: debian | pacman | fedora
-PKG_MANAGER=""      # internal: pacman | apt | dnf | brew | winget (the keys in config.yaml)
+PKG_MANAGER=""      # internal: pacman | apt | dnf | brew | winget
+PLATFORM=""         # the dotfiles.yml key: arch | debian | fedora | mac | windows
+PLATFORM_KEYS="all" # the keys that apply here, most specific first: "arch linux all"
 
 # Print one field from an os-release file. The file is read, not sourced:
 # sourcing would run it as code and overwrite variables like NAME and ID.
@@ -275,37 +284,54 @@ detect_os() {
   esac
 
   case "$DOTFILES_OS:$DISTRO_ID" in
-    linux:pacman) PKG_MANAGER="pacman" ;;
-    linux:debian) PKG_MANAGER="apt" ;;
-    linux:fedora) PKG_MANAGER="dnf" ;;
-    macos:*)      PKG_MANAGER="brew" ;;
-    windows:*)    PKG_MANAGER="winget" ;;
+    linux:pacman) PKG_MANAGER="pacman"; PLATFORM="arch" ;;
+    linux:debian) PKG_MANAGER="apt";    PLATFORM="debian" ;;
+    linux:fedora) PKG_MANAGER="dnf";    PLATFORM="fedora" ;;
+    macos:*)      PKG_MANAGER="brew";   PLATFORM="mac" ;;
+    windows:*)    PKG_MANAGER="winget"; PLATFORM="windows" ;;
   esac
+  # The dotfiles.yml keys that apply here, most specific first.
+  PLATFORM_KEYS="${PLATFORM:+$PLATFORM }"
+  if [[ $DOTFILES_OS == linux ]]; then
+    PLATFORM_KEYS+="linux "
+  fi
+  PLATFORM_KEYS+="all"
+  export DOTFILES_PLATFORM="$PLATFORM"
 
   export DOTFILES_OS DOTFILES_DISTRO
-  log debug "DOTFILES_OS=${DOTFILES_OS:-<unknown>} DOTFILES_DISTRO=${DOTFILES_DISTRO:-<none>} package manager=${PKG_MANAGER:-<none>}"
+  log debug "DOTFILES_OS=${DOTFILES_OS:-<unknown>} DOTFILES_DISTRO=${DOTFILES_DISTRO:-<none>} package manager=${PKG_MANAGER:-<none>} platform=${PLATFORM:-<none>}"
 }
 
 # ════════════════════════════════════════════════════════════════════════
-# CONFIG FILE: config/dotfiles/config.yaml (plan Section 18)
+# CONFIG FILES (#51)
+#   config/dotfiles/dotfiles.yml      every tool: package, links, clones (repo)
+#   config/dotfiles/hooks/<tool>.sh   extra steps for a tool (repo, optional)
+#   ~/.config/dotfiles/config.yml     this machine: settings, required, tools
 # ════════════════════════════════════════════════════════════════════════
 
 BACKUP_SUFFIX=".bak"
 THEME="starburst"   # settings.theme: the theme machines without Omarchy use
 
-# Run one yq query against the config file.
+# Run one yq query against a file (default: dotfiles.yml).
 _yq() {
-  yq eval "$1" "$DOTFILES_CONFIG"
+  yq eval "$1" "${2:-$DOTFILES_TOOLS}"
 }
 
-# Settings from the config, once it can be read. Unset = built-in default.
-# Also reads the whole config into the shell (_cfg_load) here, in the main
-# shell: a first read inside $(…) or < <(…) would be lost with the subshell.
+# Read both files, once they can be read: dotfiles.yml (and the hooks),
+# then this machine's config.yml (written from the old config.yaml on the
+# first run after #51), then its settings. Unset = built-in default.
+# Runs in the main shell: a first read inside $(…) or < <(…) would be lost
+# with the subshell.
 load_settings() {
-  if [[ -z $DOTFILES_CONFIG || ! -f $DOTFILES_CONFIG ]] || ! command -v yq >/dev/null 2>&1; then
+  if [[ -z $DOTFILES_TOOLS || ! -f $DOTFILES_TOOLS ]] || ! command -v yq >/dev/null 2>&1; then
     return 0
   fi
   _cfg_load
+  case "$LOG_CMD" in
+    help | version) ;;
+    *) _config_migrate ;;
+  esac
+  _machine_load
   local value
   value="$(_cfg_setting theme)"
   THEME="${value:-$THEME}"
@@ -327,154 +353,232 @@ load_settings() {
   log debug "settings: backup_suffix=$BACKUP_SUFFIX log_file=${LOG_FILE:-<none>}"
 }
 
-# ─── config.yaml, read once per run ─────────────────────────────────────
-# Every packages: field the script needs, settings: and default: come out
-# of one yq call and are kept in shell variables, so asking for a tool's
-# package or links costs nothing (one yq call per question made update take
-# ~17 s, and the interactive screens ~3 min). load_settings reads it in the
-# main shell, so every $(…) after that has the copy. set_enabled updates
-# the copy when it writes the file.
-#   CFG_TOOLS               tool names, in config.yaml order
-#   CFG_DEFAULT             default: names, one per line
-#   CFG_SET_<key>           "=value" for a settings: entry
-#   CFG_<id>_S_<field>      "=value" for a plain field (enabled, manual, brew…);
-#                           a list of package names is stored space-separated
-#   CFG_<id>_C_<key>        "=value" for a command: map entry
-#   CFG_<id>_CMAP           1 when command: is a map
-#   CFG_<id>_L              links: "src dest os linux macos windows copy inject enable fill"
-#   CFG_<id>_K              clones: "repo dest"
+# ─── dotfiles.yml and the hooks, read once per run ──────────────────────
+# Every field the script needs comes out of one yq call and is kept in
+# shell variables, so asking for a tool's package or links costs nothing
+# (one yq call per question made update take ~17 s, and the interactive
+# screens ~3 min).
+#   CFG_TOOLS               tool names: dotfiles.yml order, then hook-only ones
+#   CFG_<id>_PRIO           "high" (priority: high, or PRIORITY=high in the hook)
+#   CFG_<id>_HASPKG         1 when the tool has package:
+#   CFG_<id>_P_<platform>   "=name" for a package: entry (a list space-separated;
+#                           "=" alone for ~: nothing to install there)
+#   CFG_<id>_C_<platform>   "=name" for a command: entry (all = a plain command:)
+#   CFG_<id>_L              links: "src platform dest" lines (all = one dest)
+#   CFG_<id>_K              clones: "repo dest" lines
+#   CFG_<id>_HOOK           1 when hooks/<tool>.sh exists
 # Records use the unit separator (\x1f) between fields: tabs would collapse
 # empty fields when read.
 CFG_LOADED=false
 CFG_TOOLS=""
-CFG_DEFAULT=""
 readonly CFG_SEP=$'\x1f'
 
-# A tool name as a variable-name part: letters and digits kept, anything
-# else as _<hex> (chromium-flags.conf -> chromium_2dflags_2econf).
-CFG_ID_FOR=""
-CFG_ID=""
-_cfg_id() {
-  if [[ $1 == "$CFG_ID_FOR" ]]; then
-    return 0
-  fi
+# A name as a variable-name part: letters and digits kept, anything else
+# as _<hex> (chromium-flags.conf -> chromium_2dflags_2econf). Into NAME_ID.
+NAME_ID=""
+_name_id() {
   local name="$1" id="" char i
   # Most names are letters and digits only: nothing to convert.
   if [[ $name != *[!A-Za-z0-9]* ]]; then
-    CFG_ID_FOR="$1"
-    CFG_ID="t_$name"
+    NAME_ID="$name"
     return 0
   fi
   for ((i = 0; i < ${#name}; i++)); do
     char="${name:i:1}"
     case "$char" in
       [A-Za-z0-9]) id+="$char" ;;
-      *) id+="$(printf '_%02x' "'$char")" ;;
+      *)
+        # printf -v: no $(…) fork for every character of a long path.
+        printf -v char '_%02x' "'$char"
+        id+="$char"
+        ;;
     esac
   done
+  NAME_ID="$id"
+}
+
+# A tool's variable-name part, into CFG_ID (the last one is remembered).
+CFG_ID_FOR=""
+CFG_ID=""
+_cfg_id() {
+  if [[ $1 == "$CFG_ID_FOR" ]]; then
+    return 0
+  fi
+  _name_id "$1"
   CFG_ID_FOR="$1"
-  CFG_ID="t_$id"
+  CFG_ID="t_$NAME_ID"
 }
 
 _cfg_load() {
   if [[ $CFG_LOADED == true ]]; then
     return 0
   fi
-  local dump line kind tool a b rest var
+  local dump line kind tool a b c var
   # Marked loaded only once yq has read the file: doctor installs yq first.
-  dump="$(_yq '(.packages // {} | to_entries | .[] | .key as $t | .value as $v |
-    ( ($v // {} | to_entries | .[] | select((.value | tag) != "!!seq" and (.value | tag) != "!!map" and (.value | tag) != "!!null") | "S\t" + $t + "\t" + .key + "\t" + (.value | tostring)),
-      ($v // {} | to_entries | .[] | select((.key == "pacman" or .key == "apt" or .key == "dnf" or .key == "brew" or .key == "winget") and (.value | tag) == "!!seq") | "S\t" + $t + "\t" + .key + "\t" + (.value | join(" "))),
-      ($v.command // "" | select(tag == "!!map") | to_entries | .[] | "C\t" + $t + "\t" + .key + "\t" + (.value | tostring)),
-      ($v.links // [] | .[] | "L\t" + $t + "\t" + (.src // "") + "\t" + (.dest // "") + "\t" + (.os // "") + "\t" + (.linux // "") + "\t" + (.macos // "") + "\t" + (.windows // "") + "\t" + ((.copy // false) | tostring) + "\t" + ((.inject // false) | tostring) + "\t" + ((.enable // false) | tostring) + "\t" + ((.fill // false) | tostring)),
-      ($v.clone // [] | .[] | "K\t" + $t + "\t" + (.repo // "") + "\t" + (.dest // "")),
-      ("T\t" + $t) )),
-    (.settings // {} | to_entries | .[] | select((.value | tag) != "!!null") | "G\t" + .key + "\t" + (.value | tostring)),
-    (.default // [] | .[] | "D\t" + (. | tostring))' 2>/dev/null)" || return 0
+  # The whole list after "as $v |" is in ( ): yq binds $v only for the
+  # first item of a bare comma list. Every output uses . (the H line its
+  # tag): a string made only of literals and $vars is printed even when
+  # the select before it let nothing through.
+  dump="$(_yq '.tools // {} | to_entries | .[] | .key as $t | .value as $v | (
+    ("T\t" + $t + "\t" + (($v.priority // "") | tostring)),
+    ($v.package | select(tag == "!!map" or tag == "!!str" or tag == "!!seq") | "H\t" + $t + "\t" + (. | tag)),
+    ($v.package | select(tag == "!!str") | "P\t" + $t + "\tall\t" + .),
+    ($v.package | select(tag == "!!seq") | "P\t" + $t + "\tall\t" + join(" ")),
+    ($v.package | select(tag == "!!map") | to_entries | .[] | select((.value | tag) == "!!seq") | "P\t" + $t + "\t" + .key + "\t" + (.value | join(" "))),
+    ($v.package | select(tag == "!!map") | to_entries | .[] | select((.value | tag) == "!!null") | "P\t" + $t + "\t" + .key + "\t"),
+    ($v.package | select(tag == "!!map") | to_entries | .[] | select((.value | tag) != "!!seq" and (.value | tag) != "!!null" and (.value | tag) != "!!map") | "P\t" + $t + "\t" + .key + "\t" + (.value | tostring)),
+    ($v.command | select(tag == "!!str") | "C\t" + $t + "\tall\t" + .),
+    ($v.command | select(tag == "!!map") | to_entries | .[] | "C\t" + $t + "\t" + .key + "\t" + (.value | tostring)),
+    ($v.links | select(tag == "!!map") | to_entries | .[] | .key as $s |
+      ((.value | select(tag == "!!str") | "L\t" + $t + "\t" + $s + "\tall\t" + .),
+       (.value | select(tag == "!!map") | to_entries | .[] | "L\t" + $t + "\t" + $s + "\t" + .key + "\t" + ((.value // "") | tostring)))),
+    ($v.clone | select(tag == "!!map") | to_entries | .[] | "K\t" + $t + "\t" + .key + "\t" + ((.value // "") | tostring)) )' 2>/dev/null)" || return 0
   CFG_LOADED=true
   while IFS= read -r line; do
+    [[ -n $line ]] || continue
     line="${line//$'\t'/$CFG_SEP}"
-    IFS="$CFG_SEP" read -r kind tool a b <<<"$line"
-    case "$kind" in
-      G)
-        # Only names a variable can have (settings keys are plain words).
-        if [[ $tool =~ ^[A-Za-z0-9_]+$ ]]; then
-          printf -v "CFG_SET_$tool" '=%s' "$a"
-        fi
-        continue
-        ;;
-      D)
-        CFG_DEFAULT+="$tool"$'\n'
-        continue
-        ;;
-    esac
+    IFS="$CFG_SEP" read -r kind tool a b c <<<"$line"
     _cfg_id "$tool"
     case "$kind" in
       T)
         CFG_TOOLS+="$tool"$'\n'
+        if [[ $a == high ]]; then
+          printf -v "CFG_${CFG_ID}_PRIO" 'high'
+        fi
         ;;
-      S)
-        printf -v "CFG_${CFG_ID}_S_$a" '=%s' "$b"
+      H) printf -v "CFG_${CFG_ID}_HASPKG" '1' ;;
+      # Platform keys are plain words; anything else is left for doctor.
+      P | C)
+        if [[ $a =~ ^[A-Za-z0-9_]+$ ]]; then
+          printf -v "CFG_${CFG_ID}_${kind}_$a" '=%s' "$b"
+        fi
         ;;
-      C)
-        printf -v "CFG_${CFG_ID}_C_$a" '=%s' "$b"
-        printf -v "CFG_${CFG_ID}_CMAP" '1'
+      L)
+        var="CFG_${CFG_ID}_L"
+        printf -v "$var" '%s%s\n' "${!var:-}" "$a$CFG_SEP$b$CFG_SEP$c"
         ;;
-      L | K)
-        rest="${line#*"$CFG_SEP"*"$CFG_SEP"}"
-        var="CFG_${CFG_ID}_$kind"
-        printf -v "$var" '%s%s\n' "${!var:-}" "$rest"
+      K)
+        var="CFG_${CFG_ID}_K"
+        printf -v "$var" '%s%s\n' "${!var:-}" "$a$CFG_SEP$b"
         ;;
     esac
   done <<<"$dump"
-}
 
-# A settings: value, or nothing when it isn't set.
-_cfg_setting() {
-  _cfg_load
-  local var="CFG_SET_$1" value
-  value="${!var:-}"
-  echo "${value#=}"
-}
-
-# A plain field's value; returns 1 when the tool doesn't have it.
-_cfg_field() {
-  _cfg_get "$1" "$2" || return 1
-  echo "$CFG_VALUE"
-}
-
-# The same into CFG_VALUE, without a $(…) subshell. The helpers called for
-# every line of a list (…_get) set a variable instead of printing: each
-# $(…) is a fork, ~20 of them per tool made the lists show line by line.
-CFG_VALUE=""
-_cfg_get() {
-  _cfg_load
-  _cfg_id "$1"
-  local var="CFG_${CFG_ID}_S_$2"
-  CFG_VALUE=""
-  if [[ -z ${!var:-} ]]; then
-    return 1
+  # Hooks: config/dotfiles/hooks/<tool>.sh. A hook with no dotfiles.yml
+  # entry is a tool of its own (after the others, by name).
+  local hook name high=""
+  if [[ -n $HOOKS_DIR && -d $HOOKS_DIR ]]; then
+    high="$(grep -l '^PRIORITY=high' "$HOOKS_DIR"/*.sh 2>/dev/null)" || true
+    for hook in "$HOOKS_DIR"/*.sh; do
+      [[ -f $hook ]] || continue
+      name="${hook##*/}"
+      name="${name%.sh}"
+      _cfg_id "$name"
+      printf -v "CFG_${CFG_ID}_HOOK" '1'
+      if [[ $'\n'$high$'\n' == *$'\n'"$hook"$'\n'* ]]; then
+        printf -v "CFG_${CFG_ID}_PRIO" 'high'
+      fi
+      if ! _tool_exists "$name"; then
+        CFG_TOOLS+="$name"$'\n'
+      fi
+    done
   fi
-  CFG_VALUE="${!var#=}"
 }
 
-# Every package name under packages:, one per line.
+# Read dotfiles.yml and the hooks again (update, after the pull).
+_cfg_reload() {
+  local var
+  # compgen -v lists the variables with that prefix (Bash 3.2 has it too).
+  for var in $(compgen -v CFG_t_) $(compgen -v CFG_F_); do
+    unset "$var"
+  done
+  CFG_LOADED=false
+  CFG_TOOLS=""
+  CFG_ID_FOR=""
+  _cfg_load
+}
+
+# Every tool, one per line: dotfiles.yml order, then hook-only ones.
 manifest_tools() {
   _cfg_load
   printf '%s' "$CFG_TOOLS"
 }
 
-# True when the name is a key under packages:.
+# True when the name is a tool (in dotfiles.yml or a hook).
 _tool_exists() {
   _cfg_load
   [[ $'\n'$CFG_TOOLS == *$'\n'"$1"$'\n'* ]]
 }
 
-# Package name on this machine: the manager's own name if one is set,
-# else the key. Empty = nothing to install here (a manual-only tool, or
-# "none" for this manager). A list in config.yaml (brew: [1password,
-# 1password-cli]) comes out space-separated; package_version, pm_install
-# and pm_remove handle each name.
+# Every tool, space-separated, for "unknown tool" messages.
+_tool_names() {
+  manifest_tools | paste -sd ' ' -
+}
+
+# This platform's entry in a per-platform map (package:, command:, a link's
+# dests): its own key (arch, mac…), then linux (on Linux), then all.
+# $1 is the variable prefix (CFG_t_fd_P); the value goes into PICKED.
+# Returns 1 when no key matches. PLATFORM_KEYS is set by detect_os.
+PICKED=""
+_cfg_pick() {
+  local key var
+  PICKED=""
+  for key in $PLATFORM_KEYS; do
+    var="$1_$key"
+    if [[ -n ${!var:-} ]]; then
+      PICKED="${!var#=}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# A link's rank for this platform: its own key 3, linux 2, all 1, else 0.
+_platform_rank() {
+  case "$1" in
+    "$PLATFORM") PLATFORM_RANK=3 ;;
+    linux) if [[ $DOTFILES_OS == linux ]]; then PLATFORM_RANK=2; else PLATFORM_RANK=0; fi ;;
+    all) PLATFORM_RANK=1 ;;
+    *) PLATFORM_RANK=0 ;;
+  esac
+}
+PLATFORM_RANK=0
+
+_tool_has_hook() {
+  _cfg_load
+  _cfg_id "$1"
+  local var="CFG_${CFG_ID}_HOOK"
+  [[ -n ${!var:-} ]]
+}
+
+_tool_is_high() {
+  _cfg_load
+  _cfg_id "$1"
+  local var="CFG_${CFG_ID}_PRIO"
+  [[ ${!var:-} == high ]]
+}
+
+# True when the tool is used on this platform: it has a hook (the hook
+# handles the platforms package: doesn't list), or no package: at all
+# (links only), or a package: entry for this platform (~ included).
+_tool_is_used_here() {
+  _cfg_load
+  _cfg_id "$1"
+  local var="CFG_${CFG_ID}_HOOK"
+  if [[ -n ${!var:-} ]]; then
+    return 0
+  fi
+  var="CFG_${CFG_ID}_HASPKG"
+  if [[ -z ${!var:-} ]]; then
+    return 0
+  fi
+  _cfg_pick "CFG_${CFG_ID}_P"
+}
+
+# Package name on this platform. Empty = nothing to install here (~, no
+# package:, or a platform only the hook handles). A list (brew:
+# [1password, 1password-cli]) comes out space-separated; package_version,
+# pm_install and pm_remove handle each name.
 tool_package() {
   _tool_package_get "$1"
   echo "$TOOL_PACKAGE"
@@ -483,20 +587,16 @@ tool_package() {
 # tool_package into TOOL_PACKAGE.
 TOOL_PACKAGE=""
 _tool_package_get() {
-  local tool="$1" value=""
-  if [[ -n $PKG_MANAGER ]] && _cfg_get "$tool" "$PKG_MANAGER"; then
-    value="$CFG_VALUE"
-  elif ! _cfg_get "$tool" manual; then
-    value="$tool"
+  _cfg_load
+  _cfg_id "$1"
+  TOOL_PACKAGE=""
+  if _cfg_pick "CFG_${CFG_ID}_P"; then
+    TOOL_PACKAGE="$PICKED"
   fi
-  if [[ $value == none ]]; then
-    value=""
-  fi
-  TOOL_PACKAGE="$value"
 }
 
-# Command that proves the tool is installed: command:, else the key.
-# A command: map picks this machine's entry: manager, then OS, then default.
+# Command that proves the tool is installed: command: (this platform's
+# entry when it's a map), else the tool's name.
 tool_command() {
   _tool_command_get "$1"
   echo "$TOOL_COMMAND"
@@ -505,103 +605,106 @@ tool_command() {
 # tool_command into TOOL_COMMAND.
 TOOL_COMMAND=""
 _tool_command_get() {
-  local tool="$1" value="" key var
-  _cfg_load
-  _cfg_id "$tool"
-  var="CFG_${CFG_ID}_CMAP"
-  if [[ -n ${!var:-} ]]; then
-    for key in "$PKG_MANAGER" "$DOTFILES_OS" default; do
-      var="CFG_${CFG_ID}_C_$key"
-      if [[ -n $key && -n ${!var:-} ]]; then
-        value="${!var#=}"
-        break
-      fi
-    done
-  elif _cfg_get "$tool" command; then
-    value="$CFG_VALUE"
-  fi
-  TOOL_COMMAND="${value:-$tool}"
-}
-
-# The manual: message (how to install by hand), or nothing.
-tool_manual() {
-  _cfg_field "$1" manual || true
-}
-
-# Links, one "src<TAB>dest" line each, with this OS's dest when the link
-# has one (windows:, macos:, linux:). Missing src or dest comes out empty.
-# A link with os: is only used on that OS (os: linux for system files).
-tool_links() {
   _cfg_load
   _cfg_id "$1"
-  local var="CFG_${CFG_ID}_L" src dest os linux macos windows rest
-  while IFS="$CFG_SEP" read -r src dest os linux macos windows rest; do
-    if [[ -z $src && -z $dest ]]; then
-      continue
-    fi
-    if [[ -n $os && $os != "${DOTFILES_OS:-none}" ]]; then
-      continue
-    fi
-    case "${DOTFILES_OS:-}" in
-      linux) dest="${linux:-$dest}" ;;
-      macos) dest="${macos:-$dest}" ;;
-      windows) dest="${windows:-$dest}" ;;
-    esac
-    printf '%s\t%s\n' "$src" "$dest"
-  done <<<"${!var:-}"
+  TOOL_COMMAND="$1"
+  if _cfg_pick "CFG_${CFG_ID}_C" && [[ -n $PICKED ]]; then
+    TOOL_COMMAND="$PICKED"
+  fi
 }
 
-# One true/false field of the link with this src (inject, copy, enable).
+# A dest from dotfiles.yml as the script uses it: $HOME/… (or ~/…) becomes
+# relative to $HOME, anything else absolute stays (a system file). Into DEST.
+DEST=""
+_dest_norm() {
+  DEST="$1"
+  case "$DEST" in
+    '$HOME/'*) DEST="${DEST#\$HOME/}" ;;
+    '${HOME}/'*) DEST="${DEST#\$\{HOME\}/}" ;;
+    '~/'*) DEST="${DEST#\~/}" ;;
+    "$HOME/"*) DEST="${DEST#"$HOME"/}" ;;
+  esac
+}
+
+# Links, one "src<TAB>dest" line each: this platform's dest when a link
+# has several (no dest for this platform = not linked here). dest is
+# relative to $HOME, or absolute for a system file. Nothing for a tool
+# that isn't used here.
+tool_links() {
+  if ! _tool_is_used_here "$1"; then
+    return 0
+  fi
+  _cfg_id "$1"
+  local var="CFG_${CFG_ID}_L" src platform dest cur="" best="" best_rank=0
+  while IFS="$CFG_SEP" read -r src platform dest; do
+    [[ -n $src ]] || continue
+    if [[ $src != "$cur" ]]; then
+      if [[ -n $cur && -n $best ]]; then
+        _dest_norm "$best"
+        printf '%s\t%s\n' "$cur" "$DEST"
+      fi
+      cur="$src" best="" best_rank=0
+    fi
+    _platform_rank "$platform"
+    if [[ $PLATFORM_RANK -gt $best_rank ]]; then
+      best="$dest" best_rank=$PLATFORM_RANK
+    fi
+  done <<<"${!var:-}"
+  if [[ -n $cur && -n $best ]]; then
+    _dest_norm "$best"
+    printf '%s\t%s\n' "$cur" "$DEST"
+  fi
+}
+
+# What a link is, from its files (nothing to write in dotfiles.yml), into
+# LINK_COPY, LINK_INJECT and LINK_ENABLE (true/false):
+#   copy    dest is outside $HOME (/etc, /usr): a root-owned copy, never a
+#           symlink (root must not run files you can edit)
+#   enable  a copied systemd unit with [Install]: systemctl enable --now
+#   inject  a file with op:// references: dest gets a copy filled in from
+#           1Password instead of a symlink
+# The file checks are kept for the run (CFG_F_<src>), so the lists don't
+# grep every file again for every tool.
+LINK_COPY=false LINK_INJECT=false LINK_ENABLE=false
+_link_flags_get() {
+  local src="$1" dest="$2" var src_path
+  LINK_COPY=false LINK_INJECT=false LINK_ENABLE=false
+  case "$dest" in
+    /*) LINK_COPY=true ;;
+  esac
+  _name_id "$src"
+  var="CFG_F_$NAME_ID"
+  if [[ -z ${!var:-} ]]; then
+    src_path="$DOTFILES/config/$src"
+    printf -v "$var" '%s' "-"
+    if [[ -f $src_path ]]; then
+      if grep -q 'op://' "$src_path" 2>/dev/null; then
+        printf -v "$var" '%s' "${!var}i"
+      fi
+      if grep -q '^\[Install\]' "$src_path" 2>/dev/null; then
+        printf -v "$var" '%s' "${!var}u"
+      fi
+    fi
+  fi
+  if [[ $LINK_COPY == true ]]; then
+    if [[ ${!var} == *u* && $dest == /etc/systemd/* ]]; then
+      LINK_ENABLE=true
+    fi
+  elif [[ ${!var} == *i* ]]; then
+    LINK_INJECT=true
+  fi
+}
+
+# One flag of a link as true/false: _link_flag <src> <dest> copy|inject|enable
 _link_flag() {
-  local value=""
   _link_flags_get "$1" "$2"
   case "$3" in
-    copy) value="$LINK_COPY" ;;
-    inject) value="$LINK_INJECT" ;;
-    enable) value="$LINK_ENABLE" ;;
-    fill) value="$LINK_FILL" ;;
+    copy) echo "$LINK_COPY" ;;
+    inject) echo "$LINK_INJECT" ;;
+    enable) echo "$LINK_ENABLE" ;;
   esac
-  if [[ $value == true ]]; then
-    echo true
-  else
-    echo false
-  fi
 }
-
-# Every flag of the link with this src at once, into LINK_COPY,
-# LINK_INJECT, LINK_ENABLE and LINK_FILL ("true" or something else).
-LINK_COPY="" LINK_INJECT="" LINK_ENABLE="" LINK_FILL=""
-_link_flags_get() {
-  _cfg_load
-  _cfg_id "$1"
-  local var="CFG_${CFG_ID}_L" src dest os linux macos windows copy inject enable fill
-  LINK_COPY="" LINK_INJECT="" LINK_ENABLE="" LINK_FILL=""
-  while IFS="$CFG_SEP" read -r src dest os linux macos windows copy inject enable fill; do
-    if [[ -n $src && $src == "$2" ]]; then
-      LINK_COPY="$copy" LINK_INJECT="$inject" LINK_ENABLE="$enable" LINK_FILL="$fill"
-      break
-    fi
-  done <<<"${!var:-}"
-}
-
-# copy: true = a system file: dest is an absolute path that gets a
-# root-owned copy, never a symlink (root must not run files you can edit).
-tool_link_copy() { _link_flag "$1" "$2" copy; }
-
-# enable: true on a copied systemd unit = systemctl enable --now it.
 tool_link_enable() { _link_flag "$1" "$2" enable; }
-
-# "true" when the tool has system files on this OS (needs sudo to link).
-tool_has_system() {
-  local src dest
-  while IFS=$'\t' read -r src dest; do
-    if [[ $(tool_link_copy "$1" "$src") == true ]]; then
-      echo true
-      return 0
-    fi
-  done < <(tool_links "$1")
-  echo false
-}
 
 # A link dest as a full path, and as shown in messages: under $HOME
 # unless it's absolute (system files).
@@ -618,75 +721,440 @@ _dest_shown() {
   esac
 }
 
-# "true" when the link with this src has inject: true: the repo file holds
-# op:// references, and dest gets a filled-in copy instead of a symlink.
-# Repos to clone, one "repo<TAB>dest" line each (dest under $HOME).
+# Repos to clone, one "repo<TAB>dest" line each (dest relative to $HOME).
+# owner/repo is on GitHub; anything with :// or git@ is used as written.
 tool_clones() {
-  _cfg_load
+  if ! _tool_is_used_here "$1"; then
+    return 0
+  fi
   _cfg_id "$1"
   local var="CFG_${CFG_ID}_K" repo dest
   while IFS="$CFG_SEP" read -r repo dest; do
-    if [[ -n $repo || -n $dest ]]; then
-      printf '%s\t%s\n' "$repo" "$dest"
+    if [[ -z $repo && -z $dest ]]; then
+      continue
     fi
+    case "$repo" in
+      *://* | git@*) ;;
+      ?*/?*) repo="https://github.com/$repo.git" ;;
+    esac
+    _dest_norm "$dest"
+    printf '%s\t%s\n' "$repo" "$DEST"
   done <<<"${!var:-}"
 }
 
-# "true" when a tool has nothing to do on this machine: no package, no
-# manual: message and no links for this OS (hypr or limine on macOS,
-# komorebi on Linux). link and update skip it; doctor reports it.
-tool_unused_here() {
-  if [[ -z $(tool_package "$1") && -z $(tool_manual "$1") && -z $(tool_links "$1") ]]; then
-    echo true
+# ─── config.yml: this machine ───────────────────────────────────────────
+#   CFG_REQUIRED    required: names, one per line
+#   CFG_USED        tools: names, one per line
+#   CFG_SET_<key>   "=value" for a settings: entry
+MACHINE_LOADED=false
+CFG_REQUIRED=""
+CFG_USED=""
+
+_machine_load() {
+  if [[ $MACHINE_LOADED == true ]]; then
+    return 0
+  fi
+  MACHINE_LOADED=true
+  CFG_REQUIRED=""
+  CFG_USED=""
+  if [[ ! -f $DOTFILES_CONFIG ]] || ! command -v yq >/dev/null 2>&1; then
+    return 0
+  fi
+  local dump line kind a b
+  if ! dump="$(_yq '(.settings // {} | to_entries | .[] | select((.value | tag) != "!!null") | "G\t" + .key + "\t" + (.value | tostring)),
+    (.required // [] | .[] | "R\t" + (. | tostring)),
+    (.tools // [] | .[] | "U\t" + (. | tostring))' "$DOTFILES_CONFIG" 2>/dev/null)"; then
+    log warn "$(_tilde "$DOTFILES_CONFIG") can't be read; run: dotfiles doctor"
+    return 0
+  fi
+  while IFS= read -r line; do
+    [[ -n $line ]] || continue
+    line="${line//$'\t'/$CFG_SEP}"
+    IFS="$CFG_SEP" read -r kind a b <<<"$line"
+    case "$kind" in
+      G)
+        # Only names a variable can have (settings keys are plain words).
+        if [[ $a =~ ^[A-Za-z0-9_]+$ ]]; then
+          printf -v "CFG_SET_$a" '=%s' "$b"
+        fi
+        ;;
+      R) CFG_REQUIRED+="$a"$'\n' ;;
+      U) CFG_USED+="$a"$'\n' ;;
+    esac
+  done <<<"$dump"
+}
+
+# A settings: value, or nothing when it isn't set.
+_cfg_setting() {
+  _machine_load
+  local var="CFG_SET_$1" value
+  value="${!var:-}"
+  echo "${value#=}"
+}
+
+# required: on this machine (unlink and the interactive screen keep it).
+_tool_is_required() {
+  _machine_load
+  [[ $'\n'$CFG_REQUIRED == *$'\n'"$1"$'\n'* ]]
+}
+
+# In config.yml at all (required: or tools:): the tool is used here.
+_tool_is_listed() {
+  _machine_load
+  [[ $'\n'$CFG_REQUIRED$'\n'$CFG_USED == *$'\n'"$1"$'\n'* ]]
+}
+
+# "required", "tools" or "-": where config.yml lists the tool.
+_tool_listed_as() {
+  if _tool_is_required "$1"; then
+    echo required
+  elif _tool_is_listed "$1"; then
+    echo tools
   else
-    echo false
+    echo -
   fi
 }
 
-tool_link_inject() { _link_flag "$1" "$2" inject; }
+# Every tool in config.yml that is a tool and used on this platform.
+_listed_tools() {
+  local tool
+  while IFS= read -r tool; do
+    if _tool_is_listed "$tool" && _tool_is_used_here "$tool"; then
+      echo "$tool"
+    fi
+  done < <(manifest_tools)
+}
 
-# fill: true on a link to a folder of .json files: dest gets copies with the
-# repo-relative paths ("config/...") filled in as this machine's full path.
-tool_link_fill() { _link_flag "$1" "$2" fill; }
+# The tools named in the arguments, in run order: priority: high, then
+# required here, then the rest; dotfiles.yml order within each.
+_order_tools() {
+  local wanted tool pass
+  wanted=$'\n'"$(printf '%s\n' "$@")"$'\n'
+  for pass in high required rest; do
+    while IFS= read -r tool; do
+      [[ -n $tool && $wanted == *$'\n'"$tool"$'\n'* ]] || continue
+      case "$pass" in
+        high) _tool_is_high "$tool" || continue ;;
+        required) { ! _tool_is_high "$tool" && _tool_is_required "$tool"; } || continue ;;
+        rest) { ! _tool_is_high "$tool" && ! _tool_is_required "$tool"; } || continue ;;
+      esac
+      echo "$tool"
+    done <<<"$CFG_TOOLS"
+  done
+}
 
-# "true" or "false"; anything else counts as false.
-tool_enabled() {
-  if [[ $(_cfg_field "$1" enabled) == true ]]; then
-    echo true
-  else
-    echo false
+# A list as YAML: "key: []", or "key:" with one "  - name" line each.
+_yaml_list() {
+  local key="$1" names="$2" name
+  if [[ -z ${names//$'\n'/} ]]; then
+    echo "$key: []"
+    return 0
   fi
+  echo "$key:"
+  while IFS= read -r name; do
+    if [[ -n $name ]]; then
+      echo "  - $name"
+    fi
+  done <<<"$names"
 }
 
-# locked: true = unlink never removes this tool's package (only its links).
-tool_locked() {
-  if [[ $(_cfg_field "$1" locked) == true ]]; then
-    echo true
-  else
-    echo false
+# A new config.yml. $1: settings lines ("  theme: starburst"), if any.
+_config_template() {
+  cat <<EOF
+# This machine's dotfiles setup: never in the repo. dotfiles rewrites
+# required: and tools: (alphabetical); everything else here, and your own
+# edits, are kept. Every run, a tool installed here goes into tools: and
+# one removed outside dotfiles comes off; one you add by hand stays until
+# link installs it.
+
+settings:
+${1:-  # theme: starburst}
+  # log_file: ~/.local/state/dotfiles/dotfiles.log
+  # backup_suffix: .bak
+
+# Required here: unlink and the interactive screen never remove these
+# (unlink --force does, and takes the tool off this list).
+required: []
+
+# The other tools used here.
+tools: []
+EOF
+}
+
+# Write required: and tools: (each sorted) into config.yml. Only those two
+# blocks change: comments, settings and hand edits stay. A missing file is
+# made from the template first.
+_config_write() {
+  local required="$1" used="$2" file="$DOTFILES_CONFIG" tmp
+  if [[ -L $CONFIG_DIR && $(_physical "$CONFIG_DIR") == "$(_physical "$DOTFILES/config/dotfiles")" ]]; then
+    log error "$(_tilde "$CONFIG_DIR") still links into the repo; config.yml must not go in git (run: dotfiles doctor)"
+    return 1
   fi
+  mkdir -p "$CONFIG_DIR"
+  if [[ ! -f $file ]]; then
+    _config_template >"$file"
+  fi
+  tmp="$file.tmp.$$"
+  REQ_BLOCK="$(_yaml_list required "$(printf '%s' "$required" | sort -u)")" \
+    TOOLS_BLOCK="$(_yaml_list tools "$(printf '%s' "$used" | sort -u)")" \
+    awk '
+      function block(k) { return (k == "required") ? ENVIRON["REQ_BLOCK"] : ENVIRON["TOOLS_BLOCK"] }
+      /^(required|tools):/ {
+        k = $0; sub(/:.*/, "", k)
+        if (!(k in done)) { print block(k); done[k] = 1 }
+        skip = 1; next
+      }
+      skip && /^([ \t]|-)/ { next }
+      { skip = 0; print }
+      END {
+        if (!("required" in done)) { print ""; print block("required") }
+        if (!("tools" in done)) { print ""; print block("tools") }
+      }
+    ' "$file" >"$tmp"
+  if ! yq eval '.' "$tmp" >/dev/null 2>&1; then
+    rm -f "$tmp"
+    log error "couldn't update $(_tilde "$file") (it isn't valid YAML afterwards); left it as it was"
+    return 1
+  fi
+  mv "$tmp" "$file"
 }
 
-# Names in the default: list, one per line.
-default_list() {
-  _cfg_load
-  printf '%s' "$CFG_DEFAULT"
-}
-
-# Package name for a default: entry. A name that is also under packages:
-# uses that entry's names; any other name is installed as written.
-default_package() {
-  if _tool_exists "$1"; then
-    tool_package "$1"
+# Put a tool in config.yml: required, tools, or none (taken off both).
+#   _config_set <tool> required|tools|none
+_config_set() {
+  local tool="$1" where="$2" required="" used="" name before
+  _machine_load
+  before="$(_tool_listed_as "$tool")"
+  if [[ $before == "$where" || ( $where == none && $before == - ) ]]; then
+    log debug "$tool: config.yml already has it as $before"
+    return 0
+  fi
+  while IFS= read -r name; do
+    if [[ -n $name && $name != "$tool" ]]; then
+      required+="$name"$'\n'
+    fi
+  done <<<"$CFG_REQUIRED"
+  while IFS= read -r name; do
+    if [[ -n $name && $name != "$tool" ]]; then
+      used+="$name"$'\n'
+    fi
+  done <<<"$CFG_USED"
+  case "$where" in
+    required) required+="$tool"$'\n' ;;
+    tools) used+="$tool"$'\n' ;;
+  esac
+  local what
+  case "$where" in
+    required) what="added to required:" ;;
+    tools) what="added to tools:" ;;
+    none) what="taken off $before:" ;;
+  esac
+  if [[ $DRY_RUN == true ]]; then
+    log info "dry run, $tool: would be $what in config.yml"
   else
-    echo "$1"
+    _config_write "$required" "$used" || return 1
+    log info "$tool: $what in config.yml"
+  fi
+  CFG_REQUIRED="$required"
+  CFG_USED="$used"
+}
+
+# ─── first run after #51: config.yaml -> config.yml ─────────────────────
+# ~/.config/dotfiles used to link to the repo's config/dotfiles, and each
+# tool's enabled:/locked: lived in the repo's config.yaml. Now the folder
+# is a real one, and config.yml is written from those values (enabled =
+# used here, locked = required), so nothing gets switched off. The old file
+# comes from the working tree, or from git once the pull removed it. No old
+# file = a new machine: empty lists. Either way _config_sync then lists
+# only what's installed here.
+_config_migrate() {
+  if [[ -z $DOTFILES ]]; then
+    return 0
+  fi
+  local shown repo_link=false
+  shown="$(_tilde "$CONFIG_DIR")"
+  if [[ -L $CONFIG_DIR ]]; then
+    if [[ $(_physical "$CONFIG_DIR") == "$(_physical "$DOTFILES/config/dotfiles")" ]]; then
+      if [[ $DRY_RUN == true ]]; then
+        # Still the link in a dry run: whatever is "there" is the repo's.
+        repo_link=true
+        log info "dry run, would replace the link $shown (to the repo) with a real folder for config.yml"
+      else
+        rm "$CONFIG_DIR"
+        mkdir -p "$CONFIG_DIR"
+        log info "$shown linked to the repo; it's a real folder now (it holds config.yml)"
+      fi
+    else
+      log debug "$shown links to $(readlink "$CONFIG_DIR"); config.yml is read from there"
+    fi
+  fi
+  if [[ $repo_link != true && -f $DOTFILES_CONFIG ]]; then
+    return 0
+  fi
+
+  local old="" from="" rev
+  if [[ -f $DOTFILES/config/dotfiles/config.yaml ]]; then
+    old="$(cat "$DOTFILES/config/dotfiles/config.yaml")"
+    from="config/dotfiles/config.yaml"
+  elif command -v git >/dev/null 2>&1 &&
+    rev="$(git -C "$DOTFILES" log -1 --diff-filter=D --format=%h -- config/dotfiles/config.yaml 2>/dev/null)" && [[ -n $rev ]]; then
+    old="$(git -C "$DOTFILES" show "$rev^:config/dotfiles/config.yaml" 2>/dev/null)" || old=""
+    from="config.yaml from git (before $rev)"
+  fi
+
+  local dump="" line kind a b required="" used="" settings=""
+  if [[ -n $old ]]; then
+    dump="$(yq eval '(.packages // {} | to_entries | .[] | select(.value.enabled == true) |
+        ((select(.value.locked == true) | "R\t" + .key), (select(.value.locked != true) | "U\t" + .key))),
+      (.settings // {} | to_entries | .[] | select((.value | tag) != "!!null") | "G\t" + .key + "\t" + (.value | tostring))' - <<<"$old" 2>/dev/null)" || dump=""
+  fi
+  while IFS= read -r line; do
+    [[ -n $line ]] || continue
+    IFS=$'\t' read -r kind a b <<<"$line"
+    case "$kind" in
+      R | U)
+        # Only tools that still exist and are used on this platform.
+        _tool_exists "$a" && _tool_is_used_here "$a" || continue
+        if [[ $kind == R ]]; then required+="$a"$'\n'; else used+="$a"$'\n'; fi
+        ;;
+      G) settings+="  $a: $b"$'\n' ;;
+    esac
+  done <<<"$dump"
+  settings="${settings%$'\n'}"
+
+  local counts
+  if [[ -n $from ]]; then
+    counts="$(grep -c . <<<"$required" || true) required, $(grep -c . <<<"$used" || true) other tools"
+  fi
+  if [[ $DRY_RUN == true ]]; then
+    if [[ -n $from ]]; then
+      log info "dry run, would write $shown/config.yml from $from ($counts)"
+    else
+      log info "dry run, would write an empty $shown/config.yml (new machine)"
+    fi
+  else
+    mkdir -p "$CONFIG_DIR"
+    _config_template "$settings" >"$DOTFILES_CONFIG"
+    if [[ -n $from ]]; then
+      _config_write "$required" "$used" || return 0
+      log success "wrote $shown/config.yml from $from ($counts)"
+    else
+      log info "new machine: wrote $shown/config.yml (the tools installed here go in it); pick more with: dotfiles (or dotfiles link <tool>)"
+    fi
+  fi
+  # This run uses the new lists (a dry run has no file to read them from).
+  MACHINE_LOADED=true
+  CFG_REQUIRED="$required"
+  CFG_USED="$used"
+  while IFS= read -r line; do
+    [[ $line =~ ^\ \ ([A-Za-z0-9_]+):\ (.*)$ ]] || continue
+    printf -v "CFG_SET_${BASH_REMATCH[1]}" '=%s' "${BASH_REMATCH[2]}"
+  done <<<"$settings"
+}
+
+# ─── config.yml follows the machine (every run) ─────────────────────────
+# config.yml lists the tools installed here: one installed outside dotfiles
+# goes into tools:, one removed outside dotfiles comes off. INSTALLED_STATE
+# remembers what was installed at the end of the last run, so a tool added
+# to the file by hand (not installed yet: link installs it) isn't mistaken
+# for one that was removed. Names that aren't tools used here, and which
+# list a tool is in, are left as they are.
+INSTALLED_STATE="$LOG_DIR/installed"
+SYNC_READY=false
+
+# "name" is one of the lines in $2.
+_in_lines() {
+  [[ $'\n'$2$'\n' == *$'\n'"$1"$'\n'* ]]
+}
+
+# The tools used here that are installed now, one per line.
+_installed_now() {
+  local tool
+  while IFS= read -r tool; do
+    if _tool_is_used_here "$tool" && _tool_is_installed "$tool"; then
+      echo "$tool"
+    fi
+  done < <(manifest_tools)
+}
+
+_config_sync() {
+  if [[ $MACHINE_LOADED != true || -z $DOTFILES_TOOLS || ! -f $DOTFILES_TOOLS ]]; then
+    return 0
+  fi
+  if [[ ! -f $DOTFILES_CONFIG && $DRY_RUN != true ]]; then
+    return 0
+  fi
+  SYNC_READY=true
+  local now before="" have_state=false name required="" used="" added="" dropped=""
+  now="$(_installed_now)"
+  if [[ -f $INSTALLED_STATE ]]; then
+    have_state=true
+    before="$(<"$INSTALLED_STATE")"
+  fi
+  # Listed but not installed: removed outside dotfiles when it was
+  # installed last time (or there's no last time yet); otherwise added by
+  # hand, and kept for link to install.
+  local list kept
+  for list in required used; do
+    kept=""
+    while IFS= read -r name; do
+      [[ -n $name ]] || continue
+      if _tool_exists "$name" && _tool_is_used_here "$name" && ! _in_lines "$name" "$now" &&
+        { [[ $have_state != true ]] || _in_lines "$name" "$before"; }; then
+        dropped="${dropped:+$dropped }$name"
+        continue
+      fi
+      kept+="$name"$'\n'
+    done <<<"$(if [[ $list == required ]]; then printf '%s' "$CFG_REQUIRED"; else printf '%s' "$CFG_USED"; fi)"
+    if [[ $list == required ]]; then required="$kept"; else used="$kept"; fi
+  done
+  # Installed but not listed: into tools:.
+  while IFS= read -r name; do
+    [[ -n $name ]] || continue
+    if ! _in_lines "$name" "$required$used"; then
+      used+="$name"$'\n'
+      added="${added:+$added }$name"
+    fi
+  done <<<"$now"
+
+  if [[ -n $added || -n $dropped ]]; then
+    if [[ $DRY_RUN == true ]]; then
+      [[ -z $added ]] || log info "dry run, config.yml: would add (installed here): $added"
+      [[ -z $dropped ]] || log info "dry run, config.yml: would take off (not installed): $dropped"
+    elif _config_write "$required" "$used"; then
+      [[ -z $added ]] || log info "config.yml: added (installed here): $added"
+      [[ -z $dropped ]] || log info "config.yml: took off (not installed any more): $dropped"
+    else
+      return 0
+    fi
+    CFG_REQUIRED="$required"
+    CFG_USED="$used"
+  fi
+  _installed_state_save "$now"
+}
+
+# Write INSTALLED_STATE (not in a dry run). No argument: look again, with a
+# fresh package list (the run may have installed or removed packages).
+_installed_state_save() {
+  if [[ $DRY_RUN == true || ${SYNC_READY:-} != true ]]; then
+    return 0
+  fi
+  local now
+  if [[ $# -gt 0 ]]; then
+    now="$1"
+  else
+    pkg_cache_load
+    now="$(_installed_now)"
+  fi
+  if mkdir -p "$(dirname "$INSTALLED_STATE")" 2>/dev/null; then
+    printf '%s\n' "$now" >"$INSTALLED_STATE" 2>/dev/null || true
   fi
 }
 
 # Print the installed version of a package, or return 1 if it isn't
 # installed. Asks the package manager, because a package name often isn't
 # a command (bind provides dig and nslookup).
-# Several names (a list in config.yaml): all must be installed; prints the
+# Several names (a list in dotfiles.yml): all must be installed; prints the
 # first one's version.
 package_version() {
   local name first="" version
@@ -844,7 +1312,7 @@ _pm() {
   local -a cmd
 
   case "$action:$PKG_MANAGER" in
-    # aur/<name> (config.yaml): an AUR package, installed with yay. yay
+    # aur/<name> (dotfiles.yml): an AUR package, installed with yay. yay
     # runs as you and asks for sudo itself; pacman removes it like any other.
     install:pacman)
       if [[ $package == aur/* ]]; then
@@ -955,6 +1423,7 @@ parse_args() {
       --force)   FORCE=true ;;
       --verbose) VERBOSE=true ;;
       --no-color) NO_COLOR_FLAG=true ;;
+      --required) REQUIRED_FLAG=true ;;
       -[!-]*)
         # One dash: walk the letters after it. ${arg:i:1} = 1 char at i.
         for ((i = 1; i < ${#arg}; i++)); do
@@ -982,7 +1451,7 @@ parse_args() {
 warn_unused_flags() {
   local cmd="$1"
   case "$cmd" in
-    link | unlink | default | update | wipe | doctor | interactive) ;;
+    link | unlink | update | wipe | doctor | interactive) ;;
     *)
       if [[ $DRY_RUN == true ]]; then
         log warn "--dry-run has no effect on '$cmd'"
@@ -990,13 +1459,16 @@ warn_unused_flags() {
       ;;
   esac
   case "$cmd" in
-    link | interactive) ;;
+    link | unlink | update | interactive) ;;
     *)
       if [[ $FORCE == true ]]; then
         log warn "--force has no effect on '$cmd'"
       fi
       ;;
   esac
+  if [[ $REQUIRED_FLAG == true && $cmd != link ]]; then
+    log warn "--required has no effect on '$cmd' (only link)"
+  fi
 }
 
 # ════════════════════════════════════════════════════════════════════════
@@ -1009,15 +1481,20 @@ cmd_help() {
     "") _help_main ;;
     link)
       cat <<'EOF'
-dotfiles link [tool...] [-d] [-v] [--force]
+dotfiles link [tool...] [--required] [-d] [-v] [--force]
 
 Install tools and link their configs: install the package if it's missing
 (neither its command nor the package manager finds it), link every config,
-set enabled: true. No tool = every tool with enabled: true in config.yaml.
-A tool with no package here (none, manual:) is still linked; a tool with
-no package and nothing to link on this OS is skipped. Repos under clone:
-are cloned once the links are in place, only when missing (an existing
-clone is never touched).
+clone its repos, run its hook, and add it to config.yml (tools:).
+No tool = every tool in config.yml. --required adds the named tools to
+required: instead (unlink and the interactive screen keep those).
+
+Order: priority: high first, then the required tools, then the rest.
+A tool with nothing to install here (~ in dotfiles.yml, or no package:) is
+still linked, and dotfiles checks that its command is there. A tool that
+isn't used on this platform is skipped. Repos under clone: are cloned once
+the links are in place, only when missing (an existing clone is never
+touched). Then config/dotfiles/hooks/<tool>.sh runs, if there is one.
 
 What's in the way of a link:
   nothing                   link it
@@ -1028,43 +1505,51 @@ What's in the way of a link:
 
 Never touches anything inside the repo (through a linked folder).
 
-System files (links with copy: true, e.g. omarchy, limine) get a
+System files (a dest outside $HOME, e.g. omarchy, limine) get a
 root-owned copy instead of a symlink. When one is missing or differs from
 the repo, linking asks for your sudo password first; refused = nothing
 changes. All in place = no password. A copy that differs from the repo is
 replaced after you say y (the old one is kept in /var/lib/dotfiles/backup).
 
-A file filled in from 1Password (inject: true, e.g. ~/.ssh/config) is only
-filled in again when its source in the repo changed; --force fills it in
-again anyway (for values changed in 1Password).
+A file with op:// references (e.g. ~/.ssh/config) is filled in from
+1Password, only again when its source in the repo changed; --force fills
+it in again anyway (for values changed in 1Password).
+
+Things to do by hand (apps to download) are listed under "Next steps" at
+the end.
 
   -d  show what would happen, change nothing (doesn't ask for sudo)
   -v  also show the package manager's output and ls -l of each link
   --force  no questions, no backups: replace files and folders, and fill
            in 1Password files again
+  --required  add the named tools to required: in config.yml
 
 Examples:
   dotfiles link -dv neovim fd
-  dotfiles link -dv
+  dotfiles link --required git
 EOF
       ;;
     unlink)
       cat <<'EOF'
-dotfiles unlink [tool...] [-d] [-v]
+dotfiles unlink [tool...] [-d] [-v] [--force]
 
 Remove tools: the package, then the config links (backups are put back),
-then enabled: false. Doesn't ask before removing the package.
+then the tool comes off config.yml. Doesn't ask before removing the
+package. Hook steps aren't undone.
 
-  dotfiles unlink             interactive: pick from the enabled tools
+  dotfiles unlink             interactive: pick from the tools in config.yml
   dotfiles unlink cowsay      that tool
 
 Removes the package only (pacman -R, apt remove, ...), never its
-dependencies. If removing fails, the tool stays linked and enabled. A tool
-with locked: true in config.yaml, or no package here (none, manual:), is
-just unlinked.
+dependencies. If removing fails, the tool stays linked and in config.yml.
+A tool with nothing to install here is just unlinked.
+
+A required tool (required: in config.yml) isn't removed; --force removes
+it and takes it off required:.
 
   -d  show what would happen, change nothing
   -v  show every step
+  --force  also remove required tools
 
 Example:
   dotfiles unlink -dv cowsay
@@ -1074,11 +1559,12 @@ EOF
       cat <<'EOF'
 dotfiles [-d] [-v] [--force]
 
-Interactive setup, two screens:
-  1. the default: list; Enter installs every missing one
-  2. packages:, [x] = enabled; Enter continues, numbers switch tools on/off.
-     Switched on = link (install + link), switched off = unlink (unlink +
-     remove the package)
+Interactive setup, two steps:
+  1. every tool used on this platform, [x] = in config.yml, [R] = required.
+     Enter continues, numbers switch tools on/off. Switched on = link
+     (install + link), switched off = unlink (unlink + remove the
+     package). Required tools can't be switched off here.
+  2. which of the picked tools are required on this machine.
 
 Picking in lists: 1 3 5, 2-4, a = all, Enter = continue.
 
@@ -1087,37 +1573,22 @@ Picking in lists: 1 3 5, 2-4, a = all, Enter = continue.
   --force  no questions, no backups: replace whatever is in the way
 EOF
       ;;
-    default)
-      cat <<'EOF'
-dotfiles default [-d] [-v]
-
-Install every package in the default: list of config.yaml, link nothing.
-For machines that only need the basics (test VMs). A name that is also
-under packages: uses that entry's package names; any other name is
-installed as written. Already installed packages are skipped.
-
-  -d  show what would be installed (with versions), change nothing
-  -v  show every step
-
-Example:
-  dotfiles default -dv
-EOF
-      ;;
     wipe)
       cat <<'EOF'
 dotfiles wipe [-d] [-v]
 
 Undo everything dotfiles set up on this machine, to test it again from
 scratch:
-  - every tool in config.yaml: remove its links and system copies (backups
-    are put back), and for enabled tools its package (unless locked: true)
-  - then dotfiles' own links (~/.local/bin/dotfiles, ~/.config/dotfiles)
+  - every tool used here: remove its links and system copies (backups are
+    put back), and for the tools in config.yml its package (not the
+    required ones)
+  - then dotfiles' own link (~/.local/bin/dotfiles)
 
-Kept: locked packages, and everything in the repo: no file in it is
-changed or removed (config.yaml keeps its enabled: flags, so
-"dotfiles.sh link" sets up the same tools again). The log stays too.
-A package others depend on (e.g. Omarchy's) can't be removed: wipe reports
-it and carries on.
+Kept: required packages, config.yml (so "dotfiles.sh link" sets up the
+same tools again), and everything in the repo: no file in it is changed
+or removed. The log stays too. Hook steps aren't undone. A package others
+depend on (e.g. Omarchy's) can't be removed: wipe reports it and carries
+on.
 
 Shows the list first, then asks you to type the hostname. Asks for sudo
 when a tool has system files.
@@ -1137,7 +1608,8 @@ Get the latest repo changes and bring this machine in line with them:
   1. git fetch
   2. git pull --rebase --autostash (your local changes are set aside and
      put back; a conflict stops with how to continue or undo)
-  3. install new tools (never upgrades) and make sure every link is there
+  3. for every tool in config.yml: install it if it's new (never
+     upgrades), make sure every link is there, run its hook
 
 Made to run from .zshrc/.bashrc on every new shell: it only asks for sudo
 when a system file changes, and only asks 1Password when a filled-in file's
@@ -1157,13 +1629,13 @@ EOF
       cat <<'EOF'
 dotfiles status [tool] [-v]
 
-  dotfiles status          every tool: ENABLED, INSTALLED, LINKED (true/false),
-                           then the default: list with installed versions
+  dotfiles status          every tool used here: CONFIG (required, tools
+                           or - for not in config.yml), INSTALLED, LINKED
   dotfiles status neovim   one tool: package, command, where it's installed,
-                           version, and each link (source, symlink, problem)
+                           version, its hook, and each link (source,
+                           symlink, problem)
 
-ENABLED here means installed and linked on this machine. When config.yaml's
-enabled: says otherwise, status adds a note. Changes nothing.
+Changes nothing.
 
 Example:
   dotfiles status neovim
@@ -1176,8 +1648,8 @@ dotfiles doctor [-d] [-v]
 Check that everything dotfiles needs is in place, and fix what it can:
   OS and package manager, git, yq (installs either when missing; on
   Debian/Ubuntu yq comes from its GitHub release, checksum-verified),
-  config.yaml, the dotfiles command and config links, PATH, every tool in
-  config.yaml, and the default: list.
+  dotfiles.yml and config.yml, the dotfiles command link, PATH, and every
+  tool in dotfiles.yml (platform names, link sources, hooks).
 
 Exit code 1 when a check fails.
 
@@ -1193,7 +1665,7 @@ EOF
 dotfiles help [command]
 
 Show the overview, or help for one command:
-  link, unlink, interactive, default, update, wipe, status, doctor, help, version
+  link, unlink, interactive, update, wipe, status, doctor, help, version
 EOF
       ;;
     version)
@@ -1220,9 +1692,8 @@ Usage: dotfiles [command] [tool...] [flags]
        dotfiles                 interactive setup (help interactive)
 
 Commands:
-  link [tool...]        install tools and link their configs (no tool = enabled tools)
+  link [tool...]        install tools and link their configs (no tool = config.yml)
   unlink [tool...]      remove tools and their links (no tool = pick from a list)
-  default               install the default: list, link nothing
   update                pull the repo, install new tools, check links
   wipe                  undo everything dotfiles set up here (for re-testing)
   status [tool]         what's installed and linked
@@ -1233,7 +1704,9 @@ Commands:
 Flags (work anywhere on the line):
   -d, --dry-run         show what would happen, change nothing
   -v, --verbose         show every step
-  --force               no questions, no backups (link, update, interactive)
+  --force               no questions, no backups (link, update, interactive);
+                        unlink: also required tools
+  --required            link: add the tools to required: in config.yml
   --no-color            the banner without colour (interactive, update)
   Short flags combine: -dv
 
@@ -1242,7 +1715,9 @@ terminal at least 84 columns wide, fading through the terminal's ANSI
 colours. help, status and doctor start with "dotfiles <version>".
 
 Files:
-  config:  ${DOTFILES_CONFIG:-<not found>}
+  tools:   ${DOTFILES_TOOLS:-<not found>}
+  hooks:   ${HOOKS_DIR:-<not found>}
+  config:  ${DOTFILES_CONFIG:-<not found>}  (this machine)
   log:     ${LOG_FILE:-<not available>}
 
 More: dotfiles help <command>
@@ -1304,14 +1779,19 @@ ui() {
   _log_to_file "INFO" "$*"
 }
 
-# Commands that read the config need the file and yq.
+# Commands that read the tools need dotfiles.yml and yq. config.yml may
+# be missing (a new machine): it's written by the first link.
 _require_config() {
-  if [[ -z $DOTFILES_CONFIG || ! -f $DOTFILES_CONFIG ]]; then
-    log error "config.yaml not found${DOTFILES_CONFIG:+ at $DOTFILES_CONFIG}; run: dotfiles.sh doctor"
+  if [[ -z $DOTFILES_TOOLS || ! -f $DOTFILES_TOOLS ]]; then
+    log error "dotfiles.yml not found${DOTFILES_TOOLS:+ at $DOTFILES_TOOLS}; run: dotfiles.sh doctor"
     exit 1
   fi
   if ! command -v yq >/dev/null 2>&1; then
     log error "yq is not installed; run: dotfiles.sh doctor"
+    exit 1
+  fi
+  if [[ $CFG_LOADED != true ]]; then
+    log error "dotfiles.yml can't be read; run: dotfiles.sh doctor"
     exit 1
   fi
 }
@@ -1376,9 +1856,9 @@ _link_state() {
   fi
 }
 
-# State of one config.yaml link. An inject link is a filled-in file, not a
-# symlink: "injected" when it's there, "symlink" when an old link is still
-# in its place.
+# State of one dotfiles.yml link. An inject link is a filled-in file, not
+# a symlink: "injected" when it's there, "symlink" when an old link is
+# still in its place.
 _tool_link_state() {
   _tool_link_state_get "$@"
   echo "$LINK_STATE"
@@ -1392,11 +1872,9 @@ _tool_link_state_get() {
     /*) dest_path="$3" ;;
     *) dest_path="$HOME/$3" ;;
   esac
-  _link_flags_get "$tool" "$src"
+  _link_flags_get "$src" "$3"
   if [[ $LINK_COPY == true ]]; then
     LINK_STATE="$(_copy_state "$src_path" "$dest_path")"
-  elif [[ $LINK_FILL == true ]]; then
-    LINK_STATE="$(_fill_state "$src_path" "$dest_path")"
   elif [[ $LINK_INJECT != true ]]; then
     LINK_STATE="$(_link_state "$src_path" "$dest_path")"
   elif [[ -L $dest_path ]]; then
@@ -1418,7 +1896,7 @@ _render_copy() {
   sed -e "s|\$HOME|$HOME|g" -e "s|\$USER|$(id -un)|g" "$1"
 }
 
-# State of a system file (copy: true):
+# State of a system file (a dest outside $HOME):
 #   copied   dest is a regular file with the repo's content
 #   differs  something else is there (changed by hand, or a symlink)
 #   folder   a folder is in the way
@@ -1453,8 +1931,6 @@ _link_state_text() {
     copied)        echo "copied (root-owned)" ;;
     differs)       echo "differs from the repo; dotfiles link copies it again" ;;
     injected)      echo "filled in from 1Password" ;;
-    filled)        echo "copies with this machine's paths filled in" ;;
-    stale)         echo "copies out of date; dotfiles link writes them again" ;;
     symlink)       echo "still a symlink; dotfiles link fills it in from 1Password" ;;
     linked)        echo "linked" ;;
     linked-parent) echo "linked (through a linked parent folder)" ;;
@@ -1561,94 +2037,74 @@ _tool_is_linked() {
   local tool="$1" src dest result=0
   while IFS=$'\t' read -r src dest; do
     _tool_link_state_get "$tool" "$src" "$dest"
-    log debug "$tool: ~/$dest is $LINK_STATE"
+    log debug "$tool: $(_dest_shown "$dest") is $LINK_STATE"
     case "$LINK_STATE" in
-      linked | linked-parent | injected | copied | filled) ;;
+      linked | linked-parent | injected | copied) ;;
       *) result=1 ;;
     esac
   done < <(tool_links "$tool")
   return "$result"
 }
 
-# A tool counts as enabled when it's installed and linked.
-_and() {
-  if [[ $1 == true && $2 == true ]]; then echo true; else echo false; fi
-}
-
-# One line per tool.
+# One line per tool used on this platform.
 _status_all() {
-  local tool installed linked width=4
+  local tool installed linked width=4 unused=0
   # The first column is as wide as the longest tool name.
   while IFS= read -r tool; do
     if [[ ${#tool} -gt $width ]]; then
       width=${#tool}
     fi
   done < <(manifest_tools)
-  out "$(printf '%-*s  %-8s %-10s %s' "$width" TOOL ENABLED INSTALLED LINKED)"
+  out "$(printf '%-*s  %-9s %-10s %s' "$width" TOOL CONFIG INSTALLED LINKED)"
   while IFS= read -r tool; do
+    if ! _tool_is_used_here "$tool"; then
+      unused=$((unused + 1))
+      continue
+    fi
     installed="$(_tool_installed "$tool")"
     linked="$(_tool_linked "$tool")"
-    out "$(printf '%-*s  %-8s %-10s %s' "$width" "$tool" "$(_and "$installed" "$linked")" "$installed" "$linked")"
+    out "$(printf '%-*s  %-9s %-10s %s' "$width" "$tool" "$(_tool_listed_as "$tool")" "$installed" "$linked")"
   done < <(manifest_tools)
-  _status_default_packages
-}
-
-# The default: list, one row each, with the installed version.
-_status_default_packages() {
-  local name package version
-  out ""
-  if [[ -z $(default_list) ]]; then
-    out "Default packages: none (add names to default: in config.yaml)"
-    return 0
+  if [[ $unused -gt 0 ]]; then
+    out ""
+    out "Not used on ${PLATFORM:-this platform}: $unused tools (dotfiles status <tool> shows one)"
   fi
-  out "Default packages (dotfiles.sh default):"
-  out "$(printf '%-16s %-16s %-10s %s' NAME PACKAGE INSTALLED VERSION)"
-  while IFS= read -r name; do
-    package="$(default_package "$name")"
-    if [[ -z $package ]]; then
-      out "$(printf '%-16s %-16s %-10s %s' "$name" - - "install by hand")"
-    elif version="$(package_version "$package")"; then
-      out "$(printf '%-16s %-16s %-10s %s' "$name" "$package" true "$version")"
-    else
-      out "$(printf '%-16s %-16s %-10s %s' "$name" "$package" false -)"
-    fi
-  done < <(default_list)
+  if [[ ! -f $DOTFILES_CONFIG ]]; then
+    out "No config.yml yet: dotfiles link <tool> (or dotfiles) writes $(_tilde "$DOTFILES_CONFIG")"
+  fi
 }
 
 # Details for one tool.
 _status_tool() {
   local tool="$1"
-  local command package manual src dest state
-  local installed linked enabled why="" selected first=true
+  local command package src dest state shown installed linked first=true
 
   if ! _tool_exists "$tool"; then
-    log error "unknown tool: $tool (in config.yaml: $(manifest_tools | paste -sd ' ' -))"
+    log error "unknown tool: $tool (tools: $(_tool_names))"
     exit 2
   fi
 
+  out "$tool"
+  if ! _tool_is_used_here "$tool"; then
+    out "  not used on ${PLATFORM:-this platform} (dotfiles.yml has no package for it here)"
+    return 0
+  fi
   command="$(tool_command "$tool")"
   package="$(tool_package "$tool")"
-  manual="$(tool_manual "$tool")"
   installed="$(_tool_installed "$tool")"
   linked="$(_tool_linked "$tool")"
-  enabled="$(_and "$installed" "$linked")"
-  if [[ $installed != true ]]; then why="not installed"; fi
-  if [[ $linked != true ]]; then why="${why:+$why, }not linked"; fi
-  selected="$(tool_enabled "$tool")"
 
-  out "$tool"
-  if [[ $enabled == true ]]; then
-    out "  enabled:    true (installed and linked)"
-  else
-    out "  enabled:    false ($why)"
-  fi
-  if [[ $selected != "$enabled" ]]; then
-    out "  note:       config.yaml has enabled: $selected"
-  fi
+  case "$(_tool_listed_as "$tool")" in
+    required) out "  config:     required (config.yml)" ;;
+    tools)    out "  config:     tools (config.yml)" ;;
+    *)        out "  config:     not in config.yml (dotfiles link $tool adds it)" ;;
+  esac
   if [[ -n $package ]]; then
     out "  package:    $package (${PKG_MANAGER:-no package manager})"
+  elif _tool_has_hook "$tool"; then
+    out "  package:    none here; the hook installs it, or says how"
   else
-    out "  package:    none here${manual:+: $manual}"
+    out "  package:    none here (only checks that $command is there)"
   fi
   out "  command:    $command"
   if [[ $installed == true ]]; then
@@ -1657,6 +2113,16 @@ _status_tool() {
   else
     out "  installed:  no"
   fi
+  if _tool_has_hook "$tool"; then
+    out "  hook:       config/dotfiles/hooks/$tool.sh"
+  fi
+  if _tool_is_high "$tool"; then
+    out "  priority:   high (installed before the others)"
+  fi
+  if [[ $linked == true && -z $(tool_links "$tool") ]]; then
+    out "  links:      none"
+    return 0
+  fi
   out "  links:"
   while IFS=$'\t' read -r src dest; do
     if [[ $first != true ]]; then
@@ -1664,18 +2130,18 @@ _status_tool() {
     fi
     first=false
     state="$(_tool_link_state "$tool" "$src" "$dest")"
+    shown="$(_dest_shown "$dest")"
     out "    source:   config/$src"
-    if [[ $(tool_link_copy "$tool" "$src") == true ]]; then
+    _link_flags_get "$src" "$dest"
+    if [[ $LINK_COPY == true ]]; then
       out "    copy:     $dest  (root-owned)"
-    elif [[ $(tool_link_fill "$tool" "$src") == true ]]; then
-      out "    copies:   ~/$dest  (this machine's paths filled in)"
-    elif [[ $(tool_link_inject "$tool" "$src") == true ]]; then
-      out "    filled:   ~/$dest  (op inject)"
+    elif [[ $LINK_INJECT == true ]]; then
+      out "    filled:   $shown  (op inject)"
     else
-      out "    symlink:  ~/$dest"
+      out "    symlink:  $shown"
     fi
     case "$state" in
-      linked | linked-parent | injected | copied | filled) ;;
+      linked | linked-parent | injected | copied) ;;
       *) out "    problem:  $(_link_state_text "$state" "$(_dest_path "$dest")")" ;;
     esac
   done < <(tool_links "$tool")
@@ -1754,57 +2220,14 @@ _tilde() {
   esac
 }
 
-# Set enabled: true|false for one tool. Only that one line changes, so
-# comments and blank lines stay (yq -i would reformat the file). yq reads
-# it back to confirm.
-set_enabled() {
-  local tool="$1" value="$2" file="$DOTFILES_CONFIG" tmp
-  if [[ $(tool_enabled "$tool") == "$value" ]]; then
-    log debug "$tool: config.yaml already has enabled: $value"
-    return 0
-  fi
-  if [[ $DRY_RUN == true ]]; then
-    log info "dry run, would set enabled: $value for $tool in config.yaml"
-    return 0
-  fi
-  tmp="$file.tmp.$$"
-  # In the block under "  <tool>:", replace the first "    enabled: ...".
-  # A tool without an enabled: line gets one, right under its name.
-  local has_line=false
-  if [[ $(_yq ".packages[\"$tool\"] | has(\"enabled\")") == true ]]; then
-    has_line=true
-  fi
-  awk -v prefix="  $tool:" -v value="$value" -v add="$has_line" '
-    substr($0, 1, length(prefix)) == prefix && substr($0, length(prefix) + 1) ~ /^[[:space:]]*(#.*)?$/ {
-      in_tool = 1; print
-      if (add != "true") { print "    enabled: " value; done = 1 }
-      next
-    }
-    in_tool && /^  [^ #]/ { in_tool = 0 }
-    in_tool && !done && /^    enabled:/ {
-      sub(/enabled:[[:space:]]*[A-Za-z]+/, "enabled: " value); done = 1
-    }
-    { print }
-  ' "$file" >"$tmp"
-  mv "$tmp" "$file"
-  # Check the file itself, then update the copy read at the start of the run.
-  if [[ $(_yq ".packages[\"$tool\"].enabled") != "$value" ]]; then
-    log error "$tool: couldn't set enabled: $value in config.yaml (is the tool's name indented 2 spaces under packages:?)"
-    return 1
-  fi
-  _cfg_id "$tool"
-  printf -v "CFG_${CFG_ID}_S_enabled" '=%s' "$value"
-  log info "$tool: config.yaml now has enabled: $value"
-}
-
-# Tools to act on: the ones named, or every tool with enabled: true.
 # "true" when linking (link) or unlinking (unlink) a tool would change a
 # system file: for link, a copy is missing or differs, or its unit isn't
 # enabled yet; for unlink, a copy is there to remove.
 _system_needs_root() {
   local tool="$1" mode="$2" src dest state
   while IFS=$'\t' read -r src dest; do
-    if [[ $(tool_link_copy "$tool" "$src") != true ]]; then
+    _link_flags_get "$src" "$dest"
+    if [[ $LINK_COPY != true ]]; then
       continue
     fi
     state="$(_copy_state "$(_src_path "$src")" "$dest")"
@@ -1816,7 +2239,7 @@ _system_needs_root() {
     elif [[ $state != copied ]]; then
       echo true
       return 0
-    elif [[ $dest == /etc/systemd/* && $(tool_link_enable "$tool" "$src") == true ]] &&
+    elif [[ $LINK_ENABLE == true ]] &&
       command -v systemctl >/dev/null 2>&1 &&
       ! systemctl is-enabled --quiet "$(basename "$dest")" 2>/dev/null; then
       echo true
@@ -1826,9 +2249,7 @@ _system_needs_root() {
   echo false
 }
 
-# Sets TOOLS. Unknown names stop the run before anything changes.
-TOOLS=()
-# Tools with system files (copy: true links) need root for them. Before
+# Tools with system files (a dest outside $HOME) need root for them. Before
 # changing anything, ask for the sudo password (sudo -v); refused = stop,
 # nothing changed. Later sudo calls in this run don't ask again. A dry run
 # changes nothing, so it doesn't ask.
@@ -1867,16 +2288,9 @@ _require_sudo() {
   fi
 }
 
-# Every tool with enabled: true, one per line.
-_enabled_tools() {
-  local tool
-  while IFS= read -r tool; do
-    if [[ $(tool_enabled "$tool") == true ]]; then
-      echo "$tool"
-    fi
-  done < <(manifest_tools)
-}
-
+# Tools to act on, into TOOLS (in run order): the ones named, or every tool
+# in config.yml. Unknown names stop the run before anything changes.
+TOOLS=()
 _pick_tools() {
   local cmd="$1" tool
   shift
@@ -1884,19 +2298,22 @@ _pick_tools() {
   if [[ $# -gt 0 ]]; then
     for tool in "$@"; do
       if ! _tool_exists "$tool"; then
-        log error "unknown tool: $tool (in config.yaml: $(manifest_tools | paste -sd ' ' -))"
+        log error "unknown tool: $tool (tools: $(_tool_names))"
         exit 2
       fi
-      TOOLS+=("$tool")
     done
-  else
     while IFS= read -r tool; do
-      if [[ $(tool_enabled "$tool") == true ]]; then
-        TOOLS+=("$tool")
-      fi
-    done < <(manifest_tools)
-    if [[ ${#TOOLS[@]} -eq 0 ]]; then
-      log info "$cmd: no tool has enabled: true in config.yaml; name one: dotfiles.sh $cmd <tool>"
+      TOOLS+=("$tool")
+    done < <(_order_tools "$@")
+  else
+    # shellcheck disable=SC2046
+    while IFS= read -r tool; do
+      TOOLS+=("$tool")
+    done < <(_order_tools $(_listed_tools))
+    if [[ ${#TOOLS[@]} -eq 0 && $cmd == update ]]; then
+      log info "update: no tools in config.yml yet; nothing to install or link"
+    elif [[ ${#TOOLS[@]} -eq 0 ]]; then
+      log info "$cmd: no tools in config.yml yet; name one: dotfiles.sh $cmd <tool> (or run dotfiles to pick)"
     fi
   fi
   log debug "$cmd: tools: ${TOOLS[*]:-<none>}"
@@ -1924,131 +2341,21 @@ _summary() {
   fi
 }
 
-# Link one src/dest pair from config.yaml. Returns 1 when the link isn't
+# Link one src/dest pair from dotfiles.yml. Returns 1 when the link isn't
 # in place afterwards.
 _link_one() {
   local tool="$1" src="$2" dest="$3"
   if [[ -z $src || -z $dest ]]; then
-    log error "$tool: a link in config.yaml is missing src or dest"
+    log error "$tool: a link in dotfiles.yml is missing its source or dest"
     return 1
   fi
-  if [[ $(tool_link_copy "$tool" "$src") == true ]]; then
+  _link_flags_get "$src" "$dest"
+  if [[ $LINK_COPY == true ]]; then
     _copy_path "$tool" "$src" "$dest"
-  elif [[ $dest == /* ]]; then
-    log error "$tool: $dest is a system path; mark that link copy: true in config.yaml"
-    return 1
-  elif [[ $(tool_link_fill "$tool" "$src") == true ]]; then
-    _fill_path "$tool" "$(_src_path "$src")" "$dest"
-  elif [[ $(tool_link_inject "$tool" "$src") == true ]]; then
+  elif [[ $LINK_INJECT == true ]]; then
     _inject_path "$tool" "$(_src_path "$src")" "$dest"
   else
     _link_path "$tool" "$(_src_path "$src")" "$dest"
-  fi
-}
-
-# ─── fill: true (folders of .json copies with this machine's paths) ─────
-# The repo keeps paths relative to itself ("config/omarchy/..."), so the
-# same file works on every machine; the copies in dest get the full path
-# ("/home/<user>/.../dotfiles/config/omarchy/..."). Aether reads blueprint
-# wallpaper paths as written, and the repo stays clean.
-
-# A repo file as this machine's copy.
-_fill_render() {
-  sed "s|\"config/|\"$DOTFILES/config/|g" "$1"
-}
-
-# A copy saved by the app, as the repo keeps it: this repo's full path and
-# the ~/.config/omarchy link (where Omarchy's own files appear) made relative.
-_fill_unrender() {
-  sed -e "s|\"$DOTFILES/config/|\"config/|g" -e "s|\"$HOME/.config/omarchy/|\"config/omarchy/|g" "$1"
-}
-
-# filled (every repo file has its up-to-date copy), stale, folder (in the
-# way: not a folder), missing.
-_fill_state() {
-  local src_dir="$1" dest_dir="$2" file
-  if [[ -L $dest_dir || ( -e $dest_dir && ! -d $dest_dir ) ]]; then
-    echo "folder"
-    return 0
-  fi
-  if [[ ! -d $dest_dir ]]; then
-    echo "missing"
-    return 0
-  fi
-  for file in "$src_dir"/*.json; do
-    [[ -f $file ]] || continue
-    if [[ ! -f $dest_dir/$(basename "$file") ]] || ! _fill_render "$file" | cmp -s - "$dest_dir/$(basename "$file")"; then
-      echo "stale"
-      return 0
-    fi
-  done
-  echo "filled"
-}
-
-# Copy files the app saved in dest (and the repo doesn't have yet) back into
-# the repo, with paths made relative. They show up in git to commit.
-_fill_copy_back() {
-  local tool="$1" src_dir="$2" dest_dir="$3" file name
-  [[ -d $dest_dir && ! -L $dest_dir ]] || return 0
-  for file in "$dest_dir"/*.json; do
-    [[ -f $file ]] || continue
-    name="$(basename "$file")"
-    if [[ ! -e $src_dir/$name ]]; then
-      if [[ $DRY_RUN == true ]]; then
-        log info "dry run, would copy $(_tilde "$file") into the repo"
-      else
-        _fill_unrender "$file" >"$src_dir/$name"
-        log success "$tool: copied $name into the repo (new; commit it)"
-      fi
-      CHANGED=true
-    fi
-  done
-}
-
-_fill_path() {
-  local tool="$1" src_dir="$2" dest="$3"
-  local dest_dir shown file name tmp written=0
-  dest_dir="$(_dest_path "$dest")"
-  shown="$(_dest_shown "$dest")"
-  if [[ ! -d $src_dir ]]; then
-    log error "$tool: source ${src_dir#"$DOTFILES"/} isn't a folder (fill: true needs one)"
-    return 1
-  fi
-  if [[ $DRY_RUN == true && $'\n'$UNFOLDED == *$'\n'"$(dirname "$dest_dir")"$'\n'* ]]; then
-    log info "dry run, would write the copies in $shown with this machine's paths"
-    return 0
-  fi
-  if _inside_repo "$(dirname "$dest_dir")" || _inside_repo "$dest_dir"; then
-    log error "$tool: $shown is inside the repo; the copies would end up in git"
-    return 1
-  fi
-  if [[ -L $dest_dir || ( -e $dest_dir && ! -d $dest_dir ) ]]; then
-    log warn "$tool: $shown is a link or a file, not a folder; left it alone"
-    return 1
-  fi
-  _fill_copy_back "$tool" "$src_dir" "$dest_dir"
-  if [[ ! -d $dest_dir ]]; then
-    run_cmd mkdir -p "$dest_dir"
-  fi
-  for file in "$src_dir"/*.json; do
-    [[ -f $file ]] || continue
-    name="$(basename "$file")"
-    if [[ -f $dest_dir/$name ]] && _fill_render "$file" | cmp -s - "$dest_dir/$name"; then
-      continue
-    fi
-    CHANGED=true
-    written=$((written + 1))
-    if [[ $DRY_RUN == true ]]; then
-      log info "dry run, would write $shown/$name with this machine's paths"
-      continue
-    fi
-    tmp="$dest_dir/.$name.tmp"
-    _fill_render "$file" >"$tmp" && mv -f "$tmp" "$dest_dir/$name"
-  done
-  if [[ $written -eq 0 ]]; then
-    log success "$tool: already up to date: $shown (copies with this machine's paths)"
-  elif [[ $DRY_RUN != true ]]; then
-    log success "$tool: wrote $written file(s) in $shown with this machine's paths"
   fi
 }
 
@@ -2067,8 +2374,8 @@ _root_cmd() {
 SYSTEM_BACKUP_DIR="/var/lib/dotfiles/backup"
 
 # For a copied systemd unit: reload systemd when the file was just copied
-# ($4 = copied), and enable the unit when the link says enable: true and it
-# isn't yet. Containers have no running systemd: warn, don't fail.
+# ($4 = copied), and enable the unit when it has [Install] and isn't
+# enabled yet. Containers have no running systemd: warn, don't fail.
 _systemd_after_copy() {
   local tool="$1" src="$2" dest_path="$3" copied="${4:-false}" unit
   case "$dest_path" in
@@ -2083,7 +2390,7 @@ _systemd_after_copy() {
     log warn "$tool: systemctl daemon-reload failed (no running systemd?)"
     return 0
   fi
-  if [[ $(tool_link_enable "$tool" "$src") == true ]] && ! systemctl is-enabled --quiet "$unit" 2>/dev/null; then
+  if [[ $(tool_link_enable "$src" "$dest_path") == true ]] && ! systemctl is-enabled --quiet "$unit" 2>/dev/null; then
     if _root_cmd systemctl enable --now "$unit"; then
       log success "$tool: enabled $unit"
     else
@@ -2092,7 +2399,7 @@ _systemd_after_copy() {
   fi
 }
 
-# Put a root-owned copy of a system file in place (copy: true). Asks
+# Put a root-owned copy of a system file in place (a dest outside $HOME). Asks
 # before replacing a different file; the old one goes to
 # $SYSTEM_BACKUP_DIR. Returns 1 when the copy isn't in place afterwards.
 _copy_path() {
@@ -2175,7 +2482,7 @@ _uncopy_path() {
       ;;
   esac
   unit="$(basename "$dest_path")"
-  if [[ $dest_path == /etc/systemd/* && $(tool_link_enable "$tool" "$src") == true ]] &&
+  if [[ $(tool_link_enable "$src" "$dest_path") == true ]] &&
     command -v systemctl >/dev/null 2>&1; then
     _root_cmd systemctl disable --now "$unit" || log warn "$tool: couldn't disable $unit"
   fi
@@ -2470,7 +2777,8 @@ _unfold_tool_link() {
   done < <(tool_links "$tool")
 }
 
-# Link one tool and set enabled: true. Returns 1 when a link isn't in place.
+# Link one tool's configs and clone its repos. Returns 1 when a link isn't
+# in place.
 _link_configs() {
   local tool="$1" src dest repo ok=true
   _unfold_tool_link "$tool"
@@ -2488,10 +2796,77 @@ _link_configs() {
       fi
     done < <(tool_clones "$tool")
   fi
-  if [[ $ok == true ]] && ! set_enabled "$tool" true; then
-    ok=false
-  fi
   [[ $ok == true ]]
+}
+
+# ─── hooks: config/dotfiles/hooks/<tool>.sh ─────────────────────────────
+# Runs, when it exists, after the tool's package and links (link, update,
+# interactive). Gets --dry-run, --verbose and --force as given to dotfiles,
+# and DOTFILES, DOTFILES_OS, DOTFILES_PLATFORM, DOTFILES_TOOL and
+# PKG_MANAGER in its environment. Its output shows as it runs (and goes to
+# the log; the interactive screen shows it with -v only). A line
+# "next: <text>" goes to the Next steps list at the end instead. A hook
+# prints nothing when there's nothing to do (update runs from the shell's
+# startup file); anything else it prints counts as a change. An exit code
+# other than 0 = the tool failed.
+NEXT_STEPS=""
+_run_hook() {
+  local tool="$1" hook="$HOOKS_DIR/$1.sh" line code_file code=0 printed=false
+  local -a args=()
+  if [[ -z $HOOKS_DIR || ! -f $hook ]]; then
+    return 0
+  fi
+  if [[ $DRY_RUN == true ]]; then args+=(--dry-run); fi
+  if [[ $VERBOSE == true ]]; then args+=(--verbose); fi
+  if [[ $FORCE == true ]]; then args+=(--force); fi
+  log debug "$tool: running hooks/$tool.sh ${args[*]:-}"
+  code_file="$(mktemp)"
+  # </dev/null: the hook can't eat input meant for a loop around it. The
+  # exit code comes back through code_file (a < <(…) has no $?).
+  while IFS= read -r line || [[ -n $line ]]; do
+    case "$line" in
+      next:*)
+        line="${line#next:}"
+        line="${line# }"
+        NEXT_STEPS+="$tool: $line"$'\n'
+        _log_to_file "INFO" "$tool: next step: $line"
+        ;;
+      *)
+        printed=true
+        if [[ $QUIET != true || $VERBOSE == true ]]; then
+          printf '%s\n' "$line"
+        fi
+        _log_to_file "INFO" "  $tool hook> $line"
+        ;;
+    esac
+  done < <(DOTFILES_TOOL="$tool" PKG_MANAGER="$PKG_MANAGER" bash "$hook" ${args[@]+"${args[@]}"} </dev/null 2>&1
+    echo "$?" >"$code_file")
+  code="$(cat "$code_file" 2>/dev/null)" || code=1
+  rm -f "$code_file"
+  if [[ $printed == true ]]; then
+    CHANGED=true
+  fi
+  if [[ ${code:-1} != 0 ]]; then
+    log error "$tool: hooks/$tool.sh failed (exit ${code:-?})"
+    return 1
+  fi
+}
+
+# Things to do by hand, collected from the hooks and from tools with
+# nothing to install here. Shown at the end of link, update and the
+# interactive setup, even when the screen is quiet.
+_next_steps() {
+  local line
+  if [[ -z $NEXT_STEPS ]]; then
+    return 0
+  fi
+  ui ""
+  ui "Next steps:"
+  while IFS= read -r line; do
+    if [[ -n $line ]]; then
+      ui "  - $line"
+    fi
+  done <<<"$NEXT_STEPS"
 }
 
 # ─── Theme templates on machines without Omarchy ────────────────────────
@@ -2511,7 +2886,7 @@ _render_theme() {
     return 0
   fi
   if [[ -z $THEME ]]; then
-    log debug "theme: no settings.theme in config.yaml; nothing to render"
+    log debug "theme: no settings.theme in config.yml; nothing to render"
     return 0
   fi
   local colors="$DOTFILES/config/omarchy/themes/$THEME/colors.toml"
@@ -2587,31 +2962,39 @@ _render_theme() {
 }
 
 # link [tool...]: install each tool's package if it's missing, link its
-# configs, set enabled: true. No tool = every enabled tool.
+# configs, run its hook, add it to config.yml (--required: to required:).
+# No tool = every tool in config.yml.
 cmd_link() {
   _require_config
+  if [[ $REQUIRED_FLAG == true && $# -eq 0 ]]; then
+    log error "link --required needs the tools to add, e.g. dotfiles link --required git"
+    exit 2
+  fi
   _pick_tools link "$@"
   _require_sudo link ${TOOLS[@]+"${TOOLS[@]}"}
-  local tool good="" bad="" manual=""
+  local tool good="" bad="" as=tools
+  if [[ $REQUIRED_FLAG == true ]]; then
+    as=required
+  fi
   for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
     CHANGED=false
-    if [[ $(tool_unused_here "$tool") == true ]]; then
-      log debug "$tool: not used on ${DOTFILES_OS:-this OS} (no package, nothing to link); skipped"
+    if ! _tool_is_used_here "$tool"; then
+      if [[ $# -gt 0 ]]; then
+        log warn "$tool: not used on ${PLATFORM:-this platform} (dotfiles.yml has no package for it here); skipped"
+      else
+        log debug "$tool: not used on ${PLATFORM:-this platform}; skipped"
+      fi
       continue
     fi
-    if ! _link_tool "$tool"; then
+    if ! _link_tool "$tool" "$as"; then
       bad="${bad:+$bad, }$tool"
-    elif [[ -n $INSTALL_NOTE ]]; then
-      manual="${manual:+$manual; }$tool: $INSTALL_NOTE"
     elif [[ $CHANGED == true ]]; then
       good="${good:+$good, }$(_tool_with_version "$tool")"
     fi
   done
   _render_theme
   _summary linked "$good" "$bad"
-  if [[ -n $manual && ${#TOOLS[@]} -gt 1 ]]; then
-    out "  install by hand: $manual"
-  fi
+  _next_steps
   if [[ -n $bad ]]; then
     exit 1
   fi
@@ -2621,12 +3004,8 @@ cmd_link() {
 _unlink_one() {
   local tool="$1" src="$2" dest="$3"
   local src_path dest_path state shown
-  if [[ $(tool_link_copy "$tool" "$src") == true ]]; then
+  if [[ $dest == /* ]]; then
     _uncopy_path "$tool" "$src" "$dest"
-    return
-  fi
-  if [[ $(tool_link_fill "$tool" "$src") == true ]]; then
-    _unfill_path "$tool" "$src" "$dest"
     return
   fi
   src_path="$(_src_path "$src")"
@@ -2666,28 +3045,7 @@ _unlink_one() {
   esac
 }
 
-# Remove fill copies: new files the app saved go back to the repo first,
-# then the copies of the repo's files are removed (the folder too, if empty).
-_unfill_path() {
-  local tool="$1" src="$2" dest="$3" src_dir dest_dir file
-  src_dir="$(_src_path "$src")"
-  dest_dir="$(_dest_path "$dest")"
-  if [[ ! -d $dest_dir || -L $dest_dir ]]; then
-    log info "$tool: $(_dest_shown "$dest") isn't there; nothing to do"
-    return 0
-  fi
-  _fill_copy_back "$tool" "$src_dir" "$dest_dir"
-  for file in "$src_dir"/*.json; do
-    [[ -f $file && -f $dest_dir/$(basename "$file") ]] || continue
-    run_cmd rm "$dest_dir/$(basename "$file")"
-  done
-  if [[ $DRY_RUN != true ]]; then
-    rmdir "$dest_dir" 2>/dev/null || true
-    log success "$tool: removed the copies in $(_dest_shown "$dest")"
-  fi
-}
-
-# Unlink one tool and set enabled: false. Returns 1 on failure.
+# Unlink one tool's configs. Returns 1 on failure.
 _unlink_configs() {
   local tool="$1" src dest ok=true i
   local -a pairs=()
@@ -2702,15 +3060,12 @@ _unlink_configs() {
       ok=false
     fi
   done
-  if [[ $ok == true && $KEEP_ENABLED != true ]] && ! set_enabled "$tool" false; then
-    ok=false
-  fi
   [[ $ok == true ]]
 }
 
-# unlink [tool...]: remove each tool's package, unlink its configs, set
-# enabled: false. No tool = pick from the enabled tools (never all of them
-# at once without asking).
+# unlink [tool...]: remove each tool's package, unlink its configs, take
+# it off config.yml. No tool = pick from config.yml (never all of them at
+# once without asking).
 cmd_unlink() {
   if [[ $# -eq 0 ]]; then
     _interactive_unlink
@@ -2736,12 +3091,11 @@ cmd_unlink() {
 
 # ─── packages: install for link, remove for unlink (plan Sections 7, 8, 11)
 
-# Install one tool's package if it's missing. Sets INSTALL_NOTE to the
-# tool's manual: message when there's no package to install here.
-INSTALL_NOTE=""
+# Install one tool's package if it's missing. A tool with nothing to
+# install here (~, no package:) is only checked: missing = a warning and a
+# next step, unless its hook installs it or says how.
 _install_package() {
   local tool="$1" cmd_name package path
-  INSTALL_NOTE=""
   cmd_name="$(tool_command "$tool")"
   package="$(tool_package "$tool")"
 
@@ -2757,9 +3111,12 @@ _install_package() {
     return 0
   fi
   if [[ -z $package ]]; then
-    INSTALL_NOTE="$(tool_manual "$tool")"
-    INSTALL_NOTE="${INSTALL_NOTE:-no package for ${PKG_MANAGER:-this OS} in config.yaml}"
-    log warn "$tool: not installed: $INSTALL_NOTE"
+    if _tool_has_hook "$tool"; then
+      log debug "$tool: not installed yet; nothing to install here, hooks/$tool.sh handles it"
+    else
+      log warn "$tool: $cmd_name isn't installed, and dotfiles.yml has nothing to install it on ${PLATFORM:-this platform}"
+      NEXT_STEPS+="$tool: install $cmd_name (dotfiles.yml has nothing to install it on ${PLATFORM:-this platform})"$'\n'
+    fi
     return 0
   fi
 
@@ -2800,14 +3157,31 @@ _install_package() {
   log success "$tool: installed $package: $path ($(_tool_installed_version "$tool"))"
 }
 
-# Install, link and set enabled: true for one tool. Returns 1 on failure.
-# Links even when there was nothing to install (plan Section 18).
+# Install, link, clone and run the hook for one tool, then put it in
+# config.yml: $2 = tools (link), required (link --required), or keep
+# (update: config.yml stays as it is). Returns 1 on failure, and then
+# config.yml isn't changed. Links even when there was nothing to install
+# (plan Section 18).
 _link_tool() {
-  local tool="$1"
+  local tool="$1" as="${2:-keep}"
   if ! _install_package "$tool"; then
     return 1
   fi
-  _link_configs "$tool"
+  if ! _link_configs "$tool"; then
+    return 1
+  fi
+  if ! _run_hook "$tool"; then
+    return 1
+  fi
+  case "$as" in
+    required) _config_set "$tool" required ;;
+    tools)
+      # Already in config.yml (also as required): left as it is.
+      if ! _tool_is_listed "$tool"; then
+        _config_set "$tool" tools
+      fi
+      ;;
+  esac
 }
 
 # "tool (version)": the installed version; for a tool not installed yet
@@ -2816,7 +3190,7 @@ _tool_with_version() {
   local tool="$1"
   if [[ $(_tool_installed "$tool") == true ]]; then
     _with_version "$tool" "$(_tool_installed_version "$tool")"
-  elif [[ $DRY_RUN == true ]]; then
+  elif [[ $DRY_RUN == true && -n $(tool_package "$tool") ]]; then
     _with_version "$tool" "$(package_available_version "$(tool_package "$tool")")"
   else
     echo "$tool"
@@ -2824,18 +3198,14 @@ _tool_with_version() {
 }
 
 # Remove one tool's package (no question: unlink always removes it).
-# Returns 1 when removing failed, so the tool stays linked and enabled.
+# Returns 1 when removing failed, so the tool stays linked and in config.yml.
 _remove_package() {
   local tool="$1" cmd_name package
   cmd_name="$(tool_command "$tool")"
   package="$(tool_package "$tool")"
 
-  if [[ $(tool_locked "$tool") == true ]]; then
-    log info "$tool: locked: true in config.yaml; kept the package, removing only the links"
-    return 0
-  fi
   if [[ -z $package ]]; then
-    log warn "$tool: no package to remove here; if you installed it by hand, remove it the same way"
+    log info "$tool: no package to remove here; if you installed it by hand, remove it the same way"
     return 0
   fi
   # Several packages: remove whichever are installed (pm_remove skips the rest).
@@ -2869,14 +3239,25 @@ _remove_package() {
   fi
 }
 
-# Remove the package, unlink, set enabled: false. Returns 1 on failure; a
-# failed removal leaves the links and enabled: as they were.
+# Remove the package, unlink, take the tool off config.yml. A required
+# tool needs --force (then it comes off required:). Returns 1 on failure;
+# a failed removal leaves the links and config.yml as they were. Hook
+# steps aren't undone.
 _unlink_tool() {
   local tool="$1"
+  if _tool_is_required "$tool" && [[ $FORCE != true ]]; then
+    log error "$tool: required on this machine (config.yml); kept it. dotfiles unlink --force $tool removes it"
+    return 1
+  fi
   if ! _remove_package "$tool"; then
     return 1
   fi
-  _unlink_configs "$tool"
+  if ! _unlink_configs "$tool"; then
+    return 1
+  fi
+  if [[ $KEEP_CONFIG != true ]]; then
+    _config_set "$tool" none
+  fi
 }
 
 # ─── interactive link / unlink (plan Section 7) ─────────────────────────
@@ -2945,7 +3326,7 @@ _state_text() {
   local tool="$1" text=""
   if _tool_is_installed "$tool"; then
     text="installed"
-  elif _tool_package_get "$tool" && [[ -z $TOOL_PACKAGE ]]; then
+  elif _tool_package_get "$tool" && [[ -z $TOOL_PACKAGE ]] && ! _tool_has_hook "$tool"; then
     text="install by hand"
   fi
   if _tool_is_linked "$tool"; then
@@ -2954,85 +3335,46 @@ _state_text() {
   echo "${text:--}"
 }
 
-# Screen 1: the default: list. Enter = install every missing one.
-_screen_defaults() {
-  local -a names=() missing=()
-  local name package version status i n
-  while IFS= read -r name; do
-    names+=("$name")
-  done < <(default_list)
-
-  ui ""
-  if [[ ${#names[@]} -eq 0 ]]; then
-    ui "Default packages: none (add names to default: in config.yaml)"
-    return 0
-  fi
-  ui "Default packages:"
-  for ((i = 0; i < ${#names[@]}; i++)); do
-    package="$(default_package "${names[i]}")"
-    if [[ -z $package ]]; then
-      status="install by hand"
-    elif version="$(package_version "$package")"; then
-      status="installed $version"
-    else
-      status="not installed"
-      missing+=("$((i + 1))")
-    fi
-    ui "$(printf '  %2d) %-16s %s' "$((i + 1))" "${names[i]}" "$status")"
-  done
-  if [[ ${#missing[@]} -eq 0 ]]; then
-    ui "  All installed."
-    return 0
-  fi
-
-  while true; do
-    _ask "Install: Enter = all missing, numbers = only those, n = skip: "
-    case "$ANSWER" in
-      "")    PICKS=("${missing[@]}"); break ;;
-      n | N) return 0 ;;
-      *)     if _parse_picks "$ANSWER" "${#names[@]}"; then break; fi ;;
-    esac
-  done
-
-  for n in "${PICKS[@]}"; do
-    name="${names[n - 1]}"
-    _default_one "$name"
-    case "$DEFAULT_RESULT" in
-      installed) ui "  $name: installed ($DEFAULT_VERSION)" ;;
-      test)      ui "  Test: $(_with_version "$name" "$DEFAULT_VERSION")" ;;
-      already)   ui "  $name: already installed" ;;
-      manual)    ui "  $name: install by hand: $(tool_manual "$name")" ;;
-      failed)    ui "  $name: failed (see the error above)" ;;
-    esac
-  done
-}
-
-# Screen 2: packages: with the enabled ones marked. Enter = continue;
-# numbers switch packages on/off. On = link (install and link); switched
-# off = unlink (remove the package and the links).
+# The interactive setup: every tool used on this platform. Step 1 picks
+# the tools ([x] = in config.yml; required ones can't be switched off),
+# step 2 which of them are required here. Then each picked tool is linked
+# (install, link, hook) and each one switched off is unlinked (package and
+# links removed).
 INTERACTIVE_FAILED=false
-_screen_packages() {
-  local -a names=() selected=() before=()
-  local name enabled mark i n
-
+_screen_tools() {
+  local -a names=() selected=() before=() required=()
+  local name mark i n
   while IFS= read -r name; do
-    enabled="$(tool_enabled "$name")"
+    _tool_is_used_here "$name" || continue
     names+=("$name")
-    selected+=("$enabled")
-    before+=("$enabled")
+    if _tool_is_listed "$name"; then
+      selected+=(true)
+      before+=(true)
+    else
+      selected+=(false)
+      before+=(false)
+    fi
+    if _tool_is_required "$name"; then
+      required+=(true)
+    else
+      required+=(false)
+    fi
   done < <(manifest_tools)
 
   ui ""
   if [[ ${#names[@]} -eq 0 ]]; then
-    ui "Packages: none (add them under packages: in config.yaml)"
+    ui "Tools: none for ${PLATFORM:-this platform} (add them to dotfiles.yml)"
     return 0
   fi
 
+  # Step 1: the tools.
   while true; do
-    ui "Packages ([x] = enabled):"
+    ui "Tools ([x] = used here, [R] = required here):"
     for ((i = 0; i < ${#names[@]}; i++)); do
       mark=" "
-      if [[ ${selected[i]} == true ]]; then
+      if [[ ${required[i]} == true ]]; then
+        mark="R"
+      elif [[ ${selected[i]} == true ]]; then
         mark="x"
       fi
       ui "$(printf '  %2d) [%s] %-16s %s' "$((i + 1))" "$mark" "${names[i]}" "$(_state_text "${names[i]}")")"
@@ -3047,7 +3389,9 @@ _screen_packages() {
       done
     elif _parse_picks "$ANSWER" "${#names[@]}"; then
       for n in "${PICKS[@]}"; do
-        if [[ ${selected[n - 1]} == true ]]; then
+        if [[ ${required[n - 1]} == true ]]; then
+          ui "  ${names[n - 1]} is required here; dotfiles unlink --force ${names[n - 1]} removes it."
+        elif [[ ${selected[n - 1]} == true ]]; then
           selected[n - 1]=false
         else
           selected[n - 1]=true
@@ -3057,16 +3401,74 @@ _screen_packages() {
     ui ""
   done
 
-  ui ""
+  # Step 2: which picked tools are required here. Only the ones that
+  # aren't yet can be switched (unlink --force takes one off).
+  local -a picked=()
   for ((i = 0; i < ${#names[@]}; i++)); do
+    if [[ ${selected[i]} == true ]]; then
+      picked+=("$i")
+    fi
+  done
+  if [[ ${#picked[@]} -gt 0 ]]; then
+    local -a was_required=("${required[@]}")
+    ui ""
+    while true; do
+      ui "Required here ([R] = unlink and this screen keep it):"
+      for ((n = 0; n < ${#picked[@]}; n++)); do
+        i="${picked[n]}"
+        mark=" "
+        if [[ ${required[i]} == true ]]; then
+          mark="R"
+        fi
+        ui "$(printf '  %2d) [%s] %s' "$((n + 1))" "$mark" "${names[i]}")"
+      done
+      _ask "Enter = continue, or numbers to switch required on/off: "
+      if [[ -z $ANSWER ]]; then
+        break
+      fi
+      if _parse_picks "$ANSWER" "${#picked[@]}"; then
+        for n in "${PICKS[@]}"; do
+          i="${picked[n - 1]}"
+          if [[ ${was_required[i]} == true ]]; then
+            ui "  ${names[i]} is already required; dotfiles unlink --force ${names[i]} takes it off."
+          elif [[ ${required[i]} == true ]]; then
+            required[i]=false
+          else
+            required[i]=true
+          fi
+        done
+      fi
+      ui ""
+    done
+  fi
+
+  # Run order: priority: high, then required, then the rest.
+  local -a order=()
+  local pass
+  for pass in high required rest; do
+    for ((i = 0; i < ${#names[@]}; i++)); do
+      case "$pass" in
+        high) _tool_is_high "${names[i]}" || continue ;;
+        required) { ! _tool_is_high "${names[i]}" && [[ ${required[i]} == true ]]; } || continue ;;
+        rest) { ! _tool_is_high "${names[i]}" && [[ ${required[i]} != true ]]; } || continue ;;
+      esac
+      order+=("$i")
+    done
+  done
+
+  ui ""
+  local as
+  for i in "${order[@]}"; do
     name="${names[i]}"
     CHANGED=false
     if [[ ${selected[i]} == true ]]; then
-      if ! _link_tool "$name"; then
+      as=tools
+      if [[ ${required[i]} == true ]]; then
+        as=required
+      fi
+      if ! _link_tool "$name" "$as"; then
         ui "  $name: failed (see the messages above)"
         INTERACTIVE_FAILED=true
-      elif [[ -n $INSTALL_NOTE ]]; then
-        ui "  $name: linked; install by hand: $INSTALL_NOTE"
       elif [[ $CHANGED != true ]]; then
         ui "  $name: already installed and linked"
       elif [[ $DRY_RUN == true ]]; then
@@ -3090,42 +3492,53 @@ _screen_packages() {
 # dotfiles with no command.
 _interactive_link() {
   _require_config
-  # shellcheck disable=SC2046
-  _require_sudo link $(manifest_tools)
+  local tool
+  local -a here=()
+  while IFS= read -r tool; do
+    if _tool_is_used_here "$tool"; then
+      here+=("$tool")
+    fi
+  done < <(manifest_tools)
+  _require_sudo link ${here[@]+"${here[@]}"}
   _require_tty
   QUIET=true
   INTERACTIVE_FAILED=false
-  _screen_defaults
-  _screen_packages
+  _screen_tools
+  _next_steps
   if [[ $INTERACTIVE_FAILED == true ]]; then
     exit 1
   fi
 }
 
-# dotfiles unlink with no tool: pick from the enabled packages.
+# dotfiles unlink with no tool: pick from the tools in config.yml (not the
+# required ones).
 _interactive_unlink() {
   _require_config
-  # shellcheck disable=SC2046
-  _require_sudo unlink $(_enabled_tools)
-  _require_tty
-  QUIET=true
   local -a names=()
-  local name n failed=false
+  local name n failed=false kept=""
   while IFS= read -r name; do
-    if [[ $(tool_enabled "$name") == true ]]; then
+    if _tool_is_required "$name"; then
+      kept="${kept:+$kept, }$name"
+    else
       names+=("$name")
     fi
-  done < <(manifest_tools)
+  done < <(_listed_tools)
+  _require_sudo unlink ${names[@]+"${names[@]}"}
+  _require_tty
+  QUIET=true
 
   ui ""
   if [[ ${#names[@]} -eq 0 ]]; then
-    ui "No package has enabled: true in config.yaml; nothing to unlink."
+    ui "No tools in config.yml to unlink${kept:+ (required: $kept)}."
     return 0
   fi
-  ui "Enabled packages:"
+  ui "Tools in config.yml:"
   for ((n = 0; n < ${#names[@]}; n++)); do
     ui "$(printf '  %2d) %-16s %s' "$((n + 1))" "${names[n]}" "$(_state_text "${names[n]}")")"
   done
+  if [[ -n $kept ]]; then
+    ui "  Required (not listed; unlink --force <tool>): $kept"
+  fi
   while true; do
     _ask "Unlink and remove: numbers (a = all), Enter = nothing: "
     if [[ -z $ANSWER ]]; then
@@ -3155,8 +3568,8 @@ _interactive_unlink() {
 
 # ─── wipe: undo everything dotfiles set up on this machine ──────────────
 
-# true = unlink leaves config.yaml's enabled: flags as they are (wipe).
-KEEP_ENABLED=false
+# true = unlink leaves config.yml as it is (wipe).
+KEEP_CONFIG=false
 
 # What wipe will do, before it asks. Fills WIPE_REMOVE (packages to remove).
 WIPE_REMOVE=""
@@ -3164,27 +3577,27 @@ _wipe_preview() {
   local tool package keep="" count=0
   WIPE_REMOVE=""
   while IFS= read -r tool; do
+    _tool_is_used_here "$tool" || continue
     count=$((count + 1))
     package="$(tool_package "$tool")"
-    if [[ $(tool_locked "$tool") == true ]]; then
+    if _tool_is_required "$tool"; then
       keep="${keep:+$keep }$tool"
-    elif [[ $(tool_enabled "$tool") == true && -n $package && $(_tool_installed "$tool") == true ]]; then
+    elif _tool_is_listed "$tool" && [[ -n $package && $(_tool_installed "$tool") == true ]]; then
       WIPE_REMOVE="${WIPE_REMOVE:+$WIPE_REMOVE, }$tool ($package)"
     fi
   done < <(manifest_tools)
   ui ""
   ui "Wipe: undo everything dotfiles set up on this machine"
-  ui "  unlink:  all $count tools in config.yaml (links and system copies; backups go back)"
-  ui "  remove:  packages of enabled tools: ${WIPE_REMOVE:-none}"
-  ui "  keep:    locked packages: ${keep:-none}"
-  ui "  remove:  dotfiles' own links: ~/.local/bin/dotfiles, ~/.config/dotfiles"
-  ui "  keep:    everything in the repo (config.yaml unchanged), the log"
+  ui "  unlink:  all $count tools used on ${PLATFORM:-this platform} (links and system copies; backups go back)"
+  ui "  remove:  packages of the tools in config.yml: ${WIPE_REMOVE:-none}"
+  ui "  keep:    required packages: ${keep:-none}"
+  ui "  remove:  dotfiles' own link: ~/.local/bin/dotfiles"
+  ui "  keep:    $(_tilde "$DOTFILES_CONFIG"), everything in the repo, the log"
   ui ""
 }
 
-# Last step: dotfiles' own links (config.yaml is read through
-# ~/.config/dotfiles, so this runs after every tool). Nothing in the repo is
-# touched.
+# Last step: dotfiles' own link. Nothing in the repo is touched, and
+# config.yml stays (link sets up the same tools again).
 _wipe_self() {
   local src dest
   while IFS=$'\t' read -r src dest; do
@@ -3206,7 +3619,9 @@ cmd_wipe() {
   local -a tools=()
   local tool host answer failed=""
   while IFS= read -r tool; do
-    tools+=("$tool")
+    if _tool_is_used_here "$tool"; then
+      tools+=("$tool")
+    fi
   done < <(manifest_tools)
   _wipe_preview
 
@@ -3227,13 +3642,14 @@ cmd_wipe() {
   fi
   _require_sudo unlink ${tools[@]+"${tools[@]}"}
 
-  KEEP_ENABLED=true
+  KEEP_CONFIG=true
   for tool in ${tools[@]+"${tools[@]}"}; do
     CHANGED=false
-    # Packages only for enabled tools (dotfiles didn't install the others).
-    # Keep going when a package can't be removed (pacman refuses packages
-    # others depend on): the links still come out.
-    if [[ $(tool_enabled "$tool") == true ]] && ! _remove_package "$tool"; then
+    # Packages only for the tools in config.yml (dotfiles didn't install
+    # the others), and never the required ones. Keep going when a package
+    # can't be removed (pacman refuses packages others depend on): the
+    # links still come out.
+    if _tool_is_listed "$tool" && ! _tool_is_required "$tool" && ! _remove_package "$tool"; then
       failed="${failed:+$failed, }$tool (package)"
     fi
     if ! _unlink_configs "$tool"; then
@@ -3289,7 +3705,7 @@ _update_pull() {
   count="$(grep -c '' <<<"$incoming")"
 
   if [[ $DRY_RUN == true ]]; then
-    log info "dry run: the installs and links below use config.yaml as it is now; the pull may change it"
+    log info "dry run: the installs and links below use dotfiles.yml as it is now; the pull may change it"
   fi
   if ! run_cmd git -C "$DOTFILES" pull --rebase --autostash; then
     log error "git pull failed. Check: git -C \"$DOTFILES\" status. If a rebase is in progress, fix the files, then git rebase --continue (or git rebase --abort to undo)."
@@ -3314,30 +3730,22 @@ cmd_update() {
   if ! _update_pull; then
     exit 1
   fi
-  # After the pull: the new commits decide whether a system file changes.
-  # shellcheck disable=SC2046
-  _require_sudo link $(_enabled_tools)
-
-  # Install what's missing (no upgrades) and relink every enabled package.
+  # The pull may have changed dotfiles.yml or the hooks: read them again.
+  if [[ $PULLED == true && $DRY_RUN != true ]]; then
+    _cfg_reload
+  fi
+  # Install what's missing (no upgrades) and relink every tool in config.yml.
   local tool good="" bad=""
-  TOOLS=()
-  while IFS= read -r tool; do
-    if [[ $(tool_enabled "$tool") == true ]]; then
-      TOOLS+=("$tool")
-    fi
-  done < <(manifest_tools)
+  _pick_tools update
   if [[ ${#TOOLS[@]} -eq 0 ]]; then
-    log info "update: no package has enabled: true; nothing to install or link"
     return 0
   fi
+  # After the pull: the new commits decide whether a system file changes.
+  _require_sudo link "${TOOLS[@]}"
   local changed=$PULLED
   for tool in "${TOOLS[@]}"; do
     CHANGED=false
-    if [[ $(tool_unused_here "$tool") == true ]]; then
-      log debug "$tool: not used on ${DOTFILES_OS:-this OS} (no package, nothing to link); skipped"
-      continue
-    fi
-    if ! _link_tool "$tool"; then
+    if ! _link_tool "$tool" keep; then
       bad="${bad:+$bad, }$tool"
     elif [[ $CHANGED == true ]]; then
       changed=true
@@ -3349,6 +3757,7 @@ cmd_update() {
     changed=true
   fi
   _summary "installed or linked" "$good" "$bad"
+  _next_steps
   if [[ $changed != true && -z $bad ]]; then
     log info "update: nothing to change"
   fi
@@ -3357,87 +3766,13 @@ cmd_update() {
   fi
 }
 
-# ─── default (plan Section 18): install the default: list, link nothing ──
-
-# Install one entry of the default: list if it's missing. Sets
-# DEFAULT_RESULT (installed, test, already, manual, failed) and
-# DEFAULT_VERSION.
-DEFAULT_RESULT=""
-DEFAULT_VERSION=""
-_default_one() {
-  local name="$1" package version
-  DEFAULT_VERSION=""
-  package="$(default_package "$name")"
-  if [[ -z $package ]]; then
-    log warn "$name: no package here${name:+: $(tool_manual "$name")}"
-    DEFAULT_RESULT="manual"
-  elif version="$(package_version "$package")"; then
-    log success "$name: already installed ($package $version)"
-    DEFAULT_RESULT="already"
-    DEFAULT_VERSION="$version"
-  elif log info "$name: not installed, installing package $package" && pm_install "$package"; then
-    if [[ $DRY_RUN == true ]]; then
-      DEFAULT_RESULT="test"
-      DEFAULT_VERSION="$(package_available_version "$package")"
-    elif version="$(package_version "$package")"; then
-      log success "$name: installed $package $version"
-      DEFAULT_RESULT="installed"
-      DEFAULT_VERSION="$version"
-    else
-      log error "$name: installed $package, but the package manager doesn't list it"
-      DEFAULT_RESULT="failed"
-    fi
-  else
-    log error "$name: installing $package failed"
-    DEFAULT_RESULT="failed"
-  fi
-}
-
-cmd_default() {
-  _require_config
-  if [[ -z $(default_list) ]]; then
-    log info "default: the default: list in config.yaml is empty; nothing to install"
-    return 0
-  fi
-  local name good="" bad="" manual="" count=0
-  while IFS= read -r name; do
-    count=$((count + 1))
-    _default_one "$name"
-    case "$DEFAULT_RESULT" in
-      installed | test) good="${good:+$good, }$(_with_version "$name" "$DEFAULT_VERSION")" ;;
-      manual)           manual="${manual:+$manual, }$name" ;;
-      failed)           bad="${bad:+$bad, }$name" ;;
-    esac
-  done < <(default_list)
-
-  # Only what changed and what failed; nothing to report = no summary.
-  if [[ $count -gt 1 && -n $good$bad$manual ]]; then
-    out ""
-    out "Summary:"
-    if [[ -n $good && $DRY_RUN == true ]]; then
-      out "  Test: $good"
-    elif [[ -n $good ]]; then
-      out "  installed: $good"
-    fi
-    if [[ -n $bad ]]; then
-      out "  failed: $bad"
-    fi
-    if [[ -n $manual ]]; then
-      out "  install by hand: $manual"
-    fi
-  fi
-  if [[ -n $bad ]]; then
-    exit 1
-  fi
-}
-
 # ─── first run (plan Section 2) ─────────────────────────────────────────
 
-# The two links dotfiles.sh always makes for itself: the command, and its
-# own config folder (decided 2026-10-12).
+# The link dotfiles.sh always makes for itself: the command. (Its config
+# folder, ~/.config/dotfiles, used to be a link too; it's a real folder
+# since #51, holding this machine's config.yml.)
 _self_links() {
   printf '%s\t%s\n' "$DOTFILES/dotfiles.sh" ".local/bin/dotfiles"
-  printf '%s\t%s\n' "$DOTFILES/config/dotfiles" ".config/dotfiles"
 }
 
 # Git signs commits through 1Password's op-ssh-sign, whose path differs per
@@ -3588,18 +3923,18 @@ _first_run_setup() {
   log info "first run: setting up dotfiles.sh"
   _doctor_yq
   if [[ $YQ_OK != true ]]; then
-    log error "first run: yq is needed to read config.yaml; fix the yq problem above, then run: $DOTFILES/dotfiles.sh"
+    log error "first run: yq is needed to read dotfiles.yml; fix the yq problem above, then run: $DOTFILES/dotfiles.sh"
     exit 1
   fi
   load_settings
   if ! _setup_self_links; then
-    log warn "first run: a self link isn't in place (see above); dotfiles.sh still works from $DOTFILES/dotfiles.sh"
+    log warn "first run: the dotfiles command link isn't in place (see above); dotfiles.sh still works from $DOTFILES/dotfiles.sh"
   fi
   _setup_git_signing || true
   _path_check
 }
 
-# doctor: the self links and PATH.
+# doctor: the command link and PATH.
 _doctor_self_links() {
   if [[ -z $DOTFILES ]]; then
     return 0
@@ -3614,11 +3949,11 @@ _doctor_self_links() {
   done < <(_self_links)
 
   if [[ $missing != true ]]; then
-    _check_ok "self links: $(_self_links | cut -f2 | sed 's|^|~/|' | paste -sd ' ' - | sed 's/ / and /')"
+    _check_ok "self link: $(_self_links | cut -f2 | sed 's|^|~/|' | paste -sd ' ' -)"
   elif _setup_self_links; then
-    _check_ok "self links: made (or would make, in a dry run)"
+    _check_ok "self link: made (or would make, in a dry run)"
   else
-    _check_fail "self links: not in place (see above)"
+    _check_fail "self link: not in place (see above)"
   fi
   if _setup_git_signing; then
     _check_ok "git signing: $(_op_ssh_sign_path)"
@@ -3629,7 +3964,6 @@ _doctor_self_links() {
 # ─── doctor (plan Section 7) ────────────────────────────────────────────
 
 DOCTOR_FAILED=0
-DOCTOR_LINKS_ONLY=0   # tools with none on this manager (doctor counts them)
 YQ_OK=false
 
 _check_ok()   { log success "$1"; }
@@ -3659,7 +3993,7 @@ _doctor_os() {
 # reason on stderr via log) when there's no native package for it.
 _prereq_package() {
   local tool="$1"
-  # In the script, not config.yaml: yq is needed to read the config, and
+  # In the script, not dotfiles.yml: yq is needed to read the config, and
   # git to clone the repo it lives in.
   case "$tool:$PKG_MANAGER" in
     git:winget)  echo "Git.Git" ;;
@@ -3804,77 +4138,136 @@ _doctor_yq() {
 
 CONFIG_OK=false
 
+# dotfiles.yml: there, valid YAML, read.
 _doctor_config() {
   if [[ -z $DOTFILES ]]; then
-    _check_fail "config.yaml: DOTFILES isn't set and the script isn't running from a clone"
+    _check_fail "dotfiles.yml: DOTFILES isn't set and the script isn't running from a clone"
     return 0
   fi
-  if [[ ! -f $DOTFILES_CONFIG ]]; then
-    _check_fail "config.yaml: not found at $DOTFILES_CONFIG"
+  if [[ ! -f $DOTFILES_TOOLS ]]; then
+    _check_fail "dotfiles.yml: not found at $DOTFILES_TOOLS"
     return 0
   fi
   if [[ $YQ_OK != true ]]; then
-    _check_fail "config.yaml: can't check it without mikefarah/yq"
+    _check_fail "dotfiles.yml: can't check it without mikefarah/yq"
     return 0
   fi
   # 2>&1 >/dev/null: keep only the error text, throw the parsed output away.
   local err
-  if err="$(yq eval '.' "$DOTFILES_CONFIG" 2>&1 >/dev/null)"; then
-    CONFIG_OK=true
-    _check_ok "config.yaml: valid YAML ($DOTFILES_CONFIG)"
-  else
-    _check_fail "config.yaml: invalid YAML: $err"
+  if ! err="$(yq eval '.' "$DOTFILES_TOOLS" 2>&1 >/dev/null)"; then
+    _check_fail "dotfiles.yml: invalid YAML: $err"
+    return 0
+  fi
+  _cfg_load
+  if [[ $CFG_LOADED != true ]]; then
+    _check_fail "dotfiles.yml: yq can't read its tools: (is it a map of tools?)"
+    return 0
+  fi
+  CONFIG_OK=true
+  local hooks=0 hook
+  for hook in "$HOOKS_DIR"/*.sh; do
+    [[ -f $hook ]] && hooks=$((hooks + 1))
+  done
+  _check_ok "dotfiles.yml: valid YAML, $(grep -c . <<<"$CFG_TOOLS") tools, $hooks hooks ($DOTFILES_TOOLS)"
+  if [[ -f $DOTFILES/config/dotfiles/config.yaml ]]; then
+    log warn "config/dotfiles/config.yaml is the old layout; dotfiles.yml replaced it (#51). Delete it once config.yml is written"
   fi
 }
 
-# One tool: a package or a manual: message here, and links with src and
-# dest. -v shows what each resolves to on this machine.
-_doctor_tool() {
-  local tool="$1" problems=0 package manual src dest count=0
-  package="$(tool_package "$tool")"
-  manual="$(tool_manual "$tool")"
-  log debug "$tool: package=${package:-<none>} command=$(tool_command "$tool")${manual:+ manual=\"$manual\"}"
+# config.yml: this machine's file (written by load_settings when it was
+# missing), valid, and only names of tools used here.
+_doctor_machine() {
+  if [[ $CONFIG_OK != true ]]; then
+    return 0
+  fi
+  local shown
+  shown="$(_tilde "$DOTFILES_CONFIG")"
+  if [[ -L $CONFIG_DIR && $(_physical "$CONFIG_DIR") == "$(_physical "$DOTFILES/config/dotfiles")" ]]; then
+    if [[ $DRY_RUN == true ]]; then
+      log info "config.yml: $(_tilde "$CONFIG_DIR") still links into the repo (dry run; doctor without -d makes it a real folder)"
+    else
+      _check_fail "config.yml: $(_tilde "$CONFIG_DIR") links into the repo; it must be a real folder"
+    fi
+    return 0
+  fi
+  if [[ ! -f $DOTFILES_CONFIG ]]; then
+    if [[ $DRY_RUN == true ]]; then
+      log info "config.yml: not there yet (dry run; doctor without -d writes it)"
+    else
+      _check_fail "config.yml: not found at $shown"
+    fi
+    return 0
+  fi
+  local err
+  if ! err="$(yq eval '.' "$DOTFILES_CONFIG" 2>&1 >/dev/null)"; then
+    _check_fail "config.yml: invalid YAML: $err"
+    return 0
+  fi
+  if [[ -n $(yq eval '(.required // [] | select(tag != "!!seq")), (.tools // [] | select(tag != "!!seq"))' "$DOTFILES_CONFIG" 2>/dev/null) ]]; then
+    _check_fail "config.yml: required: and tools: must be lists (required: [git, zsh])"
+    return 0
+  fi
+  local name unknown="" elsewhere=""
+  while IFS= read -r name; do
+    [[ -n $name ]] || continue
+    if ! _tool_exists "$name"; then
+      unknown="${unknown:+$unknown }$name"
+    elif ! _tool_is_used_here "$name"; then
+      elsewhere="${elsewhere:+$elsewhere }$name"
+    fi
+  done <<<"$CFG_REQUIRED$CFG_USED"
+  if [[ -n $unknown ]]; then
+    log warn "config.yml: not tools (not in dotfiles.yml or hooks/): $unknown"
+  fi
+  if [[ -n $elsewhere ]]; then
+    log warn "config.yml: not used on ${PLATFORM:-this platform}, skipped: $elsewhere"
+  fi
+  _check_ok "config.yml: $(grep -c . <<<"$CFG_REQUIRED" || true) required, $(grep -c . <<<"$CFG_USED" || true) other tools ($shown)"
+}
 
-  # A missing manager name falls back to the key, so an empty package here
-  # is a deliberate none: the tool is linked, nothing is installed.
-  local unused
-  unused="$(tool_unused_here "$tool")"
-  if [[ $unused == true ]]; then
-    log info "$tool: not used on ${DOTFILES_OS:-this OS} (no package, nothing to link)"
-  elif [[ -z $package && -z $manual ]]; then
-    log info "$tool: not available on ${PKG_MANAGER:-this OS} (none); links only"
-    DOCTOR_LINKS_ONLY=$((DOCTOR_LINKS_ONLY + 1))
+# Everything in dotfiles.yml that dotfiles would skip or misread: unknown
+# fields, unknown platform names, priorities other than high, dests that
+# aren't $HOME/…, ~/… or a full path. One yq call, "tool<TAB>problem" lines.
+_doctor_yml_problems() {
+  _yq '.tools // {} | to_entries | .[] | .key as $t | .value as $v | (
+    ($v // {} | keys | .[] | select(. != "priority" and . != "package" and . != "command" and . != "links" and . != "clone") | $t + "\tunknown field " + . + ":"),
+    ($v.priority | select(. != null and . != "high") | $t + "\tpriority: " + (. | tostring) + " (only high exists)"),
+    (($v.package, $v.command) | select(tag == "!!map") | keys | .[] | select(. != "arch" and . != "debian" and . != "fedora" and . != "mac" and . != "windows" and . != "linux" and . != "all") | $t + "\tunknown platform " + . + ": (arch, debian, fedora, mac, windows, linux, all)"),
+    ($v.links | select(tag == "!!map") | to_entries | .[] | .key as $s | .value | select(tag == "!!map") | keys | .[] | select(. != "arch" and . != "debian" and . != "fedora" and . != "mac" and . != "windows" and . != "linux" and . != "all") | $t + "\tlink " + $s + ": unknown platform " + .),
+    ($v.links | select(tag == "!!map") | to_entries | .[] | .key as $s | (.value | select(tag == "!!str")), (.value | select(tag == "!!map") | .[] | select(. != null)) | select(test("^(\$HOME/|\$\{HOME\}/|~/|/)") | not) | $t + "\tlink " + $s + ": dest " + . + " must start with $HOME/, ~/ or /"),
+    ($v.links | select(. != null and tag != "!!map") | $t + "\tlinks: must be a map (path: dest), not " + (. | tag)),
+    ($v.clone | select(. != null and tag != "!!map") | $t + "\tclone: must be a map (owner/repo: dest), not " + (. | tag)) )' 2>/dev/null
+}
+
+# One tool on this machine: used here or not, link sources there, the hook
+# valid bash. -v shows what each resolves to. Returns the problem count.
+_doctor_tool() {
+  local tool="$1" problems=0 package src dest count=0 hook="$HOOKS_DIR/$1.sh"
+  if ! _tool_is_used_here "$tool"; then
+    log debug "$tool: not used on ${PLATFORM:-this platform}"
+    return 0
+  fi
+  package="$(tool_package "$tool")"
+  log debug "$tool: package=${package:-<none>} command=$(tool_command "$tool")$(_tool_has_hook "$tool" && echo " hook=hooks/$tool.sh")"
+  if [[ -f $hook ]] && ! bash -n "$hook" 2>/dev/null; then
+    log error "$tool: hooks/$tool.sh has a syntax error (bash -n $hook)"
+    problems=$((problems + 1))
   fi
   while IFS=$'\t' read -r src dest; do
     count=$((count + 1))
-    log debug "$tool: link config/${src:-?} -> ~/${dest:-?}"
-    if [[ -z $src || -z $dest ]]; then
-      log error "$tool: a link is missing src or dest"
-      problems=$((problems + 1))
-    elif [[ $(tool_link_copy "$tool" "$src") == true && $dest != /* ]]; then
-      log error "$tool: config/$src has copy: true, so its dest must be a full system path (got: $dest)"
-      problems=$((problems + 1))
-    elif [[ $dest == /* && $(tool_link_copy "$tool" "$src") != true ]]; then
-      log error "$tool: $dest is a system path; mark that link copy: true"
-      problems=$((problems + 1))
-    elif [[ ! -e $(_src_path "$src") ]]; then
-      # Only an enabled tool fails: a disabled one isn't linked yet.
-      if [[ $(tool_enabled "$tool") == true ]]; then
+    log debug "$tool: link config/${src:-?} -> $(_dest_shown "${dest:-?}")"
+    if [[ ! -e $(_src_path "$src") ]]; then
+      # Only a tool in config.yml fails: the others aren't linked yet.
+      if _tool_is_listed "$tool"; then
         log error "$tool: link source config/$src doesn't exist"
         problems=$((problems + 1))
       else
-        log warn "$tool: link source config/$src doesn't exist (tool is disabled)"
+        log warn "$tool: link source config/$src doesn't exist (not in config.yml)"
       fi
     fi
   done < <(tool_links "$tool")
-  # No links is fine: an install-only tool (the app syncs its own settings),
-  # or a tool whose links are all for another OS.
-  if [[ $count -eq 0 && $unused == false ]]; then
-    if [[ $(_yq ".packages[\"$tool\"].links // [] | length") -gt 0 ]]; then
-      log info "$tool: nothing to link on ${DOTFILES_OS:-this OS}"
-    else
-      log info "$tool: install only, no links"
-    fi
+  if [[ $count -eq 0 ]]; then
+    log debug "$tool: nothing to link on ${PLATFORM:-this platform}"
   fi
   return "$problems"
 }
@@ -3883,46 +4276,28 @@ _doctor_tools() {
   if [[ $CONFIG_OK != true ]]; then
     return 0
   fi
-  local tool count=0 bad=0 note=""
-  DOCTOR_LINKS_ONLY=0
+  local tool count=0 bad=0 unused=0 line problems
+  problems="$(_doctor_yml_problems)" || problems=""
+  while IFS= read -r line; do
+    [[ -n $line ]] || continue
+    log error "dotfiles.yml: ${line%%$'\t'*}: ${line#*$'\t'}"
+  done <<<"$problems"
   while IFS= read -r tool; do
     count=$((count + 1))
+    if ! _tool_is_used_here "$tool"; then
+      unused=$((unused + 1))
+    fi
     if ! _doctor_tool "$tool"; then
       bad=$((bad + 1))
     fi
   done < <(manifest_tools)
-  if [[ $DOCTOR_LINKS_ONLY -gt 0 ]]; then
-    note=" ($DOCTOR_LINKS_ONLY links only)"
+  if [[ -n $problems ]]; then
+    bad=$((bad + $(grep -c . <<<"$problems")))
   fi
   if [[ $bad -gt 0 ]]; then
-    _check_fail "packages: $bad of $count have problems on ${PKG_MANAGER:-this OS}$note"
+    _check_fail "tools: $bad problem(s) in $count tools on ${PLATFORM:-this platform}"
   else
-    _check_ok "packages: all $count resolve on ${PKG_MANAGER:-this OS}$note"
-  fi
-}
-
-# The default: list: which are installed. Missing ones are a warning.
-_doctor_default_packages() {
-  if [[ $CONFIG_OK != true ]]; then
-    return 0
-  fi
-  local name package version count=0 have=0 missing=""
-  while IFS= read -r name; do
-    count=$((count + 1))
-    package="$(default_package "$name")"
-    if [[ -n $package ]] && version="$(package_version "$package")"; then
-      have=$((have + 1))
-      log debug "default: $name ($package $version)"
-    else
-      missing="${missing:+$missing }$name"
-    fi
-  done < <(default_list)
-  if [[ $count -eq 0 ]]; then
-    log info "default: list is empty"
-  elif [[ -n $missing ]]; then
-    log warn "default: $have of $count installed; missing: $missing (dotfiles.sh default installs them)"
-  else
-    _check_ok "default: all $count installed"
+    _check_ok "tools: all $count resolve on ${PLATFORM:-this platform} ($((count - unused)) used here)"
   fi
 }
 
@@ -3932,9 +4307,10 @@ cmd_doctor() {
   _doctor_yq
   _doctor_config
   load_settings
+  _config_sync
+  _doctor_machine
   _doctor_self_links
   _doctor_tools
-  _doctor_default_packages
 
   if [[ $DOCTOR_FAILED -gt 0 ]]; then
     log error "doctor: $DOCTOR_FAILED check(s) failed"
@@ -4003,7 +4379,7 @@ main() {
   ORIG_ARGS=("$@")
   # No need to start dotfiles with sudo: it asks for sudo itself when a
   # tool has system files. Started with sudo anyway: run as the user who ran
-  # it, so the clone, links, config.yaml and log stay theirs (sudo doesn't
+  # it, so the clone, links, config.yml and log stay theirs (sudo doesn't
   # ask again). A real root login or a container has no SUDO_USER.
   if [[ $EUID -eq 0 && -n ${SUDO_USER:-} && $SUDO_USER != root ]]; then
     if [[ -n ${BASH_SOURCE[0]:-} && -f ${BASH_SOURCE[0]} ]]; then
@@ -4057,11 +4433,15 @@ main() {
     help | version) ;;
     *) pkg_cache_load ;;
   esac
+  # config.yml follows what's installed (doctor does it after its checks).
+  case "$cmd" in
+    help | version | doctor) ;;
+    *) _config_sync ;;
+  esac
   warn_unused_flags "$cmd"
 
   case "$cmd" in
     interactive) cmd_interactive ;;
-    default)   cmd_default "$@" ;;
     link)      cmd_link "$@" ;;
     unlink)    cmd_unlink "$@" ;;
     update)    cmd_update "$@" ;;
@@ -4072,6 +4452,10 @@ main() {
     version)   cmd_version "$@" ;;
     install | uninstall)
       log error "'$cmd' is gone: use 'dotfiles link' (installs and links) or 'dotfiles unlink' (removes and unlinks)"
+      exit 2
+      ;;
+    default)
+      log error "'default' is gone (#51): pick the tools for this machine with 'dotfiles' or 'dotfiles link <tool>'"
       exit 2
       ;;
     *)

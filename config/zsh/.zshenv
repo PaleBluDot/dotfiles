@@ -24,11 +24,11 @@ export ZDOTDIR="$XDG_CONFIG_HOME/zsh"
 
 export ZSH="$HOME/.config/zsh/oh-my-zsh"
 export ZSH_CACHE_DIR="$XDG_CACHE_HOME/oh-my-zsh"
-# DOTFILES: wherever this machine's repo is, found through the ~/.config/dotfiles
-# link that dotfiles.sh makes. :A resolves the link (…/dotfiles/config/dotfiles),
-# :h:h goes up two folders to the repo.
-_dotfiles_link="$XDG_CONFIG_HOME/dotfiles"
-[[ -L $_dotfiles_link ]] && export DOTFILES="${_dotfiles_link:A:h:h}"
+# DOTFILES: wherever this machine's repo is, found through the dotfiles
+# command link that dotfiles.sh makes (~/.local/bin/dotfiles). :A resolves
+# the link (…/dotfiles/dotfiles.sh), :h goes up to the repo.
+_dotfiles_link="$HOME/.local/bin/dotfiles"
+[[ -L $_dotfiles_link ]] && export DOTFILES="${_dotfiles_link:A:h}"
 unset _dotfiles_link
 # Starship: a copy of starship.toml with the current theme's palette picked
 # (the theme hook writes the palette's name to ~/.cache/starship/palette).
