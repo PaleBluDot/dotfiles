@@ -32,10 +32,6 @@ config/Claude/
 # espanso matches with personal and work contact details (local only)
 config/espanso/match/private.yml
 
-# Each machine's dotfiles config (~/.config/dotfiles/config.yml). It used to
-# be a link into this folder; never commit one written through it.
-config/dotfiles/config.yml
-
 # gh login state, written per machine by gh auth login (token lives in the keyring)
 config/gh/hosts.yml
 
