@@ -1,0 +1,421 @@
+# dotfiles.sh: every tool, what it installs, links and clones. Tool names
+# match the folders in config/ and the scripts in config/dotfiles/hooks/.
+# What each machine uses lives in ~/.config/dotfiles/config.yml (not here).
+#
+#   tool:
+#     priority: high        installed before everything else (the only level)
+#     package:              how to install it
+#       all: name           every platform not listed below
+#       <platform>: name    or [a, b] (installed together). Without all:,
+#                           only the listed platforms get the tool and its
+#                           links. aur/<name> under arch: from the AUR (yay)
+#       <platform>: ~       used there, nothing to install (part of the OS):
+#                           only checks that its command is there
+#     command: name         the command that shows it's installed (default:
+#                           the tool's name); can also be per platform
+#     links:
+#       <path>: <dest>      <path> is in config/; <dest> is $HOME/... (or
+#                           ~/...), or absolute for system files
+#       <path>:
+#         <platform>: <dest>    another place per platform (none = not
+#                               linked there)
+#     clone:
+#       owner/repo: <dest>  GitHub; any other host as a full URL
+#
+#   Platforms: arch, debian, fedora, mac, windows, and linux (all three).
+#   No package: = nothing to install anywhere (links only, or a hook
+#   installs it).
+#
+# Worked out from the files, nothing to write:
+#   - <dest> outside $HOME (/etc, /usr): a root-owned copy, not a symlink
+#   - a copied systemd unit with [Install]: enabled (--now)
+#   - a file with op:// references: written filled in from 1Password
+#
+# Hooks: config/dotfiles/hooks/<tool>.sh runs, when it exists, after the
+# tool's package and links (link, update, interactive). A tool with a hook
+# is used on every platform (the hook handles the ones package: doesn't
+# list), and a tool can be only a hook, with no entry here.
+#
+# Order: priority: high, then the tools required on this machine
+# (config.yml), then the rest; file order within each.
+
+tools:
+  1password:
+    # The desktop app and the CLI (op), installed together.
+    package:
+      arch: [1password, 1password-cli]
+      mac: [1password, 1password-cli]
+      windows: [AgileBits.1Password, AgileBits.1Password.CLI]
+    links:
+      op/server.json: $HOME/.config/op/server.json
+
+  aerospace:
+    package:
+      mac: nikitabobko/tap/aerospace
+    links:
+      aerospace: $HOME/.config/aerospace
+
+  # Packaged in the Omarchy pacman repo. hooks/aether.sh writes the
+  # blueprints with this machine's paths, and elsewhere says how to build it.
+  aether:
+    package:
+      arch: aether
+
+  bash:
+    package:
+      all: bash
+      windows: Git.Git   # Git Bash
+    links:
+      bash/.bashrc: $HOME/.bashrc
+
+  bat:
+    package:
+      all: bat
+      windows: sharkdp.bat
+    command:
+      debian: batcat
+    links:
+      bat: $HOME/.config/bat
+
+  btop:
+    package:
+      all: btop
+      windows: aristocratos.btop4win
+    links:
+      btop: $HOME/.config/btop
+
+  chromium-flags.conf:
+    package:
+      linux: chromium
+    command: chromium
+    links:
+      chromium-flags.conf: $HOME/.config/chromium-flags.conf
+
+  composer:
+    package:
+      linux: composer
+      mac: composer
+    links:
+      composer: $HOME/.config/composer
+
+  # No package: hooks/cspell.sh installs cspell (npm) and its dictionaries.
+  cspell:
+    links:
+      cspell: $HOME/.config/cspell
+
+  # No package yet (#54).
+  espanso:
+    links:
+      espanso: $HOME/.config/espanso
+
+  fastfetch:
+    package:
+      all: fastfetch
+      windows: Fastfetch-cli.Fastfetch
+    links:
+      fastfetch: $HOME/.config/fastfetch
+
+  fd:
+    package:
+      all: fd
+      debian: fd-find
+      fedora: fd-find
+      windows: sharkdp.fd
+    command:
+      debian: fdfind
+    links:
+      fd/ignore: $HOME/.config/fd/ignore
+
+  fontconfig:
+    package:
+      linux: fontconfig
+      mac: fontconfig
+    command: fc-list
+    links:
+      fontconfig: $HOME/.config/fontconfig
+
+  gh:
+    package:
+      all: gh
+      arch: github-cli
+      windows: GitHub.cli
+    links:
+      gh/config.yml: $HOME/.config/gh/config.yml
+
+  ghostty:
+    package:
+      arch: ghostty
+      mac: ghostty
+    links:
+      ghostty: $HOME/.config/ghostty
+
+  git:
+    package:
+      all: git
+      windows: Git.Git
+    links:
+      git: $HOME/.config/git
+
+  gitlogue:
+    package:
+      arch: gitlogue
+      mac: gitlogue
+    links:
+      gitlogue/config.toml: $HOME/.config/gitlogue/config.toml
+
+  go:
+    package:
+      all: go
+      debian: golang-go
+      fedora: golang
+      windows: GoLang.Go
+    links:
+      go/env:
+        linux: $HOME/.config/go/env
+        mac: $HOME/Library/Application Support/go/env
+        windows: $HOME/AppData/Roaming/go/env
+
+  gobuster:
+    package:
+      linux: gobuster
+      mac: gobuster
+    links:
+      gobuster: $HOME/.config/gobuster
+
+  herdr:
+    package:
+      arch: herdr
+      mac: herdr
+    links:
+      herdr/config.toml: $HOME/.config/herdr/config.toml
+
+  hypr:
+    package:
+      arch: hyprland
+    command: Hyprland
+    links:
+      hypr: $HOME/.config/hypr
+
+  hyprland-preview-share-picker:
+    package:
+      arch: hyprland-preview-share-picker
+    links:
+      hyprland-preview-share-picker: $HOME/.config/hyprland-preview-share-picker
+
+  # The files are komorebi for Mac + skhd, not Windows komorebi (whkd).
+  # Kept in the repo for later; leave it off config.yml.
+  komorebi:
+    package:
+      windows: LGUG2Z.komorebi
+    links:
+      komorebi: $HOME/.config/komorebi
+
+  lazydocker:
+    package:
+      arch: lazydocker
+      mac: lazydocker
+      windows: JesseDuffield.Lazydocker
+    links:
+      lazydocker/config.yml:
+        linux: $HOME/.config/lazydocker/config.yml
+        mac: $HOME/Library/Application Support/jesseduffield/lazydocker/config.yml
+        windows: $HOME/AppData/Roaming/jesseduffield/lazydocker/config.yml
+
+  lazygit:
+    package:
+      arch: lazygit
+      debian: lazygit
+      mac: lazygit
+      windows: JesseDuffield.lazygit
+    links:
+      lazygit: $HOME/.config/lazygit
+
+  # Boot hooks, run as root after every kernel or boot update.
+  limine:
+    package:
+      arch: limine
+    links:
+      limine/hooks/40-shim-limine-sync: /etc/boot/hooks/post.d/40-shim-limine-sync
+      limine/hooks/50-omarchy-limine-style: /etc/boot/hooks/post.d/50-omarchy-limine-style
+
+  # No package: hooks/massCode.sh says where to get the app. massCode loads
+  # every .json in ~/.massCode/themes (same path on every OS).
+  massCode:
+    links:
+      massCode/starburst.json: $HOME/.massCode/themes/starburst.json
+
+  mise:
+    priority: high
+    package:
+      arch: mise-bin
+      mac: mise
+      windows: jdx.mise
+    links:
+      mise/config.toml: $HOME/.config/mise/config.toml
+
+  nano:
+    package:
+      all: nano
+      windows: GNU.Nano
+    links:
+      nano: $HOME/.config/nano
+
+  npm:
+    package:
+      all: npm
+      mac: node
+      windows: OpenJS.NodeJS
+    links:
+      npm: $HOME/.config/npm
+
+  nvim:
+    package:
+      all: neovim
+      windows: Neovim.Neovim
+    links:
+      nvim: $HOME/.config/nvim
+
+  obsidian:
+    package:
+      arch: obsidian
+      mac: obsidian
+      windows: Obsidian.Obsidian
+    links:
+      obsidian/user-flags.conf:
+        linux: $HOME/.config/obsidian/user-flags.conf
+
+  # System files: copies outside $HOME. The .path unit has [Install], so
+  # it's enabled; it starts the .service.
+  omarchy:
+    package:
+      arch: omarchy
+    links:
+      omarchy: $HOME/.config/omarchy
+      omarchy/system/surface-boot-theme-apply: /usr/local/sbin/surface-boot-theme-apply
+      omarchy/system/surface-boot-theme.service: /etc/systemd/system/surface-boot-theme.service
+      omarchy/system/surface-boot-theme.path: /etc/systemd/system/surface-boot-theme.path
+
+  ranger:
+    package:
+      linux: ranger
+      mac: ranger
+    links:
+      ranger: $HOME/.config/ranger
+
+  # macOS and Windows come with OpenSSH. ssh/config has op:// references:
+  # written filled in from 1Password.
+  ssh:
+    package:
+      arch: openssh
+      debian: openssh-client
+      fedora: openssh-clients
+      mac: ~
+      windows: ~
+    links:
+      ssh/config: $HOME/.ssh/config
+
+  starship:
+    package:
+      arch: starship
+      debian: starship
+      mac: starship
+      windows: Starship.Starship
+    links:
+      starship: $HOME/.config/starship
+
+  # No package: hooks/superfile.sh runs its installer when spf is missing.
+  superfile:
+    command: spf
+    links:
+      superfile: $HOME/.config/superfile
+
+  thefuck:
+    package:
+      linux: thefuck
+      mac: thefuck
+    links:
+      thefuck: $HOME/.config/thefuck
+
+  tmux:
+    package:
+      linux: tmux
+      mac: tmux
+    links:
+      tmux: $HOME/.config/tmux
+
+  top:
+    package:
+      arch: procps-ng
+      debian: procps
+      fedora: procps-ng
+    links:
+      top/toprc: $HOME/.config/procps/toprc
+
+  vim:
+    package:
+      all: vim
+      fedora: vim-enhanced
+      windows: vim.vim
+    links:
+      vim: $HOME/.config/vim
+
+  # Stable and Insiders, installed together (Insiders is the main one: the
+  # code alias opens it). No links: settings, snippets and extensions come
+  # from VS Code Settings Sync (sign in, then Backup and Sync Settings).
+  vscode:
+    package:
+      arch: [visual-studio-code-bin, aur/visual-studio-code-insiders-bin]
+      mac: [visual-studio-code, visual-studio-code@insiders]
+      windows: [Microsoft.VisualStudioCode, Microsoft.VisualStudioCode.Insiders]
+    command: code
+
+  # No package: hooks/warp.sh says where to get the app.
+  warp:
+    links:
+      warp/starburst.yml:
+        mac: $HOME/.warp/themes/starburst.yml
+        linux: $HOME/.local/share/warp-terminal/themes/starburst.yml
+        windows: $HOME/AppData/Roaming/warp/Warp/data/themes/starburst.yml
+
+  wezterm:
+    package:
+      arch: wezterm
+      mac: wezterm
+      windows: wez.wezterm
+    links:
+      wezterm: $HOME/.config/wezterm
+
+  xdg-terminals.list:
+    package:
+      linux: xdg-terminal-exec
+    command: xdg-terminal-exec
+    links:
+      xdg-terminals.list: $HOME/.config/xdg-terminals.list
+
+  yay:
+    priority: high
+    package:
+      arch: yay
+    links:
+      yay/config.json: $HOME/.config/yay/config.json
+
+  yazi:
+    package:
+      arch: yazi
+      mac: yazi
+      windows: sxyazi.yazi
+    links:
+      yazi: $HOME/.config/yazi
+
+  zsh:
+    package:
+      linux: zsh
+      mac: zsh
+    links:
+      zsh: $HOME/.config/zsh
+      zsh/.zshenv: $HOME/.zshenv
+    clone:
+      ohmyzsh/ohmyzsh: $HOME/.config/zsh/oh-my-zsh
+      zsh-users/zsh-autosuggestions: $HOME/.config/zsh/oh-my-zsh/custom/plugins/zsh-autosuggestions
+      zsh-users/zsh-completions: $HOME/.config/zsh/oh-my-zsh/custom/plugins/zsh-completions
+      zsh-users/zsh-syntax-highlighting: $HOME/.config/zsh/oh-my-zsh/custom/plugins/zsh-syntax-highlighting
