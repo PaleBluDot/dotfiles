@@ -1,5 +1,5 @@
 -- Same as Omarchy's built-in template, kept here so dotfiles can render it
--- on machines without Omarchy (settings.theme in config.yaml).
+-- on machines without Omarchy (settings.theme in config.yml).
 return {
   {
     "bjarneo/aether.nvim",
