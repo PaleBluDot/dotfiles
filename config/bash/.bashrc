@@ -131,11 +131,12 @@ case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$P
 # You may want to put all your additions into a separate file like
 # ~/.bash_aliases, instead of adding them here directly.
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
-# DOTFILES: wherever this machine's repo is, found through the
-# ~/.config/dotfiles link that dotfiles.sh makes (…/dotfiles/config/dotfiles).
-_dotfiles_link="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles"
+# DOTFILES: wherever this machine's repo is, found through the dotfiles
+# command link that dotfiles.sh makes (~/.local/bin/dotfiles ->
+# …/dotfiles/dotfiles.sh).
+_dotfiles_link="$HOME/.local/bin/dotfiles"
 if [ -z "$DOTFILES" ] && [ -L "$_dotfiles_link" ]; then
-    DOTFILES="$(cd "$(dirname "$(readlink -f "$_dotfiles_link")")/.." && pwd)"
+    DOTFILES="$(cd "$(dirname "$(readlink -f "$_dotfiles_link")")" && pwd)"
     export DOTFILES
 fi
 unset _dotfiles_link
