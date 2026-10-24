@@ -31,9 +31,8 @@ or the config symlinks can't be made.
 
 ```text
 dotfiles                  interactive setup
-dotfiles link [tool…]     install tools and link their configs (no tool = all enabled)
+dotfiles link [tool…]     install tools and link their configs (no tool = all in config.yml)
 dotfiles unlink [tool…]   remove tools and their links (no tool = pick from a list)
-dotfiles default          install the default: list, link nothing
 dotfiles update           pull the repo, install what's missing, relink
 dotfiles wipe             undo everything dotfiles set up here (to test again)
 dotfiles status [tool]
@@ -42,14 +41,53 @@ dotfiles help [command]
 ```
 
 Flags work anywhere on the line: `-d` dry run, `-v` verbose (combine as `-dv`),
-`--force` no questions and no backups. Try anything with `-dv` first.
+`--force` no questions and no backups (on `unlink`: also required tools),
+`--required` (on `link`: keep the tool on this machine). Try anything with
+`-dv` first.
 
 ## Config
 
-Every tool is an entry in [`config/dotfiles/config.yaml`](config/dotfiles/config.yaml):
-its configs under `config/`, where they link to, and its package name per
-package manager (pacman, apt, dnf, brew, winget) when it differs from the key.
-The comments at the top of that file explain each field.
+| File | Where | Holds |
+|---|---|---|
+| [`config/dotfiles/dotfiles.yml`](config/dotfiles/dotfiles.yml) | repo | every tool: its package per platform, its links, repos to clone |
+| [`config/dotfiles/hooks/<tool>.sh`](config/dotfiles/hooks) | repo | extra steps for a tool (optional) |
+| `~/.config/dotfiles/config.yml` | each machine, never committed | `settings:`, `required:`, `tools:` |
+
+```yaml
+# dotfiles.yml
+tools:
+  fd:
+    package:
+      all: fd              # every platform not listed
+      debian: fd-find
+      windows: sharkdp.fd  # no all: = only the listed platforms
+    command:
+      debian: fdfind       # the command that shows it's installed
+    links:
+      fd/ignore: $HOME/.config/fd/ignore
+```
+
+Platforms: `arch`, `debian`, `fedora`, `mac`, `windows`, and `linux` (all
+three). `~` as a package = used there, nothing to install (part of the OS).
+A link outside `$HOME` becomes a root-owned copy, and a file with `op://`
+references is filled in from 1Password; nothing to write for either. The
+comments at the top of `dotfiles.yml` explain each field.
+
+A hook runs after its tool's package and links (`link`, `update`, the
+interactive setup), gets `--dry-run`, `--verbose` and `--force`, and prints
+nothing when there's nothing to do. A line `next: <text>` goes to the
+**Next steps** list at the end of the run. A tool with a hook is used on
+every platform (the hook covers the ones `package:` doesn't list).
+
+`config.yml` lists what this machine uses: `required:` tools are never
+removed by `unlink` (only `unlink --force`) or the interactive setup;
+`tools:` are the rest. `dotfiles` rewrites only those two lists
+(alphabetical) and keeps everything else in the file. A new machine starts
+with an empty one; the first run after the old `config.yaml` writes it
+from that file's `enabled:` / `locked:` values.
+
+Run order: `priority: high` tools first, then the required ones, then the
+rest.
 
 No secrets are committed. Files that need them hold `op://` references and
 are filled in by the 1Password CLI (`op inject`) when linked.
