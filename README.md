@@ -82,9 +82,16 @@ every platform (the hook covers the ones `package:` doesn't list).
 `config.yml` lists what this machine uses: `required:` tools are never
 removed by `unlink` (only `unlink --force`) or the interactive setup;
 `tools:` are the rest. `dotfiles` rewrites only those two lists
-(alphabetical) and keeps everything else in the file. A new machine starts
-with an empty one; the first run after the old `config.yaml` writes it
-from that file's `enabled:` / `locked:` values.
+(alphabetical) and keeps everything else in the file. The first run after
+the old `config.yaml` writes it from that file's `enabled:` / `locked:`
+values.
+
+It follows what's installed, every run: a tool from `dotfiles.yml`
+installed here goes into `tools:`, and one removed outside dotfiles comes
+off. A tool you add by hand stays until `link` installs it, and moving one
+between the lists by hand is kept (`~/.local/state/dotfiles/installed`
+remembers what was installed last run, to tell the two apart). To stop
+using an installed tool, `dotfiles unlink` it.
 
 Run order: `priority: high` tools first, then the required ones, then the
 rest.
