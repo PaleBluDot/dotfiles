@@ -264,6 +264,7 @@ tools:
   npm:
     package:
       all: npm
+      fedora: nodejs   # brings npm
       mac: node
       windows: OpenJS.NodeJS
     links:
