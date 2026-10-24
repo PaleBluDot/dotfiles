@@ -8,12 +8,23 @@
 # reads the paths as written, so its copies get the full path. Blueprints
 # Aether saved there that the repo doesn't have yet are copied back into
 # the repo (paths made relative again), for you to commit.
-# Where Aether isn't packaged, says how to build it.
+# Where Aether isn't installed (only Arch packages it), installs the latest
+# GitHub release first; Mac and Windows have nothing to do.
 #
 # Flags from dotfiles: --dry-run, --verbose, --force. Prints nothing when
 # there's nothing to do; "next: ..." lines go to dotfiles' Next steps.
 
 set -euo pipefail
+
+# dnf prints its progress even with -q: keep its output, show it only
+# when the install fails.
+dnf_install() {
+  local out
+  if ! out="$(sudo dnf install -y -q "$@" 2>&1)"; then
+    printf '%s\n' "$out" >&2
+    return 1
+  fi
+}
 
 dry=false
 for arg in "$@"; do
@@ -27,8 +38,65 @@ parent="$HOME/.config/aether"
 dest="$parent/blueprints"
 shown="~/.config/aether/blueprints"
 
-if ! command -v aether >/dev/null 2>&1; then
-  echo "next: Aether isn't packaged on ${DOTFILES_PLATFORM:-this platform}; build it: git clone https://github.com/omacom/aether.git && cd aether && make build"
+case "${DOTFILES_PLATFORM:-}" in
+  mac | windows) exit 0 ;; # Aether themes Omarchy (Linux)
+esac
+
+# Aether isn't installed (only Arch packages it): install the latest
+# release from GitHub. Debian gets its .deb (apt pulls the libraries);
+# everywhere else the prebuilt binary goes in ~/.local/bin, and the
+# libraries it needs that are missing come from dnf.
+install_aether() {
+  local arch tag asset missing
+  case "$(uname -m)" in
+    x86_64) arch=amd64 ;;
+    aarch64 | arm64) arch=arm64 ;;
+    *)
+      echo "next: Aether has no release for $(uname -m); build it: https://github.com/omacom/aether#build-from-source"
+      return 0
+      ;;
+  esac
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "next: install Aether (needs curl): https://github.com/omacom/aether/releases/latest"
+    return 0
+  fi
+  if [[ $dry == true ]]; then
+    echo "dry run, would install the latest Aether release from github.com/omacom/aether"
+    return 0
+  fi
+  # The latest release's tag, from the redirect of /releases/latest.
+  tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/omacom/aether/releases/latest)"
+  tag="${tag##*/}"
+  if [[ $tag != v* ]]; then
+    echo "aether: couldn't find the latest release on GitHub" >&2
+    return 1
+  fi
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' EXIT
+  if [[ ${DOTFILES_PLATFORM:-} == debian ]]; then
+    asset="aether_${tag#v}_${arch}.deb"
+    curl -fsSL -o "$tmp/$asset" "https://github.com/omacom/aether/releases/download/$tag/$asset"
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q "$tmp/$asset" >/dev/null
+    echo "aether: installed $tag ($asset)"
+    return 0
+  fi
+  asset="aether-linux-$arch"
+  curl -fsSL -o "$tmp/aether" "https://github.com/omacom/aether/releases/download/$tag/$asset"
+  mkdir -p "$HOME/.local/bin"
+  install -m 755 "$tmp/aether" "$HOME/.local/bin/aether"
+  echo "aether: installed $tag in ~/.local/bin/aether"
+  missing="$(ldd "$HOME/.local/bin/aether" 2>/dev/null | awk '/not found/ {print $1}' | tr '\n' ' ')"
+  if [[ -n $missing && ${PKG_MANAGER:-} == dnf ]]; then
+    dnf_install webkit2gtk4.1 gtk3 gtk-layer-shell gstreamer1-plugins-good
+    missing="$(ldd "$HOME/.local/bin/aether" 2>/dev/null | awk '/not found/ {print $1}' | tr '\n' ' ')"
+  fi
+  if [[ -n $missing ]]; then
+    echo "next: Aether needs these libraries: ${missing% } (webkit2gtk 4.1, gtk3, gtk-layer-shell, gstreamer)"
+  fi
+}
+
+if ! command -v aether >/dev/null 2>&1 && [[ ! -x $HOME/.local/bin/aether ]]; then
+  install_aether
 fi
 
 physical() {
