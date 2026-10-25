@@ -1697,13 +1697,19 @@ EOF
       ;;
     doctor)
       cat <<'EOF'
-dotfiles doctor [-d] [-v]
+dotfiles doctor [tool] [-d] [-v]
 
 Check that everything dotfiles needs is in place, and fix what it can:
   OS and package manager, git, yq (installs either when missing; on
   Debian/Ubuntu yq comes from its GitHub release, checksum-verified),
   dotfiles.yml and config.yml, the dotfiles command link, PATH, and every
   tool in dotfiles.yml (platform names, link sources, hooks).
+
+  dotfiles doctor          everything above
+  dotfiles doctor nvim     one tool: OS, yq and dotfiles.yml (git too when
+                           it clones a repo), then its dotfiles.yml
+                           problems, package and command here, its hook,
+                           and each link (source there, linked or not)
 
 Exit code 1 when a check fails.
 
@@ -1712,6 +1718,7 @@ Exit code 1 when a check fails.
 
 Example:
   dotfiles doctor -dv
+  dotfiles doctor nvim
 EOF
       ;;
     help)
@@ -1742,7 +1749,7 @@ Commands:
   update                pull the repo, install new tools, check links
   wipe                  undo everything dotfiles set up here (for re-testing)
   status [tool]         what's installed and linked
-  doctor                check (and fix) what dotfiles needs
+  doctor [tool]         check (and fix) what dotfiles needs
   help [command]        this overview, or help for one command
 
 Flags (work anywhere on the line):
@@ -4324,7 +4331,102 @@ _doctor_tools() {
   fi
 }
 
+# doctor <tool>: _doctor_tool's checks for one tool, each shown (no -v
+# needed), plus where its links stand and its dotfiles.yml problems. A
+# link that isn't in place is a warning: dotfiles link fixes it.
+_doctor_tool_detail() {
+  local tool="$1" line package command src dest state shown count=0 hook="$HOOKS_DIR/$1.sh"
+  while IFS= read -r line; do
+    [[ ${line%%$'\t'*} == "$tool" ]] || continue
+    _check_fail "dotfiles.yml: $tool: ${line#*$'\t'}"
+  done < <(_doctor_yml_problems || true)
+  if ! _tool_is_used_here "$tool"; then
+    log info "$tool: not used on ${PLATFORM:-this platform} (dotfiles.yml has no package for it here)"
+    return 0
+  fi
+  package="$(tool_package "$tool")"
+  command="$(tool_command "$tool")"
+  if [[ -n $package ]]; then
+    _check_ok "$tool: package $package (${PKG_MANAGER:-no package manager}), command $command"
+  elif _tool_has_hook "$tool"; then
+    _check_ok "$tool: no package here; the hook installs it, or says how (command $command)"
+  else
+    _check_ok "$tool: no package here (only checks that $command is there)"
+  fi
+  if [[ -f $hook ]]; then
+    if bash -n "$hook" 2>/dev/null; then
+      _check_ok "$tool: hooks/$tool.sh is valid bash"
+    else
+      _check_fail "$tool: hooks/$tool.sh has a syntax error (bash -n $hook)"
+    fi
+  fi
+  while IFS=$'\t' read -r src dest; do
+    count=$((count + 1))
+    shown="$(_dest_shown "${dest:-?}")"
+    if [[ ! -e $(_src_path "$src") ]]; then
+      # Only a tool in config.yml fails: the others aren't linked yet.
+      if _tool_is_listed "$tool"; then
+        _check_fail "$tool: link source config/$src doesn't exist"
+      else
+        log warn "$tool: link source config/$src doesn't exist (not in config.yml)"
+      fi
+      continue
+    fi
+    state="$(_tool_link_state "$tool" "$src" "$dest")"
+    case "$state" in
+      linked | linked-parent | injected | copied)
+        _check_ok "$tool: config/$src -> $shown ($(_link_state_text "$state" "$(_dest_path "$dest")"))"
+        ;;
+      *)
+        if _tool_is_listed "$tool"; then
+          log warn "$tool: config/$src -> $shown: $(_link_state_text "$state" "$(_dest_path "$dest")") (dotfiles link $tool fixes it)"
+        else
+          log info "$tool: config/$src -> $shown: $(_link_state_text "$state" "$(_dest_path "$dest")") (not in config.yml)"
+        fi
+        ;;
+    esac
+  done < <(tool_links "$tool")
+  if [[ $count -eq 0 ]]; then
+    log info "$tool: nothing to link on ${PLATFORM:-this platform}"
+  fi
+}
+
+# doctor <tool>: only what that tool needs. Git only when it clones a
+# repo; config.yml, the self link, PATH and git signing aren't about it.
+_doctor_one() {
+  local tool="$1"
+  _doctor_os
+  _doctor_yq
+  _doctor_config
+  if [[ $CONFIG_OK == true ]]; then
+    if ! _tool_exists "$tool"; then
+      log error "unknown tool: $tool (tools: $(_tool_names))"
+      exit 2
+    fi
+    load_settings
+    _config_sync
+    if [[ -n $(tool_clones "$tool") ]]; then
+      _doctor_git
+    fi
+    _doctor_tool_detail "$tool"
+  fi
+
+  if [[ $DOCTOR_FAILED -gt 0 ]]; then
+    log error "doctor $tool: $DOCTOR_FAILED check(s) failed"
+    exit 1
+  fi
+  log success "doctor $tool: all checks passed"
+}
+
 cmd_doctor() {
+  if [[ $# -gt 1 ]]; then
+    log error "doctor takes at most one tool (got: $*)"
+    exit 2
+  fi
+  if [[ $# -eq 1 ]]; then
+    _doctor_one "$1"
+    return 0
+  fi
   _doctor_os
   _doctor_git
   _doctor_yq
