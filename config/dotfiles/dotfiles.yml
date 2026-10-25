@@ -110,9 +110,11 @@ tools:
     links:
       cspell: $HOME/.config/cspell
 
-  # hooks/espanso.sh makes it start at boot (a service). Debian and Fedora:
-  # no package yet (#54).
+  # hooks/espanso.sh makes it start at boot (a service), and installs it on
+  # Fedora (Terra repo) and Debian (latest GitHub release), which have no
+  # package. A text expander needs a graphical session: gui.
   espanso:
+    gui: true
     package:
       arch: aur/espanso-wayland
       mac: espanso
