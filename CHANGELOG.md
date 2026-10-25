@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.10.0](https://github.com/PaleBluDot/dotfiles/compare/v2.9.1...v2.10.0) (2026-10-25)
+
+
+### Features
+
+* **script:** doctor <tool> ([#64](https://github.com/PaleBluDot/dotfiles/issues/64)) ([e727451](https://github.com/PaleBluDot/dotfiles/commit/e7274512d65fcda7d0c432fbcce09086286e958f)), closes [#25](https://github.com/PaleBluDot/dotfiles/issues/25) [#60](https://github.com/PaleBluDot/dotfiles/issues/60)
+
 ## [2.9.1](https://github.com/PaleBluDot/dotfiles/compare/v2.9.0...v2.9.1) (2026-10-25)
 
 
