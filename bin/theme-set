@@ -1,0 +1,599 @@
+#!/bin/bash
+# theme-set — apply a dotfiles theme on machines without Omarchy (Debian,
+# Ubuntu, macOS). Fills every template in config/theme/templates/ from the
+# theme's config/omarchy/themes/<slug>/colors.toml into the folder Omarchy
+# uses (~/.local/state/omarchy/current/theme/), so every tool reads one place,
+# then runs the after-steps (starship palette, bat cache, tmux and terminal
+# reload). A template renders only when its tool is installed: see
+# config/theme/tools. On a machine with Omarchy it hands the theme to
+# omarchy-theme-set, whose theme-set hook (60-dotfiles-theme) then runs
+# theme-set --extras for the templates Omarchy doesn't ship.
+#
+# Usage:
+#   theme-set <theme>        apply a theme (slug or name: "Sonic Night")
+#   theme-set list           list the themes, * marks the current one
+#   theme-set tools          which templates render here
+#   theme-set --extras       (the hook) add the non-Omarchy templates to the
+#                            current theme folder
+#   theme-set --dry-run <theme>
+#                            render into a temp folder and say what would change
+#   theme-set --no-reload <theme>
+#                            don't signal running programs (tmux, terminals)
+#   theme-set --quiet <theme>   errors only (dotfiles.sh calls it like this)
+#   theme-set --help
+#
+# Bash 3.2 (macOS /bin/bash) and POSIX awk (BSD, mawk, busybox, gawk): no
+# associative arrays, no GNU-only flags. No yq: colors.toml is key = "value".
+
+set -u
+
+NAME="${0##*/}"
+
+# The repo is the folder above this script's own (through any links to it).
+_self="$0"
+while [ -L "$_self" ]; do
+  _link="$(readlink "$_self")"
+  case "$_link" in
+    /*) _self="$_link" ;;
+    *) _self="$(dirname "$_self")/$_link" ;;
+  esac
+done
+DOTFILES_DIR="$(cd "$(dirname "$_self")/.." && pwd)"
+THEMES_DIR="$DOTFILES_DIR/config/omarchy/themes"
+TEMPLATES_DIR="$DOTFILES_DIR/config/theme/templates"
+TOOLS_FILE="$DOTFILES_DIR/config/theme/tools"
+HOOK="$DOTFILES_DIR/config/omarchy/hooks/theme-set.d/60-dotfiles-theme"
+STATE_DIR="$HOME/.local/state/omarchy/current"
+THEME_DIR="$STATE_DIR/theme"
+
+DRY_RUN=false
+RELOAD=true
+QUIET=false
+ACTION="set"
+THEME=""
+
+say() {
+  if [ "$QUIET" != true ]; then
+    printf '%s\n' "$*"
+  fi
+}
+warn() { printf '%s: %s\n' "$NAME" "$*" >&2; }
+die() {
+  warn "$*"
+  exit 1
+}
+
+usage() {
+  cat <<EOF
+Usage: $NAME <theme>           apply a theme to every tool
+       $NAME list              list the themes (* = current)
+       $NAME tools             which templates render here (tool installed)
+       $NAME --dry-run <theme> render to a temp folder, change nothing
+       $NAME --no-reload <theme>
+                               apply without signalling tmux or terminals
+       $NAME --quiet <theme>   print errors only
+       $NAME --help
+
+Themes live in $THEMES_DIR.
+Rendered files go to $THEME_DIR.
+A template renders only when its tool is installed ($TOOLS_FILE).
+With Omarchy installed, $NAME runs omarchy-theme-set instead; its theme-set
+hook then runs $NAME --extras for the templates Omarchy doesn't ship.
+EOF
+}
+
+# Omarchy owns the theme folder where it's installed: its own renderer, hooks
+# and wallpaper. OMARCHY_PATH is Omarchy's own variable for its install.
+omarchy_here() {
+  if command -v omarchy-theme-set >/dev/null 2>&1; then
+    return 0
+  fi
+  if [ -x "${OMARCHY_PATH:-/usr/share/omarchy}/bin/omarchy-theme-set" ]; then
+    return 0
+  fi
+  return 1
+}
+
+current_theme() {
+  if [ -f "$STATE_DIR/theme.name" ]; then
+    head -n 1 "$STATE_DIR/theme.name"
+  fi
+}
+
+list_themes() {
+  local dir slug current
+  current="$(current_theme)"
+  for dir in "$THEMES_DIR"/*/; do
+    slug="$(basename "$dir")"
+    if [ -f "$dir/colors.toml" ]; then
+      if [ "$slug" = "$current" ]; then
+        printf '* %s\n' "$slug"
+      else
+        printf '  %s\n' "$slug"
+      fi
+    fi
+  done
+}
+
+# ─── Renderer ────────────────────────────────────────────────────────────
+# One awk run fills every template given to it. Same placeholders and
+# fallbacks as Omarchy's omarchy-theme-set-templates / omarchy-theme-color:
+#   {{ key }}  {{ key_strip }}  {{ key_rgb }}
+#   {{ mix a b N% }}  (also mix_strip, mix_rgb)
+#   {{ hypr_gradient key fallback }}  {{ shell_gradient key fallback }}
+#   {{ gradient_start key fallback }}
+# An unknown placeholder is left as it is (and reported after).
+# -v colors=<colors.toml> outdir=<folder> lightmode=0|1, files = templates.
+read -r -d '' RENDER_AWK <<'AWK' || true
+function has(k) { return (k in C) && C[k] != "" }
+function alias(k, f) { if (!has(k) && has(f)) C[k] = C[f] }
+function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
+function ishex6(v) { return v ~ ("^#" H6 "$") }
+function hv(c) { return index("0123456789abcdef", tolower(c)) - 1 }
+function hp(h, i) { return hv(substr(h, i, 1)) * 16 + hv(substr(h, i + 1, 1)) }
+function rgb(v) { sub(/^#/, "", v); return hp(v, 1) "," hp(v, 3) "," hp(v, 5) }
+function clamp(n) { return n > 255 ? 255 : n }
+
+# Colour a blended amt (35%, 0.35 or 35) of the way towards b.
+function mix(a, b, amt,   r, g, bl) {
+  sub(/^#/, "", a); sub(/^#/, "", b)
+  if (amt ~ /%$/) { sub(/%$/, "", amt); amt = amt / 100 }
+  else { amt += 0; if (amt > 1) amt = amt / 100 }
+  if (amt < 0) amt = 0
+  if (amt > 1) amt = 1
+  r = int(hp(a, 1) * (1 - amt) + hp(b, 1) * amt + 0.5)
+  g = int(hp(a, 3) * (1 - amt) + hp(b, 3) * amt + 0.5)
+  bl = int(hp(a, 5) * (1 - amt) + hp(b, 5) * amt + 0.5)
+  return sprintf("#%02x%02x%02x", r, g, bl)
+}
+function derive(k, from, to, amt) {
+  if (!has(k) && ishex6(C[from])) C[k] = mix(C[from], to, amt)
+}
+
+function ref(k, fb) {
+  if (has(k)) return C[k]
+  if (fb != "" && has(fb)) return C[fb]
+  if (fb != "") return fb
+  return k
+}
+# Splits a gradient spec ("accent rgba(...) 45deg") into GC[1..GN] and GA.
+function gradient(spec,   n, i, w, p) {
+  GN = 0; GA = ""
+  n = split(spec, w)
+  for (i = 1; i <= n; i++) {
+    p = w[i]
+    if (p ~ /^-?[0-9]+([.][0-9]+)?deg$/) { GA = p; sub(/deg$/, "", GA) }
+    else { if (has(p)) p = C[p]; GC[++GN] = p }
+  }
+}
+function shell_hex(c,   x, n, p) {
+  if (has(c)) c = C[c]
+  if (c ~ ("^#" H6 "$") || c ~ ("^#" H6 H2 "$")) return substr(c, 1, 7)
+  if (c ~ ("^[Rr][Gg][Bb][Aa]?[(]" H6 "(" H2 ")?[)]$")) {
+    x = c; sub(/^[^(]*[(]/, "", x); return "#" substr(x, 1, 6)
+  }
+  if (c ~ /^[Rr][Gg][Bb][Aa]?[(][0-9]+,[0-9]+,[0-9]+(,[0-9.]+)?[)]$/) {
+    x = c; sub(/^[^(]*[(]/, "", x); sub(/[)]$/, "", x); n = split(x, p, ",")
+    return sprintf("#%02x%02x%02x", clamp(p[1] + 0), clamp(p[2] + 0), clamp(p[3] + 0))
+  }
+  if (c ~ ("^0x" H6 H2 "$")) return "#" substr(c, 5, 6)
+  return c
+}
+function hypr_gradient(k, fb,   spec, i, out) {
+  spec = ref(k, fb); gradient(spec)
+  if (GN == 0) return "\"" spec "\""
+  if (GN == 1) return "\"" GC[1] "\""
+  out = "{ colors = {"
+  for (i = 1; i <= GN; i++) out = out (i > 1 ? "," : "") " \"" GC[i] "\""
+  out = out " }"
+  if (GA != "") out = out ", angle = " GA
+  return out " }"
+}
+function shell_gradient(k, fb,   spec, i, out) {
+  spec = ref(k, fb); gradient(spec)
+  if (GN == 0) return spec
+  out = GC[1]
+  for (i = 2; i <= GN; i++) out = out " " GC[i]
+  if (GA != "") out = out " " GA "deg"
+  return out
+}
+function gradient_start(k, fb,   spec) {
+  spec = ref(k, fb); gradient(spec)
+  return GN == 0 ? shell_hex(spec) : shell_hex(GC[1])
+}
+
+# The value for one placeholder's inside; OK = 0 when it isn't one we know.
+function token(inner,   n, w, k, base, fb, i, v) {
+  OK = 1
+  n = split(inner, w)
+  if (n == 1) {
+    k = w[1]
+    if (has(k)) return C[k]
+    base = k
+    if (sub(/_strip$/, "", base) && has(base)) { v = C[base]; sub(/^#/, "", v); return v }
+    base = k
+    if (sub(/_rgb$/, "", base) && ishex6(C[base])) return rgb(C[base])
+  } else if (n == 4 && w[1] ~ /^mix(_strip|_rgb)?$/ && ishex6(C[w[2]]) && ishex6(C[w[3]]) && w[4] ~ /^[0-9]+([.][0-9]+)?%?$/) {
+    v = mix(C[w[2]], C[w[3]], w[4])
+    if (w[1] == "mix_strip") sub(/^#/, "", v)
+    if (w[1] == "mix_rgb") v = rgb(v)
+    return v
+  } else if (n >= 2 && w[1] ~ /^(hypr_gradient|shell_gradient|gradient_start)$/) {
+    fb = ""
+    for (i = 3; i <= n; i++) fb = fb (i > 3 ? " " : "") w[i]
+    if (w[1] == "hypr_gradient") return hypr_gradient(w[2], fb)
+    if (w[1] == "shell_gradient") return shell_gradient(w[2], fb)
+    return gradient_start(w[2], fb)
+  }
+  OK = 0
+  return ""
+}
+function render(line,   out, s, rest, e, v) {
+  out = ""
+  while ((s = index(line, "{{")) > 0) {
+    rest = substr(line, s + 2)
+    e = index(rest, "}}")
+    if (e == 0) break
+    v = token(substr(rest, 1, e - 1))
+    if (OK) { out = out substr(line, 1, s - 1) v; line = substr(rest, e + 2) }
+    else { out = out substr(line, 1, s + 1); line = rest }
+  }
+  return out line
+}
+
+BEGIN {
+  H2 = "[0-9A-Fa-f][0-9A-Fa-f]"
+  H6 = H2 H2 H2
+  # key = "value" lines, as omarchy-theme-color reads them.
+  while ((getline ln < colors) > 0) {
+    eq = index(ln, "=")
+    if (!eq) continue
+    k = substr(ln, 1, eq - 1); v = substr(ln, eq + 1)
+    gsub(/["' \t]/, "", k)
+    if (k == "" || k ~ /^#/) continue
+    if (v ~ /["']/) {
+      sub(/^[^"']*["']/, "", v); sub(/["'].*$/, "", v)
+    } else {
+      v = trim(v)
+    }
+    if (k !~ /^[A-Za-z0-9_-]+$/ || v !~ /^[A-Za-z0-9#(),._+\/% -]*$/) {
+      print "theme-set: colors.toml: skipped " k " (unsupported characters)" > "/dev/stderr"
+      continue
+    }
+    C[k] = v
+  }
+  close(colors)
+
+  # Omarchy's fallbacks, in its order: legacy short and ANSI names first,
+  # then derived shades, then the aliases old templates still use.
+  split("background bg dark_background dark_bg darker_background darker_bg lighter_background lighter_bg foreground fg dark_foreground dark_fg light_foreground light_fg bright_foreground bright_fg", L)
+  for (i = 1; i < 16; i += 2) alias(L[i], L[i + 1])
+  alias("background", "color0"); alias("foreground", "color7")
+  if (has("background")) C["color0"] = C["background"]
+  if (has("foreground")) C["color7"] = C["foreground"]
+  split("red green yellow blue magenta cyan", A)
+  for (i = 1; i <= 6; i++) { alias(A[i], "color" i); alias("bright_" A[i], "color" (i + 8)) }
+  alias("magenta", "purple"); alias("bright_magenta", "bright_purple")
+  alias("light_foreground", "color7"); alias("light_foreground", "foreground")
+  alias("bright_foreground", "color15"); alias("bright_foreground", "foreground")
+  if (has("bright_foreground")) C["cursor"] = C["bright_foreground"]
+  alias("lighter_background", "color0"); alias("lighter_background", "background")
+  alias("dark_foreground", "color8"); alias("dark_foreground", "foreground")
+  alias("muted", "color8"); alias("muted", "dark_foreground")
+  alias("selection", "selection_background"); alias("selection", "color8")
+  alias("selection", "color0"); alias("selection", "background")
+  alias("selection_background", "selection")
+  alias("selection_foreground", "bright_foreground")
+  alias("orange", "yellow")
+  derive("brown", "orange", "#000000", "50%")
+  derive("dark_background", "background", "#000000", "25%")
+  derive("darker_background", "background", "#000000", "50%")
+  for (i = 1; i <= 6; i++) derive("bright_" A[i], A[i], "#ffffff", "20%")
+  alias("purple", "magenta"); alias("bright_purple", "bright_magenta")
+  split("background red green yellow blue magenta cyan foreground muted bright_red bright_green bright_yellow bright_blue bright_magenta bright_cyan bright_foreground", N)
+  for (i = 1; i <= 16; i++) alias("color" (i - 1), N[i])
+  for (i = 1; i < 16; i += 2) if (has(L[i])) C[L[i + 1]] = C[L[i]]
+  alias("mode", "theme_type")
+  if (!has("mode")) {
+    if (lightmode == 1) C["mode"] = "light"
+    else if (ishex6(C["background"])) {
+      v = C["background"]
+      C["mode"] = (hp(v, 2) + hp(v, 4) + hp(v, 6) > 382) ? "light" : "dark"
+    } else C["mode"] = "dark"
+  }
+  C["theme_type"] = C["mode"]
+}
+
+FNR == 1 {
+  if (out != "") close(out)
+  name = FILENAME; sub(/.*\//, "", name); sub(/[.]tpl$/, "", name)
+  out = outdir "/" name
+}
+{ print render($0) > out }
+END { if (out != "") close(out) }
+AWK
+
+# ─── Apply ───────────────────────────────────────────────────────────────
+STAGE=""
+OLD=""
+cleanup() {
+  if [ -n "$STAGE" ] && [ -d "$STAGE" ]; then
+    rm -rf "$STAGE"
+  fi
+}
+trap cleanup EXIT
+
+# A placeholder the renderer didn't fill ("{{{" fold markers aren't one).
+LEFTOVER='\{\{ *[A-Za-z_][^}]*\}\}'
+
+# Is the tool for this output file (bat.tmTheme) installed? config/theme/tools
+# lists its commands and paths; a file with no line there isn't.
+tool_for() {
+  local want="$1" line entry rest
+  [ -f "$TOOLS_FILE" ] || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      "$want:"*) ;;
+      *) continue ;;
+    esac
+    rest="${line#*:},"
+    while [ -n "$rest" ]; do
+      entry="${rest%%,*}"
+      rest="${rest#*,}"
+      entry="$(printf '%s' "$entry" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+      case "$entry" in
+        "") ;;
+        "~"/*) [ -e "$HOME/${entry#"~/"}" ] && return 0 ;;
+        /*) [ -e "$entry" ] && return 0 ;;
+        *) command -v "$entry" >/dev/null 2>&1 && return 0 ;;
+      esac
+    done
+    return 1
+  done <"$TOOLS_FILE"
+  return 1
+}
+
+# Omarchy renders its own built-in templates; theme-set --extras skips them.
+omarchy_ships() {
+  [ -f "${OMARCHY_PATH:-/usr/share/omarchy}/default/themed/$1.tpl" ]
+}
+
+# The templates to render into <stage> (TODO), and the ones skipped
+# (SKIPPED): already there (the theme ships the file), tool not installed,
+# or (with --extras) Omarchy renders it itself.
+pick_templates() {
+  local stage="$1" tpl out
+  TODO=()
+  SKIPPED=""
+  for tpl in "$TEMPLATES_DIR"/*.tpl; do
+    [ -f "$tpl" ] || continue
+    out="$(basename "$tpl" .tpl)"
+    if [ -e "$stage/$out" ]; then
+      continue
+    fi
+    if [ "$ACTION" = extras ] && omarchy_ships "$out"; then
+      continue
+    fi
+    if ! tool_for "$out"; then
+      SKIPPED="$SKIPPED $out"
+      continue
+    fi
+    TODO+=("$tpl")
+  done
+}
+
+# Theme files first (a theme's own hyprland.lua or vscode.json wins over the
+# template, as in Omarchy), then the templates for installed tools it doesn't
+# ship. Top-level files only: backgrounds/ is for Omarchy's wallpaper.
+# With --extras the stage already holds Omarchy's rendered theme.
+render_into() {
+  local stage="$1" colors="$2" f tpl lightmode=0 bad=""
+  if [ "$ACTION" != extras ]; then
+    for f in "$THEMES_DIR/$THEME"/*; do
+      if [ -f "$f" ]; then
+        cp "$f" "$stage/"
+      fi
+    done
+  fi
+  pick_templates "$stage"
+  if [ -f "$(dirname "$colors")/light.mode" ]; then
+    lightmode=1
+  fi
+  if [ ${#TODO[@]} -gt 0 ]; then
+    LC_ALL=C awk -v colors="$colors" -v outdir="$stage" -v lightmode="$lightmode" \
+      "$RENDER_AWK" "${TODO[@]}" || die "rendering $THEME failed"
+  fi
+  RENDERED=${#TODO[@]}
+  local -a todo=(${TODO[@]+"${TODO[@]}"})
+  for tpl in ${todo[@]+"${todo[@]}"}; do
+    f="$stage/$(basename "$tpl" .tpl)"
+    if [ ! -s "$f" ]; then
+      bad="$bad $(basename "$f") (empty)"
+    elif grep -Eq "$LEFTOVER" "$f"; then
+      bad="$bad $(basename "$f") ($(grep -Eo "$LEFTOVER" "$f" | sort -u | tr '\n' ' ' | sed 's/ $//'))"
+    fi
+  done
+  if [ -n "$bad" ]; then
+    warn "$THEME: placeholders it doesn't define:$bad"
+  fi
+}
+
+# A running program re-reads its colours. Omarchy does this itself, so this
+# only runs on machines without it.
+reload_programs() {
+  if [ -f "$HOME/.config/alacritty/alacritty.toml" ]; then
+    touch "$HOME/.config/alacritty/alacritty.toml"
+  fi
+  if command -v pkill >/dev/null 2>&1; then
+    pkill -USR1 -x kitty >/dev/null 2>&1 || true
+    if [ "$(uname -s)" != Darwin ]; then
+      pkill -USR2 -x ghostty >/dev/null 2>&1 || true
+    elif pgrep -x ghostty >/dev/null 2>&1; then
+      say "Ghostty: reload its config to see the theme (cmd+shift+,)"
+    fi
+  fi
+}
+
+apply_theme() {
+  local colors="$THEMES_DIR/$THEME/colors.toml" previous
+  if [ ! -f "$colors" ]; then
+    warn "no theme '$THEME' (no $colors)"
+    printf 'Themes:\n' >&2
+    list_themes >&2
+    exit 1
+  fi
+
+  if [ "$DRY_RUN" = true ]; then
+    STAGE="$(mktemp -d "${TMPDIR:-/tmp}/theme-set.XXXXXX")" || die "can't make a temp folder"
+    render_into "$STAGE" "$colors"
+    say "dry run: $THEME renders $RENDERED templates (checked in $STAGE, now removed)"
+    if [ -n "$SKIPPED" ]; then
+      say "skipped, tool not installed:$SKIPPED"
+    fi
+    say "would replace $THEME_DIR and write $STATE_DIR/theme.name"
+    say "would run the theme hook (starship palette, bat cache, tmux reload)"
+    if [ "$RELOAD" = true ]; then
+      say "would reload running terminals (alacritty, kitty, ghostty)"
+    fi
+    return 0
+  fi
+
+  # Render next to the live folder, then swap it in with two renames.
+  mkdir -p "$STATE_DIR" || die "can't create $STATE_DIR"
+  STAGE="$(mktemp -d "$STATE_DIR/next-theme.XXXXXX")" || die "can't make a temp folder in $STATE_DIR"
+  render_into "$STAGE" "$colors"
+  if [ -e "$THEME_DIR" ] || [ -L "$THEME_DIR" ]; then
+    OLD="$STATE_DIR/previous-theme.$$"
+    mv "$THEME_DIR" "$OLD" || die "can't move the old $THEME_DIR aside"
+  fi
+  if ! mv "$STAGE" "$THEME_DIR"; then
+    if [ -n "$OLD" ]; then
+      mv "$OLD" "$THEME_DIR"
+    fi
+    die "can't move the new theme into $THEME_DIR"
+  fi
+  STAGE=""
+  if [ -n "$OLD" ]; then
+    rm -rf "$OLD"
+  fi
+  previous="$(current_theme)"
+  printf '%s\n' "$THEME" >"$STATE_DIR/theme.name.$$" && mv "$STATE_DIR/theme.name.$$" "$STATE_DIR/theme.name"
+
+  # The same hook Omarchy runs after a theme change (starship, bat, tmux).
+  # DOTFILES_THEME_SET=1: everything is rendered, no --extras run needed.
+  if [ -f "$HOOK" ]; then
+    if [ "$RELOAD" = true ]; then
+      DOTFILES_THEME_SET=1 bash "$HOOK" "$THEME"
+    else
+      DOTFILES_THEME_SET=1 DOTFILES_THEME_NO_RELOAD=1 bash "$HOOK" "$THEME"
+    fi
+  fi
+  if [ "$RELOAD" = true ]; then
+    reload_programs
+  fi
+  if [ -n "$previous" ] && [ "$previous" != "$THEME" ]; then
+    say "$THEME (was $previous): rendered $RENDERED templates into $THEME_DIR"
+  else
+    say "$THEME: rendered $RENDERED templates into $THEME_DIR"
+  fi
+}
+
+# --extras (the theme-set hook, after Omarchy rendered a theme): add the
+# templates Omarchy doesn't ship, for the tools installed here, into the
+# current theme folder, from its colors.toml.
+render_extras() {
+  local colors="$THEME_DIR/colors.toml" f lightmode=0
+  [ -f "$colors" ] || die "no $colors to render from"
+  THEME="$(current_theme)"
+  # Files already in the folder (Omarchy's, the theme's) are left alone.
+  pick_templates "$THEME_DIR"
+  if [ -f "$THEME_DIR/light.mode" ]; then
+    lightmode=1
+  fi
+  STAGE="$(mktemp -d "$STATE_DIR/extras.XXXXXX")" || die "can't make a temp folder in $STATE_DIR"
+  if [ ${#TODO[@]} -gt 0 ]; then
+    LC_ALL=C awk -v colors="$colors" -v outdir="$STAGE" -v lightmode="$lightmode" \
+      "$RENDER_AWK" "${TODO[@]}" || die "rendering the extra templates failed"
+    for f in "$STAGE"/*; do
+      mv "$f" "$THEME_DIR/"
+    done
+  fi
+  say "${THEME:-theme}: rendered ${#TODO[@]} extra templates into $THEME_DIR"
+}
+
+# --tools: which templates render on this machine.
+show_tools() {
+  local tpl out
+  for tpl in "$TEMPLATES_DIR"/*.tpl; do
+    [ -f "$tpl" ] || continue
+    out="$(basename "$tpl" .tpl)"
+    if tool_for "$out"; then
+      printf 'render  %s\n' "$out"
+    else
+      printf 'skip    %s\n' "$out"
+    fi
+  done
+}
+
+# ─── Arguments ───────────────────────────────────────────────────────────
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -l | --list | list) ACTION=list ;;
+    --tools | tools) ACTION=tools ;;
+    --extras) ACTION=extras ;;
+    -n | --dry-run) DRY_RUN=true ;;
+    --no-reload) RELOAD=false ;;
+    -q | --quiet) QUIET=true ;;
+    --) shift; break ;;
+    -*)
+      warn "unknown option: $1"
+      usage >&2
+      exit 2
+      ;;
+    *)
+      if [ -n "$THEME" ]; then
+        warn "one theme at a time ($THEME, $1)"
+        exit 2
+      fi
+      THEME="$1"
+      ;;
+  esac
+  shift
+done
+if [ $# -gt 0 ] && [ -z "$THEME" ]; then
+  THEME="$1"
+fi
+
+case "$ACTION" in
+  list) list_themes; exit 0 ;;
+  tools) show_tools; exit 0 ;;
+  extras) render_extras; exit 0 ;;
+esac
+if [ -z "$THEME" ]; then
+  usage >&2
+  exit 2
+fi
+
+# "Sonic Night" and "sonic-night" are the same theme (Omarchy's rule).
+THEME="$(printf '%s' "$THEME" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')"
+case "$THEME" in
+  .* | */* | "") die "invalid theme name: $THEME" ;;
+esac
+
+if omarchy_here; then
+  if [ "$DRY_RUN" = true ]; then
+    say "dry run: Omarchy is installed; would run omarchy-theme-set $THEME"
+    exit 0
+  fi
+  say "Omarchy is installed; handing $THEME to omarchy-theme-set"
+  if command -v omarchy-theme-set >/dev/null 2>&1; then
+    exec omarchy-theme-set "$THEME"
+  fi
+  exec "${OMARCHY_PATH:-/usr/share/omarchy}/bin/omarchy-theme-set" "$THEME"
+fi
+
+apply_theme

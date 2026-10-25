@@ -45,6 +45,24 @@ Flags work anywhere on the line: `-d` dry run, `-v` verbose (combine as `-dv`),
 `--required` (on `link`: keep the tool on this machine). Try anything with
 `-dv` first.
 
+## Themes
+
+```text
+theme-set <theme>         apply a theme to every tool (sonic-night or "Sonic Night")
+theme-set list            the themes, * = current
+theme-set -n <theme>      dry run: render to a temp folder, change nothing
+```
+
+[`bin/theme-set`](bin/theme-set) (on `PATH` through `.zshenv`) works without
+`dotfiles.sh`: it fills [`config/theme/templates/`](config/theme) (for the
+tools installed here) from the theme's
+`config/omarchy/themes/<theme>/colors.toml` into
+`~/.local/state/omarchy/current/theme/`, then points starship and bat at it
+and reloads tmux and the terminals. With Omarchy installed it runs
+`omarchy-theme-set` instead. On machines without Omarchy, `link` and
+`update` apply `settings.theme` if no theme was chosen yet, and keep the
+current one rendered.
+
 ## Config
 
 | File | Where | Holds |

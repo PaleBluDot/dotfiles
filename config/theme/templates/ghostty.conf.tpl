@@ -1,5 +1,3 @@
-# Same as Omarchy's built-in template, kept here so dotfiles can render it
-# on machines without Omarchy (settings.theme in config.yml).
 background = {{ background }}
 foreground = {{ foreground }}
 cursor-color = {{ bright_foreground }}
