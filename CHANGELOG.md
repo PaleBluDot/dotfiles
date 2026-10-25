@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.13.0](https://github.com/PaleBluDot/dotfiles/compare/v2.12.0...v2.13.0) (2026-10-25)
+
+
+### Features
+
+* **config:** starship palettes ([#66](https://github.com/PaleBluDot/dotfiles/issues/66)) ([437bd67](https://github.com/PaleBluDot/dotfiles/commit/437bd675b9040af44e339514826af20257294d91)), closes [#30](https://github.com/PaleBluDot/dotfiles/issues/30) [#27](https://github.com/PaleBluDot/dotfiles/issues/27) [#30](https://github.com/PaleBluDot/dotfiles/issues/30) [#27](https://github.com/PaleBluDot/dotfiles/issues/27)
+
 # [2.12.0](https://github.com/PaleBluDot/dotfiles/compare/v2.11.0...v2.12.0) (2026-10-25)
 
 
