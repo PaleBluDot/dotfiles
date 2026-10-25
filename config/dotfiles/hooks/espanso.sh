@@ -9,7 +9,7 @@
 # LaunchAgent on macOS, a startup entry on Windows) and runs it as that
 # service. Also checks that
 # espanso reads the linked repo config: it reads ~/.espanso first when
-# that exists.
+# that exists. Fills the private snippets from 1Password.
 #
 # Flags from dotfiles: --dry-run, --verbose, --force. Prints nothing when
 # there's nothing to do; "next: ..." lines go to dotfiles' Next steps.
@@ -27,9 +27,11 @@ dnf_install() {
 }
 
 dry=false
+force=false
 for arg in "$@"; do
   case "$arg" in
     --dry-run) dry=true ;;
+    --force) force=true ;;
   esac
 done
 
@@ -200,6 +202,49 @@ if [[ $(physical "$config") != "$(physical "$HOME/.config/espanso")" ]]; then
   echo "espanso: it reads $config, not ~/.config/espanso (the repo's config): move $config out of the way, then run: dotfiles link espanso" >&2
   exit 1
 fi
+
+# The private snippets (contact details, signatures) come from a 1Password
+# Secure Note: its notes text is the whole match file. Written outside the
+# repo (~/.config/espanso is a link into it), owner-only; default.yml's
+# extra_includes loads it. Only when it's missing, or with --force (for
+# changes made in 1Password): no 1Password prompt on every run. op
+# missing, locked or no note = a next step, the rest still runs.
+private_ref="op://Personal/espanso private/notesPlain"
+private="$HOME/.local/share/espanso/private.yml"
+fill_private() {
+  local tmp
+  if [[ -f $private && $force != true ]]; then
+    return 0
+  fi
+  if ! command -v op >/dev/null 2>&1; then
+    echo "next: install the 1Password CLI (op), then run: dotfiles link espanso (fills ~/.local/share/espanso/private.yml)"
+    return 0
+  fi
+  if [[ $dry == true ]]; then
+    echo "dry run, would fill ~/.local/share/espanso/private.yml from 1Password ($private_ref)"
+    return 0
+  fi
+  mkdir -p "$(dirname "$private")"
+  chmod 700 "$(dirname "$private")"
+  tmp="$(mktemp "$private.XXXXXX")"
+  if ! op read "$private_ref" >"$tmp" 2>/dev/null || [[ ! -s $tmp ]]; then
+    rm -f "$tmp"
+    echo "next: unlock 1Password (or add the Secure Note \"espanso private\" to the Personal vault, its notes = the match file), then run: dotfiles link espanso$([[ $force == true ]] && echo " --force")"
+    return 0
+  fi
+  chmod 600 "$tmp"
+  if [[ -f $private ]] && cmp -s "$tmp" "$private"; then
+    rm -f "$tmp"
+    return 0
+  fi
+  mv -f "$tmp" "$private"
+  echo "espanso: filled ~/.local/share/espanso/private.yml from 1Password (owner-only)"
+  # espanso only watches its own config folder: restart it to load this.
+  if espanso status >/dev/null 2>&1; then
+    espanso restart >/dev/null 2>&1 || true
+  fi
+}
+fill_private
 
 # The Linux service is a systemd user service: no user session here (a
 # container, su/sudo without a login) means nothing to register it with.
