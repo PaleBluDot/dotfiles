@@ -196,6 +196,14 @@ tools:
     links:
       gobuster: $HOME/.config/gobuster
 
+  # The interactive screens' checkbox lists (#82); installed first so the
+  # first interactive run already has them.
+  gum:
+    priority: high
+    package:
+      all: gum
+      windows: charmbracelet.gum
+
   herdr:
     package:
       arch: herdr
