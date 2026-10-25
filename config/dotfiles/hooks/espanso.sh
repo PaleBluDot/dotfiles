@@ -131,6 +131,17 @@ if [[ $(physical "$config") != "$(physical "$HOME/.config/espanso")" ]]; then
   exit 1
 fi
 
+# The Linux service is a systemd user service: no user session here (a
+# container, su/sudo without a login) means nothing to register it with.
+case "${DOTFILES_PLATFORM:-}" in
+  arch | debian | fedora)
+    if ! systemctl --user show-environment >/dev/null 2>&1; then
+      echo "next: no systemd user session here; from your desktop session run: espanso service register && espanso start"
+      exit 0
+    fi
+    ;;
+esac
+
 if espanso service check >/dev/null 2>&1; then
   if ! espanso status >/dev/null 2>&1; then
     if [[ $dry == true ]]; then
