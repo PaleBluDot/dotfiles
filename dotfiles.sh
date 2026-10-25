@@ -381,6 +381,8 @@ load_settings() {
     return 0
   fi
   _cfg_load
+  # In the main shell, so every $(…) after it has the answer.
+  _gui_here || true
   case "$LOG_CMD" in
     help) ;;
     *) _config_migrate ;;
@@ -474,7 +476,7 @@ _cfg_load() {
   # tag): a string made only of literals and $vars is printed even when
   # the select before it let nothing through.
   dump="$(_yq '.tools // {} | to_entries | .[] | .key as $t | .value as $v | (
-    ("T\t" + $t + "\t" + (($v.priority // "") | tostring)),
+    ("T\t" + $t + "\t" + (($v.priority // "") | tostring) + "\t" + (($v.gui // false) | tostring)),
     ($v.package | select(tag == "!!map" or tag == "!!str" or tag == "!!seq") | "H\t" + $t + "\t" + (. | tag)),
     ($v.package | select(tag == "!!str") | "P\t" + $t + "\tall\t" + .),
     ($v.package | select(tag == "!!seq") | "P\t" + $t + "\tall\t" + join(" ")),
@@ -498,6 +500,9 @@ _cfg_load() {
         CFG_TOOLS+="$tool"$'\n'
         if [[ $a == high ]]; then
           printf -v "CFG_${CFG_ID}_PRIO" 'high'
+        fi
+        if [[ $b == true ]]; then
+          printf -v "CFG_${CFG_ID}_GUI" '1'
         fi
         ;;
       H) printf -v "CFG_${CFG_ID}_HASPKG" '1' ;;
@@ -618,7 +623,11 @@ _tool_is_high() {
 _tool_is_used_here() {
   _cfg_load
   _cfg_id "$1"
-  local var="CFG_${CFG_ID}_HOOK"
+  local var="CFG_${CFG_ID}_GUI"
+  if [[ -n ${!var:-} ]] && ! _gui_here; then
+    return 1
+  fi
+  var="CFG_${CFG_ID}_HOOK"
   if [[ -n ${!var:-} ]]; then
     return 0
   fi
@@ -627,6 +636,35 @@ _tool_is_used_here() {
     return 0
   fi
   _cfg_pick "CFG_${CFG_ID}_P"
+}
+
+# gui: true in dotfiles.yml = the tool only works in a graphical session.
+# This machine has a graphical interface: macOS and Windows always; Linux
+# when a graphical session is running or the system boots into one
+# (graphical.target), so an ssh session into a desktop machine counts too.
+# Worked out once per run (GUI_HERE).
+GUI_HERE=""
+_gui_here() {
+  if [[ -z $GUI_HERE ]]; then
+    GUI_HERE=true
+    if [[ $DOTFILES_OS == linux && -z ${WAYLAND_DISPLAY:-}${DISPLAY:-} &&
+      ${XDG_SESSION_TYPE:-} != x11 && ${XDG_SESSION_TYPE:-} != wayland ]] &&
+      ! { command -v systemctl >/dev/null 2>&1 && [[ $(systemctl get-default 2>/dev/null) == graphical.target ]]; }; then
+      GUI_HERE=false
+    fi
+  fi
+  [[ $GUI_HERE == true ]]
+}
+
+# Why a tool isn't used here, for status and link.
+_not_used_reason() {
+  _cfg_id "$1"
+  local var="CFG_${CFG_ID}_GUI"
+  if [[ -n ${!var:-} ]] && ! _gui_here; then
+    echo "gui: true, and this machine has no graphical interface"
+  else
+    echo "dotfiles.yml has no package for it here"
+  fi
 }
 
 # Package name on this platform. Empty = nothing to install here (~, no
@@ -2136,7 +2174,7 @@ _status_tool() {
 
   out "$tool"
   if ! _tool_is_used_here "$tool"; then
-    out "  not used on ${PLATFORM:-this platform} (dotfiles.yml has no package for it here)"
+    out "  not used on ${PLATFORM:-this platform} ($(_not_used_reason "$tool"))"
     return 0
   fi
   command="$(tool_command "$tool")"
@@ -2999,7 +3037,7 @@ cmd_link() {
     CHANGED=false
     if ! _tool_is_used_here "$tool"; then
       if [[ $# -gt 0 ]]; then
-        log warn "$tool: not used on ${PLATFORM:-this platform} (dotfiles.yml has no package for it here); skipped"
+        log warn "$tool: not used on ${PLATFORM:-this platform} ($(_not_used_reason "$tool")); skipped"
       else
         log debug "$tool: not used on ${PLATFORM:-this platform}; skipped"
       fi
@@ -4260,7 +4298,7 @@ _doctor_machine() {
 # aren't $HOME/…, ~/… or a full path. One yq call, "tool<TAB>problem" lines.
 _doctor_yml_problems() {
   _yq '.tools // {} | to_entries | .[] | .key as $t | .value as $v | (
-    ($v // {} | keys | .[] | select(. != "priority" and . != "package" and . != "command" and . != "links" and . != "clone") | $t + "\tunknown field " + . + ":"),
+    ($v // {} | keys | .[] | select(. != "priority" and . != "gui" and . != "package" and . != "command" and . != "links" and . != "clone") | $t + "\tunknown field " + . + ":"),
     ($v.priority | select(. != null and . != "high") | $t + "\tpriority: " + (. | tostring) + " (only high exists)"),
     (($v.package, $v.command) | select(tag == "!!map") | keys | .[] | select(. != "arch" and . != "debian" and . != "fedora" and . != "mac" and . != "windows" and . != "linux" and . != "all") | $t + "\tunknown platform " + . + ": (arch, debian, fedora, mac, windows, linux, all)"),
     ($v.links | select(tag == "!!map") | to_entries | .[] | .key as $s | .value | select(tag == "!!map") | keys | .[] | select(. != "arch" and . != "debian" and . != "fedora" and . != "mac" and . != "windows" and . != "linux" and . != "all") | $t + "\tlink " + $s + ": unknown platform " + .),

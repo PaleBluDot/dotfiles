@@ -4,6 +4,8 @@
 #
 #   tool:
 #     priority: high        installed before everything else (the only level)
+#     gui: true             only works in a graphical session: not installed
+#                           or linked on a machine with no graphical interface
 #     package:              how to install it
 #       all: name           every platform not listed below
 #       <platform>: name    or [a, b] (installed together). Without all:,
