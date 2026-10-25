@@ -3416,6 +3416,9 @@ _use_gum() {
 # One list row: name, then its state ("installed + linked": no commas,
 # gum's --selected takes a comma-separated list of rows).
 GUM_WIDTH=4
+# The row under the cursor: a ▶ and the terminal's bright yellow (ANSI 11,
+# from the theme's palette), easier to see than gum's default pink >.
+GUM_CURSOR_COLOR=11
 _gum_row() {
   local text
   text="$(_state_text "$1")"
@@ -3433,6 +3436,7 @@ _gum_pick() {
     height=25
   fi
   gum choose --no-limit --height "$height" --header "$header" \
+    --cursor "▶ " --cursor.foreground "$GUM_CURSOR_COLOR" \
     ${checked:+--selected "$checked"} -- "$@" </dev/tty
 }
 
@@ -3445,6 +3449,7 @@ _gum_pick_one() {
     height=25
   fi
   gum choose --height "$height" --header "$header" \
+    --cursor "▶ " --cursor.foreground "$GUM_CURSOR_COLOR" \
     ${start:+--selected "$start"} -- "$@" </dev/tty
 }
 
