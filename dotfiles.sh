@@ -1651,14 +1651,19 @@ EOF
       cat <<'EOF'
 dotfiles [-d] [-v] [--force]
 
-Interactive setup, two steps:
-  1. every tool used on this platform, [x] = in config.yml, [R] = required.
-     Enter continues, numbers switch tools on/off. Switched on = link
-     (install + link), switched off = unlink (unlink + remove the
-     package). Required tools can't be switched off here.
+Interactive setup, three steps:
+  1. every tool used on this platform, the ones in config.yml switched on.
+     Switched on = link (install + link), switched off = unlink (unlink +
+     remove the package). Required tools can't be switched off here.
   2. which of the picked tools are required on this machine.
+  3. the theme (config/omarchy/themes; theme-set switches to it after the
+     tools are set up; keeping the current one changes nothing).
 
-Picking in lists: 1 3 5, 2-4, a = all, Enter = continue.
+With gum (installed first, priority: high): checkbox lists, with gum's
+keys shown under each list (x toggles, Enter = done); Esc = cancel
+(nothing changes).
+Without gum: numbered lists, [x] = on, [R] = required; type numbers to
+switch (1 3 5, 2-4, a = all), Enter = continue.
 
   -d  show what would happen, change nothing
   -v  show every step (quiet otherwise; everything goes to the log)
@@ -3400,6 +3405,54 @@ _state_text() {
   echo "${text:--}"
 }
 
+# ─── gum lists (#82) ────────────────────────────────────────────────────
+# With gum (and a terminal), the interactive screens are checkbox lists;
+# gum shows its keys under the list (they differ between versions).
+# Without it, the numbered screens below. Only options every gum version here has (Debian 0.14).
+_use_gum() {
+  command -v gum >/dev/null 2>&1 && { true </dev/tty; } 2>/dev/null
+}
+
+# One list row: name, then its state ("installed + linked": no commas,
+# gum's --selected takes a comma-separated list of rows).
+GUM_WIDTH=4
+# The row under the cursor: a ▶ and the terminal's bright yellow (ANSI 11,
+# from the theme's palette), easier to see than gum's default pink >.
+GUM_CURSOR_COLOR=11
+_gum_row() {
+  local text
+  text="$(_state_text "$1")"
+  printf '%-*s  %s%s' "$GUM_WIDTH" "$1" "${text//, / + }" "${2:+  ($2)}"
+}
+
+# gum choose --no-limit: header, the rows to start checked (comma-
+# separated), then the rows. Prints the checked rows; returns non-zero
+# when cancelled (Esc, Ctrl+C).
+_gum_pick() {
+  local header="$1" checked="$2" height
+  shift 2
+  height=$(($# + 2))
+  if [[ $height -gt 25 ]]; then
+    height=25
+  fi
+  gum choose --no-limit --height "$height" --header "$header" \
+    --cursor "▶ " --cursor.foreground "$GUM_CURSOR_COLOR" \
+    ${checked:+--selected "$checked"} -- "$@" </dev/tty
+}
+
+# gum choose, one row: header, the row to start on, then the rows.
+_gum_pick_one() {
+  local header="$1" start="$2" height
+  shift 2
+  height=$(($# + 2))
+  if [[ $height -gt 25 ]]; then
+    height=25
+  fi
+  gum choose --height "$height" --header "$header" \
+    --cursor "▶ " --cursor.foreground "$GUM_CURSOR_COLOR" \
+    ${start:+--selected "$start"} -- "$@" </dev/tty
+}
+
 # The interactive setup: every tool used on this platform. Step 1 picks
 # the tools ([x] = in config.yml; required ones can't be switched off),
 # step 2 which of them are required here. Then each picked tool is linked
@@ -3433,7 +3486,38 @@ _screen_tools() {
   fi
 
   # Step 1: the tools.
-  while true; do
+  if _use_gum; then
+    local -a rows=()
+    local checked="" chosen row
+    GUM_WIDTH=4
+    for name in "${names[@]}"; do
+      if [[ ${#name} -gt $GUM_WIDTH ]]; then
+        GUM_WIDTH=${#name}
+      fi
+    done
+    for ((i = 0; i < ${#names[@]}; i++)); do
+      row="$(_gum_row "${names[i]}" "$([[ ${required[i]} == true ]] && echo required)")"
+      rows+=("$row")
+      if [[ ${selected[i]} == true ]]; then
+        checked="${checked:+$checked,}$row"
+      fi
+    done
+    if ! chosen="$(_gum_pick "Tools used here (keys below; required ones stay on)" "$checked" "${rows[@]}")"; then
+      ui "Cancelled; nothing changed."
+      return 0
+    fi
+    for ((i = 0; i < ${#names[@]}; i++)); do
+      if [[ $'\n'$chosen$'\n' == *$'\n'"${rows[i]}"$'\n'* ]]; then
+        selected[i]=true
+      elif [[ ${required[i]} == true ]]; then
+        ui "  ${names[i]} is required here; dotfiles unlink --force ${names[i]} removes it."
+        selected[i]=true
+      else
+        selected[i]=false
+      fi
+    done
+  fi
+  while ! _use_gum; do
     ui "Tools ([x] = used here, [R] = required here):"
     for ((i = 0; i < ${#names[@]}; i++)); do
       mark=" "
@@ -3477,7 +3561,30 @@ _screen_tools() {
   if [[ ${#picked[@]} -gt 0 ]]; then
     local -a was_required=("${required[@]}")
     ui ""
-    while true; do
+    if _use_gum; then
+      local -a req_rows=()
+      local req_checked="" req_chosen
+      for i in "${picked[@]}"; do
+        req_rows+=("${names[i]}")
+        if [[ ${required[i]} == true ]]; then
+          req_checked="${req_checked:+$req_checked,}${names[i]}"
+        fi
+      done
+      if ! req_chosen="$(_gum_pick "Required here: unlink and this screen keep them (keys below)" "$req_checked" "${req_rows[@]}")"; then
+        ui "Cancelled; nothing changed."
+        return 0
+      fi
+      for i in "${picked[@]}"; do
+        if [[ $'\n'$req_chosen$'\n' == *$'\n'"${names[i]}"$'\n'* ]]; then
+          required[i]=true
+        elif [[ ${was_required[i]} == true ]]; then
+          ui "  ${names[i]} is already required; dotfiles unlink --force ${names[i]} takes it off."
+        else
+          required[i]=false
+        fi
+      done
+    fi
+    while ! _use_gum; do
       ui "Required here ([R] = unlink and this screen keep it):"
       for ((n = 0; n < ${#picked[@]}; n++)); do
         i="${picked[n]}"
@@ -3507,6 +3614,46 @@ _screen_tools() {
     done
   fi
 
+  # Step 3: the theme (bin/theme-set list: the repo's themes, * = the
+  # current one). Applied after the tools, so their templates render.
+  local -a themes=()
+  local line current_theme="" theme_pick=""
+  if [[ -f $DOTFILES/bin/theme-set ]]; then
+    while IFS= read -r line; do
+      [[ -n $line ]] || continue
+      # "* slug" = the current one, "  slug" the others.
+      if [[ $line == "* "* ]]; then
+        current_theme="${line:2}"
+      fi
+      themes+=("${line:2}")
+    done < <(bash "$DOTFILES/bin/theme-set" list 2>/dev/null)
+  fi
+  if [[ ${#themes[@]} -gt 0 ]]; then
+    ui ""
+    if _use_gum; then
+      if ! theme_pick="$(_gum_pick_one "Theme${current_theme:+ (now: $current_theme)} (keys below)" "$current_theme" "${themes[@]}")"; then
+        ui "Cancelled; nothing changed."
+        return 0
+      fi
+    else
+      ui "Theme${current_theme:+ (now: $current_theme)}:"
+      for ((n = 0; n < ${#themes[@]}; n++)); do
+        ui "$(printf '  %2d) %s' "$((n + 1))" "${themes[n]}")"
+      done
+      while true; do
+        _ask "Theme number, Enter = keep ${current_theme:-as it is}: "
+        if [[ -z $ANSWER ]]; then
+          break
+        fi
+        if [[ $ANSWER =~ ^[0-9]+$ && $ANSWER -ge 1 && $ANSWER -le ${#themes[@]} ]]; then
+          theme_pick="${themes[ANSWER - 1]}"
+          break
+        fi
+        ui "  a number from 1 to ${#themes[@]}"
+      done
+    fi
+  fi
+
   # Run order: priority: high, then required, then the rest.
   local -a order=()
   local pass
@@ -3521,37 +3668,60 @@ _screen_tools() {
     done
   done
 
+  # [3/12] in front of each result: the tools to link or unlink.
+  local as total=0 step=0 at
+  for i in "${order[@]}"; do
+    if [[ ${selected[i]} == true || ${before[i]} == true ]]; then
+      total=$((total + 1))
+    fi
+  done
   ui ""
-  local as
   for i in "${order[@]}"; do
     name="${names[i]}"
     CHANGED=false
+    if [[ ${selected[i]} == true || ${before[i]} == true ]]; then
+      step=$((step + 1))
+    fi
+    at="[$step/$total]"
     if [[ ${selected[i]} == true ]]; then
       as=tools
       if [[ ${required[i]} == true ]]; then
         as=required
       fi
       if ! _link_tool "$name" "$as"; then
-        ui "  $name: failed (see the messages above)"
+        ui "  $at $name: failed (see the messages above)"
         INTERACTIVE_FAILED=true
       elif [[ $CHANGED != true ]]; then
-        ui "  $name: already installed and linked"
+        ui "  $at $name: already installed and linked"
       elif [[ $DRY_RUN == true ]]; then
-        ui "  Test: $(_tool_with_version "$name")"
+        ui "  $at Test: $(_tool_with_version "$name")"
       else
-        ui "  $name: installed and linked ($(_tool_installed_version "$name"))"
+        ui "  $at $name: installed and linked ($(_tool_installed_version "$name"))"
       fi
     elif [[ ${before[i]} == true ]]; then
       if ! _unlink_tool "$name"; then
-        ui "  $name: unlinking failed (see the messages above)"
+        ui "  $at $name: unlinking failed (see the messages above)"
         INTERACTIVE_FAILED=true
       elif [[ $DRY_RUN == true ]]; then
-        ui "  Test: unlink $name"
+        ui "  $at Test: unlink $name"
       else
-        ui "  $name: unlinked and removed"
+        ui "  $at $name: unlinked and removed"
       fi
     fi
   done
+
+  # The theme, when another one was picked (theme-set hands off to
+  # omarchy-theme-set on Omarchy).
+  if [[ -n $theme_pick && $theme_pick != "$current_theme" ]]; then
+    if [[ $DRY_RUN == true ]]; then
+      ui "  Test: theme $theme_pick"
+    elif bash "$DOTFILES/bin/theme-set" --quiet "$theme_pick"; then
+      ui "  theme: $theme_pick"
+    else
+      ui "  theme: switching to $theme_pick failed (see the messages above)"
+      INTERACTIVE_FAILED=true
+    fi
+  fi
 }
 
 # dotfiles with no command.
@@ -3597,22 +3767,52 @@ _interactive_unlink() {
     ui "No tools in config.yml to unlink${kept:+ (required: $kept)}."
     return 0
   fi
-  ui "Tools in config.yml:"
-  for ((n = 0; n < ${#names[@]}; n++)); do
-    ui "$(printf '  %2d) %-16s %s' "$((n + 1))" "${names[n]}" "$(_state_text "${names[n]}")")"
-  done
-  if [[ -n $kept ]]; then
-    ui "  Required (not listed; unlink --force <tool>): $kept"
-  fi
-  while true; do
-    _ask "Unlink and remove: numbers (a = all), Enter = nothing: "
-    if [[ -z $ANSWER ]]; then
+  if _use_gum; then
+    local -a rows=()
+    local chosen
+    GUM_WIDTH=4
+    for name in "${names[@]}"; do
+      if [[ ${#name} -gt $GUM_WIDTH ]]; then
+        GUM_WIDTH=${#name}
+      fi
+    done
+    for name in "${names[@]}"; do
+      rows+=("$(_gum_row "$name")")
+    done
+    if [[ -n $kept ]]; then
+      ui "Required, not listed (unlink --force <tool>): $kept"
+    fi
+    if ! chosen="$(_gum_pick "Unlink and remove (keys below)" "" "${rows[@]}")"; then
+      ui "Cancelled; nothing changed."
       return 0
     fi
-    if _parse_picks "$ANSWER" "${#names[@]}"; then
-      break
+    PICKS=()
+    for ((n = 0; n < ${#names[@]}; n++)); do
+      if [[ $'\n'$chosen$'\n' == *$'\n'"${rows[n]}"$'\n'* ]]; then
+        PICKS+=("$((n + 1))")
+      fi
+    done
+    if [[ ${#PICKS[@]} -eq 0 ]]; then
+      return 0
     fi
-  done
+  else
+    ui "Tools in config.yml:"
+    for ((n = 0; n < ${#names[@]}; n++)); do
+      ui "$(printf '  %2d) %-16s %s' "$((n + 1))" "${names[n]}" "$(_state_text "${names[n]}")")"
+    done
+    if [[ -n $kept ]]; then
+      ui "  Required (not listed; unlink --force <tool>): $kept"
+    fi
+    while true; do
+      _ask "Unlink and remove: numbers (a = all), Enter = nothing: "
+      if [[ -z $ANSWER ]]; then
+        return 0
+      fi
+      if _parse_picks "$ANSWER" "${#names[@]}"; then
+        break
+      fi
+    done
+  fi
 
   for n in "${PICKS[@]}"; do
     name="${names[n - 1]}"
