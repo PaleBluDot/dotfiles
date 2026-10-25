@@ -59,9 +59,13 @@ disabled = false # Disabled by default
 [os.symbols]
 Arch = "󰣇"
 Debian = ""
+Fedora = ""
 FreeBSD = ""
-Linux = ""
+# Omarchy's os-release says ID=omarchy, which starship doesn't know, so it
+# shows up as plain Linux (starship ignores ID_LIKE=arch): the Arch logo.
+Linux = "󰣇"
 Macos = ""
+Ubuntu = ""
 Windows = ""
 
 # You can also replace your username with a neat symbol like   or disable this
