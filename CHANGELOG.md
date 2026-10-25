@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.16.0](https://github.com/PaleBluDot/dotfiles/compare/v2.15.1...v2.16.0) (2026-10-25)
+
+
+### Features
+
+* **script:** gum interactive screen ([#83](https://github.com/PaleBluDot/dotfiles/issues/83)) ([eca7cc4](https://github.com/PaleBluDot/dotfiles/commit/eca7cc4e4bd85d9f808ac9c80dbf98465b725cbc)), closes [#82](https://github.com/PaleBluDot/dotfiles/issues/82)
+
 ## [2.15.1](https://github.com/PaleBluDot/dotfiles/compare/v2.15.0...v2.15.1) (2026-10-25)
 
 
