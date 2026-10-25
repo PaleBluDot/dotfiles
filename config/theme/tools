@@ -1,0 +1,41 @@
+# Which tool each template is for. A template renders only on a machine
+# where its tool is installed: any of the commands on PATH, or any of the
+# paths (starting with / or ~) existing, e.g. a macOS app. A template with
+# no line here never renders.
+#
+# <output file>: <command or path>, <command or path>, ...
+#
+# A new tool's template: add it to templates/ and a line here.
+alacritty.toml: alacritty, /Applications/Alacritty.app
+bat.tmTheme: bat, batcat
+btop.theme: btop
+chromium.theme: chromium, brave
+claude.json: claude
+delta.gitconfig: delta
+eza.yml: eza
+foot.ini: foot
+fzf.sh: fzf
+ghostty.conf: ghostty, /Applications/Ghostty.app
+gum_env.lua: gum
+helix.toml: hx, helix
+hermes.yaml: hermes
+hyprland.lua: Hyprland, hyprctl
+hyprland-preview-share-picker.css: hyprland-preview-share-picker
+keyboard.rgb: asusctl, framework_tool
+kitty.conf: kitty, /Applications/kitty.app
+lazydocker.yml: lazydocker
+lazygit.yml: lazygit
+neovim.lua: nvim
+obsidian.css: obsidian, /Applications/Obsidian.app
+pi.json: pi
+shell.toml: omarchy-shell
+starship-palette.toml: starship
+superfile.toml: spf, superfile
+t3code.json: t3code
+tmux.conf: tmux
+vscode-theme.json: code, code-insiders, codium, /Applications/Visual Studio Code.app
+warp.yaml: warp-terminal, /Applications/Warp.app
+wezterm.lua: wezterm, /Applications/WezTerm.app
+windows-terminal.json: wt, wt.exe
+yazi-theme.toml: yazi
+zellij.kdl: zellij
