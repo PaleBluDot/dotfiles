@@ -7,7 +7,8 @@
 # so the same file works on every machine and the repo stays clean; Aether
 # reads the paths as written, so its copies get the full path. Blueprints
 # Aether saved there that the repo doesn't have yet are copied back into
-# the repo (paths made relative again), for you to commit.
+# the repo (paths made relative again), for you to commit. settings.json
+# and favorites.json get the same paths, and go both ways: see below.
 # Where Aether isn't installed (only Arch packages it), installs the latest
 # GitHub release first; Mac and Windows have nothing to do.
 #
@@ -165,3 +166,54 @@ done
 if [[ $written -gt 0 && $dry != true ]]; then
   echo "aether: wrote $written blueprint(s) in $shown with this machine's paths"
 fi
+
+# settings.json and favorites.json: Aether saves them, git pull brings the
+# repo's, so both sides change. The copy last written here (in dotfiles'
+# state folder) tells which one did, and that one wins. Both changed (or
+# no copy yet): Aether's goes into the repo, the repo's stays in git; the
+# diff shows both, commit it or check out the repo's and run again.
+state="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/aether"
+for name in settings.json favorites.json; do
+  repo="$DOTFILES/config/aether/$name"
+  mine="$parent/$name"
+  last="$state/$name"
+  [[ -f $repo || -f $mine ]] || continue
+  if [[ ! -f $mine ]]; then
+    action=write why=""
+  elif [[ ! -f $repo ]]; then
+    action=copy why="new"
+  elif render "$repo" | cmp -s - "$mine"; then
+    action=same why=""
+  elif [[ -f $last ]] && cmp -s "$mine" "$last"; then
+    action=write why="" # only the repo changed
+  elif [[ -f $last ]] && render "$repo" | cmp -s - "$last"; then
+    action=copy why="changed in Aether"
+  else
+    action=copy why="changed in Aether and in the repo; git diff shows both"
+  fi
+  if [[ $dry == true ]]; then
+    case "$action" in
+      write) echo "dry run, would write ~/.config/aether/$name with this machine's paths" ;;
+      copy) echo "dry run, would copy ~/.config/aether/$name into the repo ($why)" ;;
+    esac
+    continue
+  fi
+  case "$action" in
+    write)
+      mkdir -p "$parent"
+      render "$repo" >"$parent/.$name.tmp"
+      mv -f "$parent/.$name.tmp" "$mine"
+      echo "aether: wrote ~/.config/aether/$name with this machine's paths"
+      ;;
+    copy)
+      unrender "$mine" >"$repo"
+      echo "aether: copied $name into the repo ($why; commit it)"
+      ;;
+  esac
+  # Also when they already matched (first run, or the same change on both
+  # sides), quietly: the next run compares against it.
+  if ! cmp -s "$mine" "$last" 2>/dev/null; then
+    mkdir -p "$state"
+    cp "$mine" "$last"
+  fi
+done

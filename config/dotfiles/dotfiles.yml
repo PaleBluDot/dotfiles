@@ -56,7 +56,8 @@ tools:
       aerospace: $HOME/.config/aerospace
 
   # Packaged in the Omarchy pacman repo. hooks/aether.sh writes the
-  # blueprints with this machine's paths, and elsewhere installs the latest
+  # blueprints, settings.json and favorites.json with this machine's paths
+  # (and copies Aether's changes back), and elsewhere installs the latest
   # GitHub release.
   aether:
     package:
