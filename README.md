@@ -123,6 +123,9 @@ Run order: `priority: high` tools first, then the required ones, then the
 rest.
 
 No secrets are committed. Files that need them hold `op://` references and
-are filled in by the 1Password CLI (`op inject`) when linked.
+are filled in by the 1Password CLI (`op inject`) when linked. espanso's
+private snippets are the Secure Note `espanso private` (Personal vault):
+its hook writes the note's text to `~/.local/share/espanso/private.yml`
+when that's missing; `dotfiles link espanso --force` refreshes it.
 
 Log: `~/.local/state/dotfiles/dotfiles.log`.
