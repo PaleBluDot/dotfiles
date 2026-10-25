@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.7.0](https://github.com/PaleBluDot/dotfiles/compare/v2.6.0...v2.7.0) (2026-10-25)
+
+
+### Features
+
+* **config:** theme superfile, gitlogue, wezterm ([#67](https://github.com/PaleBluDot/dotfiles/issues/67)) ([b9850c1](https://github.com/PaleBluDot/dotfiles/commit/b9850c19bad5aa0c1b9e95c8c8f31c653f34830a)), closes [#31](https://github.com/PaleBluDot/dotfiles/issues/31) [#62](https://github.com/PaleBluDot/dotfiles/issues/62) [#62](https://github.com/PaleBluDot/dotfiles/issues/62) [#62](https://github.com/PaleBluDot/dotfiles/issues/62)
+
 # [2.6.0](https://github.com/PaleBluDot/dotfiles/compare/v2.5.2...v2.6.0) (2026-10-25)
 
 
