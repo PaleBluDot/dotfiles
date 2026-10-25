@@ -27,3 +27,12 @@ require("default.hypr.toggles")
 
 -- Add any other personal Hyprland configuration below.
 -- o.window("qemu", { workspace = "5" })
+
+-- 1Password's floating SSH/approval prompt: the window is ~40px larger than
+-- what the app draws and the extra strip is transparent. Forcing a size
+-- doesn't work (the app resizes itself back, even past max_size), so no
+-- border or shadow to outline the gap.
+o.window(
+  { class = "com.onepassword.OnePassword", title = "^1Password$", float = true },
+  { border_size = 0, no_shadow = true }
+)
