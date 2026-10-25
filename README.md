@@ -96,6 +96,13 @@ interactive setup), gets `--dry-run`, `--verbose` and `--force`, and prints
 nothing when there's nothing to do. A line `next: <text>` goes to the
 **Next steps** list at the end of the run. A tool with a hook is used on
 every platform (the hook covers the ones `package:` doesn't list).
+Hooks get the command in `DOTFILES_COMMAND` (`link`, `update` or
+`interactive`). The tools hooks install from GitHub releases, which no
+package manager updates, get a newer release on `dotfiles update` (only
+there, so `link` stays fast and works offline): Aether (Debian, Fedora),
+massCode (Debian, Fedora), espanso (Debian) and superfile (Debian; Fedora
+gets it from the Terra repo). The installed tag of the ones in
+`~/.local/bin` is kept in `~/.local/state/dotfiles/versions/`.
 
 `config.yml` lists what this machine uses: `required:` tools are never
 removed by `unlink` (only `unlink --force`) or the interactive setup;
