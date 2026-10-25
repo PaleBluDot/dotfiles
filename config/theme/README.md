@@ -90,7 +90,7 @@ Helpers (Omarchy's renderer and `theme-set` both have them):
 | `tmux.conf.tpl` | tmux, `source-file -q` from `tmux.conf` | dotfiles |
 | `vscode-theme.json.tpl` | VS Code (as a local theme extension) | Omarchy |
 | `warp.yaml.tpl` | Warp custom theme | new |
-| `wezterm.lua.tpl` | WezTerm, `config.colors = dofile(...)` | new |
+| `wezterm.lua.tpl` | WezTerm, `config.colors = dofile(...)` | dotfiles |
 | `windows-terminal.json.tpl` | Windows Terminal colour scheme (`schemes`) | new |
 | `yazi-theme.toml.tpl` | yazi, `~/.config/yazi/theme.toml` (yazi's default layout, theme colours) | new |
 | `zellij.kdl.tpl` | zellij, `~/.config/zellij/themes/omarchy.kdl` | new |

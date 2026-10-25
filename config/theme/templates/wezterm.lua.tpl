@@ -1,5 +1,6 @@
--- WezTerm colours for the current theme. In wezterm.lua:
---   config.colors = dofile(os.getenv("HOME") .. "/.local/state/omarchy/current/theme/wezterm.lua")
+-- WezTerm colours for the current theme. bin/theme-set renders it
+-- (with Omarchy, through the theme hook) into
+-- ~/.local/state/omarchy/current/theme/wezterm.lua; wezterm.lua loads it as config.colors.
 return {
   foreground = "{{ foreground }}",
   background = "{{ background }}",
