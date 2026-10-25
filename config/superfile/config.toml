@@ -94,8 +94,10 @@ file_panel_name_percent = 50
 ###############################################################################
 
 #-- Theme
-# Put your theme's name here!
-theme = "catppuccin-mocha"
+# "omarchy" follows the current theme: the theme-set hook links the rendered
+# superfile.toml in as theme/omarchy.toml. Until it's there (no theme set),
+# superfile falls back to its built-in catppuccin-mocha.
+theme = "omarchy"
 
 #-- Code Previewer
 # Whether to use the builtin syntax highlighting with chroma or use bat. Values: "" for builtin chroma, "bat" for bat

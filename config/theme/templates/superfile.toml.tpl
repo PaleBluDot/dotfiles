@@ -1,5 +1,6 @@
-# superfile theme: copy to ~/.config/superfile/theme/omarchy.toml and set
-# theme = "omarchy" in superfile's config.toml.
+# superfile colours for the current theme. bin/theme-set renders it
+# (with Omarchy, through the theme hook) into
+# ~/.local/state/omarchy/current/theme/superfile.toml; the theme-set hook links it in as superfile's "omarchy" theme.
 code_syntax_highlight = "dracula"
 
 file_panel_border = "{{ muted }}"

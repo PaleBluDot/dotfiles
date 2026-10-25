@@ -85,7 +85,7 @@ Helpers (Omarchy's renderer and `theme-set` both have them):
 | `pi.json.tpl` | pi | Omarchy |
 | `shell.toml.tpl` | Omarchy shell | Omarchy |
 | `starship-palette.toml.tpl` | starship, appended as `[palettes.<theme>]` | new |
-| `superfile.toml.tpl` | superfile, `~/.config/superfile/theme/omarchy.toml` | new |
+| `superfile.toml.tpl` | superfile, linked in as `~/.config/superfile/theme/omarchy.toml` | dotfiles |
 | `t3code.json.tpl` | t3code | Omarchy |
 | `tmux.conf.tpl` | tmux, `source-file -q` from `tmux.conf` | dotfiles |
 | `vscode-theme.json.tpl` | VS Code (as a local theme extension) | Omarchy |

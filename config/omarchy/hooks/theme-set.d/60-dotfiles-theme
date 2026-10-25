@@ -1,7 +1,7 @@
 #!/bin/bash
 # Omarchy theme-set hook (also run by bin/theme-set on machines without
-# Omarchy, after it renders the templates): point starship, bat and tmux at
-# the new theme. $1 = the theme's slug (sonic-night).
+# Omarchy, after it renders the templates): point starship, bat, superfile
+# and tmux at the new theme. $1 = the theme's slug (sonic-night).
 #
 # The templates are already rendered into ~/.local/state/omarchy/current/theme/
 # when this runs. DOTFILES_THEME_NO_RELOAD=1 (theme-set --no-reload) leaves a
@@ -69,6 +69,16 @@ if [[ -n $bat_cmd && -f $THEME_DIR/bat.tmTheme ]]; then
   mkdir -p "$bat_themes"
   cp "$THEME_DIR/bat.tmTheme" "$bat_themes/omarchy.tmTheme"
   "$bat_cmd" cache --build >/dev/null 2>&1 || true
+fi
+
+# ─── superfile ───────────────────────────────────────────────────────────
+# superfile only loads themes by name from its theme folder. A link there
+# points at the rendered file, so later theme changes need nothing else
+# (gitignored in the repo; a missing target = its built-in default).
+spf_themes="$HOME/.config/superfile/theme"
+if [[ -d $HOME/.config/superfile && -f $THEME_DIR/superfile.toml ]]; then
+  mkdir -p "$spf_themes"
+  ln -sfn "$THEME_DIR/superfile.toml" "$spf_themes/omarchy.toml"
 fi
 
 # ─── tmux ────────────────────────────────────────────────────────────────
