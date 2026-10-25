@@ -4,6 +4,18 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.15.0](https://github.com/PaleBluDot/dotfiles/compare/v2.14.0...v2.15.0) (2026-10-25)
+
+
+### Bug Fixes
+
+* **script:** stale hook comment ([#80](https://github.com/PaleBluDot/dotfiles/issues/80)) ([1b33c6d](https://github.com/PaleBluDot/dotfiles/commit/1b33c6de44ae472acd4656dcbf45d1f720e93cf9)), closes [#79](https://github.com/PaleBluDot/dotfiles/issues/79)
+
+
+### Features
+
+* **script:** vs code follows theme-set ([#76](https://github.com/PaleBluDot/dotfiles/issues/76)) ([62c239b](https://github.com/PaleBluDot/dotfiles/commit/62c239bb34c2412c04eb2c57a07428a34497c583)), closes [#74](https://github.com/PaleBluDot/dotfiles/issues/74)
+
 # [2.14.0](https://github.com/PaleBluDot/dotfiles/compare/v2.13.1...v2.14.0) (2026-10-25)
 
 
