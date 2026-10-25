@@ -228,7 +228,7 @@ root = "#db490b"
 
 [palettes.knuckles-night]
 os = "#e0262e"
-os_text = "#0c0303"
+os_text = "#ffd8d6"
 user = "#5c1418"
 directory = "#b83036"
 git = "#6e2c2a"
@@ -239,7 +239,7 @@ root = "#8c0f14"
 
 [palettes.sonic-night]
 os = "#2f6bff"
-os_text = "#040818"
+os_text = "#d4e0ff"
 user = "#1c3380"
 directory = "#3558cf"
 git = "#2a3f7a"
@@ -250,7 +250,7 @@ root = "#0b2a99"
 
 [palettes.tails-night]
 os = "#ff9f1c"
-os_text = "#1c1206"
+os_text = "#ffe8c8"
 user = "#5c3a10"
 directory = "#9b5900"
 git = "#4a2c0c"
