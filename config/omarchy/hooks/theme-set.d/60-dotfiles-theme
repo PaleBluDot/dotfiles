@@ -33,13 +33,8 @@ color() {
 # After omarchy-theme-set: render the templates Omarchy doesn't ship (bat,
 # tmux, ...) for the tools installed here (config/theme/tools). bin/theme-set
 # sets DOTFILES_THEME_SET=1 when it runs this hook: it rendered them already.
-# The repo is four folders up from this file's real location.
-if [[ ${DOTFILES_THEME_SET:-} != 1 ]]; then
-  hook_dir="$(cd "$(dirname "$0")" && pwd -P)"
-  setter="$hook_dir/../../../../bin/theme-set"
-  if [[ -f $setter ]]; then
-    bash "$setter" --extras --quiet || true
-  fi
+if [[ ${DOTFILES_THEME_SET:-} != 1 && -f $DOTFILES/bin/theme-set ]]; then
+  bash "$DOTFILES/bin/theme-set" --extras --quiet || true
 fi
 
 # ─── starship ────────────────────────────────────────────────────────────
@@ -101,9 +96,8 @@ fi
 # Rebuilds the local.dotfiles-themes extension when a theme's colours
 # changed (a no-op otherwise). Omarchy's own VS Code step ran before this
 # hook and already set workbench.colorTheme from the theme's vscode.json.
-vscode_hook="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../../dotfiles/hooks/vscode.sh"
-if [[ -f $vscode_hook ]]; then
-  bash "$vscode_hook" >/dev/null 2>&1 || true
+if [[ -f $DOTFILES/config/dotfiles/hooks/vscode.sh ]]; then
+  bash "$DOTFILES/config/dotfiles/hooks/vscode.sh" >/dev/null 2>&1 || true
 fi
 
 # ─── tmux ────────────────────────────────────────────────────────────────
