@@ -2890,8 +2890,9 @@ _link_configs() {
 # ─── hooks: config/dotfiles/hooks/<tool>.sh ─────────────────────────────
 # Runs, when it exists, after the tool's package and links (link, update,
 # interactive). Gets --dry-run, --verbose and --force as given to dotfiles,
-# and DOTFILES, DOTFILES_OS, DOTFILES_PLATFORM, DOTFILES_TOOL and
-# PKG_MANAGER in its environment. Its output shows as it runs (and goes to
+# and DOTFILES, DOTFILES_OS, DOTFILES_PLATFORM, DOTFILES_TOOL,
+# DOTFILES_COMMAND (link, update or interactive) and PKG_MANAGER in its
+# environment. Its output shows as it runs (and goes to
 # the log; the interactive screen shows it with -v only). A line
 # "next: <text>" goes to the Next steps list at the end instead. A hook
 # prints nothing when there's nothing to do (update runs from the shell's
@@ -2928,7 +2929,7 @@ _run_hook() {
         _log_to_file "INFO" "  $tool hook> $line"
         ;;
     esac
-  done < <(DOTFILES_TOOL="$tool" PKG_MANAGER="$PKG_MANAGER" bash "$hook" ${args[@]+"${args[@]}"} </dev/null 2>&1
+  done < <(DOTFILES_TOOL="$tool" DOTFILES_COMMAND="$LOG_CMD" PKG_MANAGER="$PKG_MANAGER" bash "$hook" ${args[@]+"${args[@]}"} </dev/null 2>&1
     echo "$?" >"$code_file")
   code="$(cat "$code_file" 2>/dev/null)" || code=1
   rm -f "$code_file"
