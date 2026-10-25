@@ -2343,7 +2343,7 @@ _system_needs_root() {
 # changes nothing, so it doesn't ask.
 # Only tools whose system files would actually change count: a link run
 # where every copy is already in place (and its unit enabled) doesn't ask,
-# so update can run from a shell's startup file without a password prompt.
+# so a repeat link or update with nothing to change doesn't prompt for one.
 #   _require_sudo link|unlink <tool...>
 _require_sudo() {
   local mode="$1" tool need=""
@@ -2895,9 +2895,10 @@ _link_configs() {
 # environment. Its output shows as it runs (and goes to
 # the log; the interactive screen shows it with -v only). A line
 # "next: <text>" goes to the Next steps list at the end instead. A hook
-# prints nothing when there's nothing to do (update runs from the shell's
-# startup file); anything else it prints counts as a change. An exit code
-# other than 0 = the tool failed.
+# prints nothing when there's nothing to do (link, update and the
+# interactive setup run it on every pass; DOTFILES_COMMAND tells them
+# apart); anything else it prints counts as a change. An exit code other
+# than 0 = the tool failed.
 NEXT_STEPS=""
 _run_hook() {
   local tool="$1" hook="$HOOKS_DIR/$1.sh" line code_file code=0 printed=false
