@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.14.0](https://github.com/PaleBluDot/dotfiles/compare/v2.13.1...v2.14.0) (2026-10-25)
+
+
+### Features
+
+* **config:** hooks update downloaded tools ([#77](https://github.com/PaleBluDot/dotfiles/issues/77)) ([2b8d980](https://github.com/PaleBluDot/dotfiles/commit/2b8d980eccf85bdfe365674737ad33f5a3d8ed6c)), closes [#71](https://github.com/PaleBluDot/dotfiles/issues/71)
+
 ## [2.13.1](https://github.com/PaleBluDot/dotfiles/compare/v2.13.0...v2.13.1) (2026-10-25)
 
 
