@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.11.0](https://github.com/PaleBluDot/dotfiles/compare/v2.10.0...v2.11.0) (2026-10-25)
+
+
+### Features
+
+* **config:** track aether settings ([#65](https://github.com/PaleBluDot/dotfiles/issues/65)) ([149b243](https://github.com/PaleBluDot/dotfiles/commit/149b2435aa7c804f7eb5b27647b561b1a111e8af)), closes [#28](https://github.com/PaleBluDot/dotfiles/issues/28)
+
 # [2.10.0](https://github.com/PaleBluDot/dotfiles/compare/v2.9.1...v2.10.0) (2026-10-25)
 
 
