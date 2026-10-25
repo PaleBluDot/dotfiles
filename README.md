@@ -42,8 +42,8 @@ dotfiles help [command]
 
 Flags work anywhere on the line: `-d` dry run, `-v` verbose (combine as `-dv`),
 `--force` no questions and no backups (on `unlink`: also required tools),
-`--required` (on `link`: keep the tool on this machine). Try anything with
-`-dv` first.
+`--required` (on `link`: keep the tool on this machine), `--version` (print
+`dotfiles <latest tag>` and stop). Try anything with `-dv` first.
 
 ## Themes
 
