@@ -1,13 +1,31 @@
 # Theme templates
 
 `templates/` has a colour template (`<file>.tpl`) for every tool that can take
-a colour file, used or not. A theme setter fills them from a theme's
-`colors.toml` (`config/omarchy/themes/<slug>/colors.toml`) and writes each to
+a colour file, used or not, and is the one place to edit them. Each is filled
+from a theme's `colors.toml` (`config/omarchy/themes/<slug>/colors.toml`) into
 `~/.local/state/omarchy/current/theme/<file>` (the template name without
 `.tpl`), the same folder Omarchy uses, so every tool reads one place on every
-machine. The standalone setter for Debian, Ubuntu and macOS is issue #40; for
-now Omarchy still renders its own copies from `config/omarchy/themed/` and its
-built-in templates.
+machine. A template renders only where its tool is installed:
+[`tools`](tools) maps each output file to the commands (or macOS app paths)
+that show the tool is there (`theme-set tools` shows the result here).
+
+- **Without Omarchy** (Debian, Ubuntu, macOS), `bin/theme-set <theme>`
+  renders the templates for the installed tools, the same way Omarchy does
+  (output checked byte for byte against `omarchy-theme-set-templates`),
+  swaps the folder in and writes `theme.name`. Then the theme-set hook
+  (`config/omarchy/hooks/theme-set.d/60-dotfiles-theme`: starship palette,
+  bat cache, tmux reload) and a terminal reload (alacritty, kitty, and
+  ghostty on Linux). `dotfiles link` / `update` keep it current:
+  `settings.theme` is only the first theme, a theme chosen here stays.
+- **With Omarchy**, `theme-set` runs `omarchy-theme-set`, which renders its
+  own built-in templates (the "Omarchy" ones below, for every tool, its
+  choice). The same hook then runs `theme-set --extras`: the other
+  templates, for the installed tools. `config/omarchy/themed/` (Omarchy's
+  user templates) stays empty, since one repo folder can't vary per machine.
+
+A file a theme ships itself (`hyprland.lua`, `vscode.json`) wins over the
+template, in both. A new tool: its `<file>.tpl` in `templates/` and a line
+in `tools`; nothing else.
 
 ## Variables
 
@@ -26,12 +44,18 @@ Derived when the theme doesn't set them:
 - `selection_foreground` = `bright_foreground`
 - `theme_type` = `mode` (`dark` or `light`)
 - `purple` = `magenta`
+- the rest of Omarchy's fallbacks (`omarchy-theme-color`): legacy `bg` /
+  `colorN` names, `brown`, `dark_background`, `darker_background` and the
+  `bright_*` colours mixed from their base, `mode` from the background's
+  brightness.
 
-Helpers (Omarchy's renderer has them; a setter needs them too):
+Helpers (Omarchy's renderer and `theme-set` both have them):
 - `{{ mix a b N% }}`: colour `a` blended N% towards `b` (claude, hermes,
-  shell, t3code, pi).
+  shell, t3code, pi); `mix_strip`, `mix_rgb` too.
 - `{{ hypr_gradient key default }}`: Hyprland border gradient (hyprland.lua,
   Omarchy only).
+- `{{ shell_gradient key default }}`, `{{ gradient_start key default }}`:
+  the same gradient for the Omarchy shell (shell.toml).
 
 ## Templates
 
@@ -72,7 +96,9 @@ Helpers (Omarchy's renderer has them; a setter needs them too):
 | `zellij.kdl.tpl` | zellij, `~/.config/zellij/themes/omarchy.kdl` | new |
 
 "Omarchy" = a copy of Omarchy's built-in template (keep in step when Omarchy
-updates them); "dotfiles" = also in `config/omarchy/themed/` today.
+updates them); "dotfiles" = wired up by dotfiles before these templates
+(bat, tmux); "dotfiles" and "new" are rendered by `theme-set` (with
+Omarchy: `--extras`, from the hook).
 
 ## Not covered
 
