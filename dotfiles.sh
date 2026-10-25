@@ -1657,8 +1657,9 @@ Interactive setup, two steps:
      remove the package). Required tools can't be switched off here.
   2. which of the picked tools are required on this machine.
 
-With gum (installed first, priority: high): checkbox lists, arrows to
-move, Space = on/off, Enter = done, Esc = cancel (nothing changes).
+With gum (installed first, priority: high): checkbox lists, with gum's
+keys shown under each list (x toggles, Enter = done); Esc = cancel
+(nothing changes).
 Without gum: numbered lists, [x] = on, [R] = required; type numbers to
 switch (1 3 5, 2-4, a = all), Enter = continue.
 
@@ -3403,9 +3404,9 @@ _state_text() {
 }
 
 # ─── gum lists (#82) ────────────────────────────────────────────────────
-# With gum (and a terminal), the interactive screens are checkbox lists:
-# arrows move, Space toggles, Enter is done. Without it, the numbered
-# screens below. Only options every gum version here has (Debian 0.14).
+# With gum (and a terminal), the interactive screens are checkbox lists;
+# gum shows its keys under the list (they differ between versions).
+# Without it, the numbered screens below. Only options every gum version here has (Debian 0.14).
 _use_gum() {
   command -v gum >/dev/null 2>&1 && { true </dev/tty; } 2>/dev/null
 }
@@ -3482,7 +3483,7 @@ _screen_tools() {
         checked="${checked:+$checked,}$row"
       fi
     done
-    if ! chosen="$(_gum_pick "Tools used here (Space = on/off, Enter = done; required ones stay on)" "$checked" "${rows[@]}")"; then
+    if ! chosen="$(_gum_pick "Tools used here (keys below; required ones stay on)" "$checked" "${rows[@]}")"; then
       ui "Cancelled; nothing changed."
       return 0
     fi
@@ -3550,7 +3551,7 @@ _screen_tools() {
           req_checked="${req_checked:+$req_checked,}${names[i]}"
         fi
       done
-      if ! req_chosen="$(_gum_pick "Required here (unlink and this screen keep them)" "$req_checked" "${req_rows[@]}")"; then
+      if ! req_chosen="$(_gum_pick "Required here: unlink and this screen keep them (keys below)" "$req_checked" "${req_rows[@]}")"; then
         ui "Cancelled; nothing changed."
         return 0
       fi
@@ -3709,7 +3710,7 @@ _interactive_unlink() {
     if [[ -n $kept ]]; then
       ui "Required, not listed (unlink --force <tool>): $kept"
     fi
-    if ! chosen="$(_gum_pick "Unlink and remove (Space = pick, Enter = done)" "" "${rows[@]}")"; then
+    if ! chosen="$(_gum_pick "Unlink and remove (keys below)" "" "${rows[@]}")"; then
       ui "Cancelled; nothing changed."
       return 0
     fi
