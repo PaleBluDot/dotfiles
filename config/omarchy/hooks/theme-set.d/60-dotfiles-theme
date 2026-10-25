@@ -1,10 +1,11 @@
 #!/bin/bash
-# Omarchy theme-set hook (also run by dotfiles on machines without Omarchy,
-# after it renders the templates): point starship, bat and tmux at the new
-# theme. $1 = the theme's slug (sonic-night).
+# Omarchy theme-set hook (also run by bin/theme-set on machines without
+# Omarchy, after it renders the templates): point starship, bat and tmux at
+# the new theme. $1 = the theme's slug (sonic-night).
 #
-# Templates in ~/.config/omarchy/themed/ are already rendered into
-# ~/.local/state/omarchy/current/theme/ when this runs.
+# The templates are already rendered into ~/.local/state/omarchy/current/theme/
+# when this runs. DOTFILES_THEME_NO_RELOAD=1 (theme-set --no-reload) leaves a
+# running tmux alone.
 
 theme="${1:-}"
 THEME_DIR="$HOME/.local/state/omarchy/current/theme"
@@ -15,6 +16,19 @@ CACHE="${XDG_CACHE_HOME:-$HOME/.cache}"
 color() {
   awk -F'"' -v key="$1" '$0 ~ "^" key "[[:space:]]*=" { print $2; exit }' "$COLORS"
 }
+
+# ─── extra templates ─────────────────────────────────────────────────────
+# After omarchy-theme-set: render the templates Omarchy doesn't ship (bat,
+# tmux, ...) for the tools installed here (config/theme/tools). bin/theme-set
+# sets DOTFILES_THEME_SET=1 when it runs this hook: it rendered them already.
+# The repo is four folders up from this file's real location.
+if [[ ${DOTFILES_THEME_SET:-} != 1 ]]; then
+  hook_dir="$(cd "$(dirname "$0")" && pwd -P)"
+  setter="$hook_dir/../../../../bin/theme-set"
+  if [[ -f $setter ]]; then
+    bash "$setter" --extras --quiet || true
+  fi
+fi
 
 # ─── starship ────────────────────────────────────────────────────────────
 # ~/.config/starship/starship.toml (the repo file, through the link) has one
@@ -59,6 +73,6 @@ fi
 
 # ─── tmux ────────────────────────────────────────────────────────────────
 # A running tmux re-reads its config, which sources the rendered tmux.conf.
-if command -v tmux >/dev/null 2>&1 && tmux list-sessions >/dev/null 2>&1; then
+if [[ ${DOTFILES_THEME_NO_RELOAD:-} != 1 ]] && command -v tmux >/dev/null 2>&1 && tmux list-sessions >/dev/null 2>&1; then
   tmux source-file "$HOME/.config/tmux/tmux.conf" >/dev/null 2>&1 || true
 fi
