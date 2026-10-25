@@ -4448,6 +4448,25 @@ main() {
 
   resolve_dotfiles
   detect_os
+  # Not a command: say so and show the help before anything is read or
+  # written (a typo used to write config.yml first).
+  case "$cmd" in
+    interactive | link | unlink | update | wipe | status | doctor | help) ;;
+    install | uninstall)
+      log error "'$cmd' is gone: use 'dotfiles link' (installs and links) or 'dotfiles unlink' (removes and unlinks)"
+      exit 2
+      ;;
+    default)
+      log error "'default' is gone (#51): pick the tools for this machine with 'dotfiles' or 'dotfiles link <tool>'"
+      exit 2
+      ;;
+    *)
+      log error "unknown command: $cmd"
+      _title
+      cmd_help
+      exit 2
+      ;;
+  esac
   # From curl | bash there is no file on disk: clone first (plan Section 2).
   if [[ $RUNNING_FROM_FILE != true ]]; then
     _bootstrap
@@ -4482,18 +4501,6 @@ main() {
     status)    cmd_status "$@" ;;
     doctor)    cmd_doctor "$@" ;;
     help)      cmd_help "$@" ;;
-    install | uninstall)
-      log error "'$cmd' is gone: use 'dotfiles link' (installs and links) or 'dotfiles unlink' (removes and unlinks)"
-      exit 2
-      ;;
-    default)
-      log error "'default' is gone (#51): pick the tools for this machine with 'dotfiles' or 'dotfiles link <tool>'"
-      exit 2
-      ;;
-    *)
-      log error "unknown command: $cmd (see: dotfiles.sh help)"
-      exit 2
-      ;;
   esac
 }
 
