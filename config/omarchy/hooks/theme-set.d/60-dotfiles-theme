@@ -13,6 +13,17 @@ THEME_DIR="$HOME/.local/state/omarchy/current/theme"
 COLORS="$THEME_DIR/colors.toml"
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}"
 
+# The repo: four folders up from this hook (Omarchy runs it through a link).
+src="${BASH_SOURCE[0]}"
+while [[ -L $src ]]; do
+  target="$(readlink "$src")"
+  case "$target" in
+    /*) src="$target" ;;
+    *)  src="$(dirname "$src")/$target" ;;
+  esac
+done
+DOTFILES="$(cd "$(dirname "$src")/../../../.." && pwd -P)"
+
 # One colour from colors.toml: key = "#rrggbb".
 color() {
   awk -F'"' -v key="$1" '$0 ~ "^" key "[[:space:]]*=" { print $2; exit }' "$COLORS"
@@ -33,12 +44,16 @@ fi
 
 # ─── starship ────────────────────────────────────────────────────────────
 # ~/.config/starship/starship.toml (the repo file, through the link) has one
-# [palettes.<theme>] per theme. A theme without one gets it here, built from
-# its colors.toml (a repo change to commit). starship reads a copy with
+# [palettes.<theme>] per theme. One of our own themes (in
+# config/omarchy/themes, not a cloned third-party repo) without one gets it
+# here, built from its colors.toml (a repo change to commit). Stock and
+# third-party themes get none and use starburst. starship reads a copy with
 # palette = "<theme>"; .zshenv redoes the copy when starship.toml changes.
 starship_src="$HOME/.config/starship/starship.toml"
+own_theme="$DOTFILES/config/omarchy/themes/$theme"
 if [[ -n $theme && -f $starship_src ]]; then
-  if [[ -f $COLORS ]] && ! grep -q "^\[palettes\.$theme\]" "$starship_src"; then
+  if [[ -f $COLORS && -f $own_theme/colors.toml && ! -e $own_theme/.git ]] &&
+    ! grep -q "^\[palettes\.$theme\]" "$starship_src"; then
     {
       printf '\n[palettes.%s]\n' "$theme"
       printf 'os = "%s"\n' "$(color accent)"

@@ -5,9 +5,10 @@
 # on Omarchy, the current theme's (dotfiles writes a copy of this file with
 # palette = "<theme>" to ~/.cache/starship/starship.toml on every theme
 # change; STARSHIP_CONFIG points there); elsewhere, settings.theme in
-# config.yml (default starburst). Setting an Omarchy theme with no palette
-# here adds one, built from its colors.toml. Without the copy, palette below
-# is used.
+# config.yml (default starburst). Setting one of our own Omarchy themes
+# (config/omarchy/themes) with no palette here adds one, built from its
+# colors.toml; stock and third-party themes use starburst. Without the copy,
+# palette below is used.
 #
 # Palette keys: os (first segment), os_text (its text), user, directory,
 # git, language, docker, time, root (username when root).
