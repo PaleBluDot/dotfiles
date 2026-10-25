@@ -104,6 +104,8 @@ Omarchy: `--extras`, from the hook).
 
 - **iTerm2:** `.itermcolors` needs each colour as fractions (0–1), which the
   variables can't give yet.
-- **gitlogue:** only built-in themes, no custom theme files.
+- **gitlogue:** only built-in themes, no custom theme files. Its config sets
+  `background = false`, so the terminal's themed background shows through
+  (the syntax colours stay tokyo-night).
 - **Terminal.app:** its profile format stores archived colour objects, not
   plain values.

@@ -8,7 +8,9 @@ theme = "tokyo-night"
 speed = 30
 
 # Show background colors (set to false for transparent background)
-background = true
+# Off: gitlogue has no custom themes, so the terminal's (themed) background
+# shows through instead of the theme's own.
+background = false
 
 # Commit playback order: random, asc, or desc
 order = "random"
