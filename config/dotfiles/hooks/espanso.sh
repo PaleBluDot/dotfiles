@@ -4,9 +4,10 @@
 # interactive). Arch, Mac and Windows get espanso from package: in
 # dotfiles.yml; Debian and Fedora have no package, so this installs it
 # first (Fedora from the Terra repo, Debian from the latest GitHub
-# release). Makes espanso start at boot: registers it as a service (a
-# systemd user service on Linux, a LaunchAgent on macOS, a startup entry on
-# Windows) and runs it as that service. Also checks that
+# release; update installs a newer one over it). Makes espanso start at
+# boot: registers it as a service (a systemd user service on Linux, a
+# LaunchAgent on macOS, a startup entry on Windows) and runs it as that
+# service. Also checks that
 # espanso reads the linked repo config: it reads ~/.espanso first when
 # that exists.
 #
@@ -49,7 +50,7 @@ fi
 # the Wayland one's postinst gives espanso the capability it needs to read
 # the keyboard).
 install_espanso() {
-  local tag asset
+  local tag
   case "${DOTFILES_PLATFORM:-}" in
     debian | fedora) ;;
     *)
@@ -83,30 +84,90 @@ install_espanso() {
     echo "next: install espanso (needs curl): https://github.com/espanso/espanso/releases/latest"
     return 0
   fi
-  asset="espanso-debian-$session-amd64.deb"
   if [[ $dry == true ]]; then
     echo "dry run, would install the latest espanso release from github.com/espanso/espanso ($asset)"
     return 0
   fi
-  # The latest release's tag, from the redirect of /releases/latest.
-  tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/espanso/espanso/releases/latest)"
-  tag="${tag##*/}"
-  if [[ $tag != v* ]]; then
+  tag="$(latest_tag)"
+  if [[ -z $tag ]]; then
     echo "espanso: couldn't find the latest release on GitHub" >&2
     return 1
   fi
+  fetch_deb "$tag"
+  echo "espanso: installed $tag ($asset)"
+}
+
+# The Debian .deb for the session.
+asset="espanso-debian-$session-amd64.deb"
+
+# The latest release's tag (v1.2.3), from the redirect of /releases/latest;
+# nothing when GitHub can't be reached.
+latest_tag() {
+  local tag
+  tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/espanso/espanso/releases/latest 2>/dev/null)" || return 0
+  tag="${tag##*/}"
+  if [[ $tag == v* ]]; then
+    echo "$tag"
+  fi
+}
+
+# Downloads release $1's .deb and installs it with apt.
+fetch_deb() {
+  local tag="$1"
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' EXIT
-  curl -fsSL -o "$tmp/$asset" "https://github.com/espanso/espanso/releases/download/$tag/$asset"
+  curl -fsSL -o "$tmp/$asset" "https://github.com/espanso/espanso/releases/download/$tag/$asset" || return 1
   # Readable by apt's own user: no "Download is performed unsandboxed" note.
   chmod 755 "$tmp"
   chmod 644 "$tmp/$asset"
   # The Wayland postinst runs setcap and fails without it.
   if [[ $session == wayland ]] && ! command -v setcap >/dev/null 2>&1; then
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q libcap2-bin >/dev/null
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q libcap2-bin >/dev/null || return 1
   fi
-  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q "$tmp/$asset" >/dev/null
-  echo "espanso: installed $tag ($asset)"
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q "$tmp/$asset" >/dev/null || return 1
+}
+
+# dotfiles update on Debian, espanso from the GitHub .deb (Fedora's Terra
+# package updates with dnf): a newer release goes over it, and a running
+# espanso restarts on it. GitHub out of reach = a warning, the rest still
+# runs.
+update_espanso() {
+  local installed="" tag pkg
+  if [[ $(uname -m) != x86_64 ]] || ! command -v curl >/dev/null 2>&1; then
+    return 0
+  fi
+  # The .deb installed (espanso-wayland or espanso-x11) stays the one.
+  for pkg in espanso-wayland espanso-x11; do
+    if installed="$(dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null)" && [[ -n $installed ]]; then
+      asset="espanso-debian-${pkg#espanso-}-amd64.deb"
+      break
+    fi
+  done
+  if [[ -z $installed ]]; then
+    return 0
+  fi
+  # 2.3.0-1: the Debian revision off.
+  installed="v${installed%-*}"
+  tag="$(latest_tag)"
+  if [[ -z $tag ]]; then
+    echo "espanso: couldn't check GitHub for a newer release; skipped"
+    return 0
+  fi
+  if [[ $(printf '%s\n' "$tag" "$installed" | sort -V | tail -n 1) == "$installed" ]]; then
+    return 0
+  fi
+  if [[ $dry == true ]]; then
+    echo "dry run, would update espanso $installed -> $tag"
+    return 0
+  fi
+  if ! fetch_deb "$tag"; then
+    echo "espanso: couldn't install $tag; still on $installed"
+    return 0
+  fi
+  if espanso status >/dev/null 2>&1; then
+    espanso restart >/dev/null 2>&1 || true
+  fi
+  echo "espanso: updated $installed -> $tag"
 }
 
 if ! command -v espanso >/dev/null 2>&1; then
@@ -114,6 +175,8 @@ if ! command -v espanso >/dev/null 2>&1; then
   if [[ $dry == true ]] || ! command -v espanso >/dev/null 2>&1; then
     exit 0
   fi
+elif [[ ${DOTFILES_COMMAND:-} == update && ${DOTFILES_PLATFORM:-} == debian ]]; then
+  update_espanso
 fi
 
 physical() {
