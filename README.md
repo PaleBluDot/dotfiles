@@ -36,7 +36,7 @@ dotfiles unlink [tool…]   remove tools and their links (no tool = pick from a 
 dotfiles update           pull the repo, install what's missing, relink
 dotfiles wipe             undo everything dotfiles set up here (to test again)
 dotfiles status [tool]
-dotfiles doctor           check (and fix) what dotfiles needs
+dotfiles doctor [tool]    check (and fix) what dotfiles needs (one tool: only its checks)
 dotfiles help [command]
 ```
 
