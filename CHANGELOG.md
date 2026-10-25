@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.17.0](https://github.com/PaleBluDot/dotfiles/compare/v2.16.0...v2.17.0) (2026-10-25)
+
+
+### Features
+
+* **config:** espanso private from 1Password ([#85](https://github.com/PaleBluDot/dotfiles/issues/85)) ([fcaec29](https://github.com/PaleBluDot/dotfiles/commit/fcaec299ec8105d05505524cbf6ed3357c5cfffa)), closes [#84](https://github.com/PaleBluDot/dotfiles/issues/84)
+
 # [2.16.0](https://github.com/PaleBluDot/dotfiles/compare/v2.15.1...v2.16.0) (2026-10-25)
 
 
