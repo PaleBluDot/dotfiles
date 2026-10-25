@@ -1579,7 +1579,7 @@ the end.
   --required  add the named tools to required: in config.yml
 
 Examples:
-  dotfiles link -dv neovim fd
+  dotfiles link -dv nvim fd
   dotfiles link --required git
 EOF
       ;;
@@ -1685,14 +1685,14 @@ dotfiles status [tool] [-v]
 
   dotfiles status          every tool used here: CONFIG (required, tools
                            or - for not in config.yml), INSTALLED, LINKED
-  dotfiles status neovim   one tool: package, command, where it's installed,
+  dotfiles status nvim   one tool: package, command, where it's installed,
                            version, its hook, and each link (source,
                            symlink, problem)
 
 Changes nothing.
 
 Example:
-  dotfiles status neovim
+  dotfiles status nvim
 EOF
       ;;
     doctor)
@@ -3284,7 +3284,7 @@ ANSWER=""
 # Interactive mode reads answers from the terminal.
 _require_tty() {
   if ! { true </dev/tty; } 2>/dev/null; then
-    log error "interactive mode needs a terminal; name tools instead, e.g. dotfiles link neovim"
+    log error "interactive mode needs a terminal; name tools instead, e.g. dotfiles link nvim"
     exit 1
   fi
 }
@@ -4257,7 +4257,7 @@ _doctor_yml_problems() {
     ($v.priority | select(. != null and . != "high") | $t + "\tpriority: " + (. | tostring) + " (only high exists)"),
     (($v.package, $v.command) | select(tag == "!!map") | keys | .[] | select(. != "arch" and . != "debian" and . != "fedora" and . != "mac" and . != "windows" and . != "linux" and . != "all") | $t + "\tunknown platform " + . + ": (arch, debian, fedora, mac, windows, linux, all)"),
     ($v.links | select(tag == "!!map") | to_entries | .[] | .key as $s | .value | select(tag == "!!map") | keys | .[] | select(. != "arch" and . != "debian" and . != "fedora" and . != "mac" and . != "windows" and . != "linux" and . != "all") | $t + "\tlink " + $s + ": unknown platform " + .),
-    ($v.links | select(tag == "!!map") | to_entries | .[] | .key as $s | (.value | select(tag == "!!str")), (.value | select(tag == "!!map") | .[] | select(. != null)) | select(test("^(\$HOME/|\$\{HOME\}/|~/|/)") | not) | $t + "\tlink " + $s + ": dest " + . + " must start with $HOME/, ~/ or /"),
+    ($v.links | select(tag == "!!map") | to_entries | .[] | .key as $s | ((.value | select(tag == "!!str")), (.value | select(tag == "!!map") | .[] | select(. != null))) | select(test("^(\$HOME/|\$\{HOME\}/|~/|/)") | not) | $t + "\tlink " + $s + ": dest " + . + " must start with $HOME/, ~/ or /"),
     ($v.links | select(. != null and tag != "!!map") | $t + "\tlinks: must be a map (path: dest), not " + (. | tag)),
     ($v.clone | select(. != null and tag != "!!map") | $t + "\tclone: must be a map (owner/repo: dest), not " + (. | tag)) )' 2>/dev/null
 }
@@ -4448,6 +4448,25 @@ main() {
 
   resolve_dotfiles
   detect_os
+  # Not a command: say so and show the help before anything is read or
+  # written (a typo used to write config.yml first).
+  case "$cmd" in
+    interactive | link | unlink | update | wipe | status | doctor | help) ;;
+    install | uninstall)
+      log error "'$cmd' is gone: use 'dotfiles link' (installs and links) or 'dotfiles unlink' (removes and unlinks)"
+      exit 2
+      ;;
+    default)
+      log error "'default' is gone (#51): pick the tools for this machine with 'dotfiles' or 'dotfiles link <tool>'"
+      exit 2
+      ;;
+    *)
+      log error "unknown command: $cmd"
+      _title
+      cmd_help
+      exit 2
+      ;;
+  esac
   # From curl | bash there is no file on disk: clone first (plan Section 2).
   if [[ $RUNNING_FROM_FILE != true ]]; then
     _bootstrap
@@ -4482,18 +4501,6 @@ main() {
     status)    cmd_status "$@" ;;
     doctor)    cmd_doctor "$@" ;;
     help)      cmd_help "$@" ;;
-    install | uninstall)
-      log error "'$cmd' is gone: use 'dotfiles link' (installs and links) or 'dotfiles unlink' (removes and unlinks)"
-      exit 2
-      ;;
-    default)
-      log error "'default' is gone (#51): pick the tools for this machine with 'dotfiles' or 'dotfiles link <tool>'"
-      exit 2
-      ;;
-    *)
-      log error "unknown command: $cmd (see: dotfiles.sh help)"
-      exit 2
-      ;;
   esac
 }
 
