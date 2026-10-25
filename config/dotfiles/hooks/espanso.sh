@@ -183,6 +183,13 @@ physical() {
   (cd -P "$1" 2>/dev/null && pwd -P) || echo "$1"
 }
 
+# No config folder yet: nothing linked here. Checked before asking espanso,
+# which would make an empty ~/.config/espanso in the link's place.
+if [[ ! -e $HOME/.espanso && ! -d $HOME/.config/espanso/config ]]; then
+  echo "next: espanso has no config yet; run: dotfiles link espanso"
+  exit 0
+fi
+
 # espanso takes the first of ~/.espanso, ~/.config/espanso, then the OS
 # default (~/Library/Application Support/espanso on macOS) that exists.
 if ! config="$(espanso path config 2>/dev/null)" || [[ -z $config ]]; then
