@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.6.0](https://github.com/PaleBluDot/dotfiles/compare/v2.5.2...v2.6.0) (2026-10-25)
+
+
+### Features
+
+* **script:** theme setter ([#62](https://github.com/PaleBluDot/dotfiles/issues/62)) ([13fc485](https://github.com/PaleBluDot/dotfiles/commit/13fc4853e353d3c4b672b59deb8a04f39c171367)), closes [#40](https://github.com/PaleBluDot/dotfiles/issues/40) [#29](https://github.com/PaleBluDot/dotfiles/issues/29) [#31](https://github.com/PaleBluDot/dotfiles/issues/31)
+
 ## [2.5.2](https://github.com/PaleBluDot/dotfiles/compare/v2.5.1...v2.5.2) (2026-10-24)
 
 
