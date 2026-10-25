@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.8.0](https://github.com/PaleBluDot/dotfiles/compare/v2.7.0...v2.8.0) (2026-10-25)
+
+
+### Features
+
+* **config:** vs code themes ([#68](https://github.com/PaleBluDot/dotfiles/issues/68)) ([5123962](https://github.com/PaleBluDot/dotfiles/commit/5123962158e5946e06a55cdbc70cabe97eb9362e)), closes [#29](https://github.com/PaleBluDot/dotfiles/issues/29) [#62](https://github.com/PaleBluDot/dotfiles/issues/62) [#62](https://github.com/PaleBluDot/dotfiles/issues/62) [#67](https://github.com/PaleBluDot/dotfiles/issues/67)
+
 # [2.7.0](https://github.com/PaleBluDot/dotfiles/compare/v2.6.0...v2.7.0) (2026-10-25)
 
 
