@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.13.1](https://github.com/PaleBluDot/dotfiles/compare/v2.13.0...v2.13.1) (2026-10-25)
+
+
+### Bug Fixes
+
+* **config:** 1password prompt border ([#75](https://github.com/PaleBluDot/dotfiles/issues/75)) ([2179634](https://github.com/PaleBluDot/dotfiles/commit/2179634332df55a612017837e459cbab0122e8f7)), closes [#73](https://github.com/PaleBluDot/dotfiles/issues/73)
+
 # [2.13.0](https://github.com/PaleBluDot/dotfiles/compare/v2.12.0...v2.13.0) (2026-10-25)
 
 
