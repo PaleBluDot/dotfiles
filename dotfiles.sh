@@ -382,7 +382,7 @@ load_settings() {
   fi
   _cfg_load
   case "$LOG_CMD" in
-    help | version) ;;
+    help) ;;
     *) _config_migrate ;;
   esac
   _machine_load
@@ -1719,16 +1719,7 @@ EOF
 dotfiles help [command]
 
 Show the overview, or help for one command:
-  link, unlink, interactive, update, wipe, status, doctor, help, version
-EOF
-      ;;
-    version)
-      cat <<'EOF'
-dotfiles version
-
-Print the release this repo is at: its latest git tag (e.g. v2.1.7), which
-the release workflow creates. Before the repo is cloned, the newest tag on
-GitHub; offline, "unknown".
+  link, unlink, interactive, update, wipe, status, doctor, help
 EOF
       ;;
     *)
@@ -1753,7 +1744,6 @@ Commands:
   status [tool]         what's installed and linked
   doctor                check (and fix) what dotfiles needs
   help [command]        this overview, or help for one command
-  version               print the version
 
 Flags (work anywhere on the line):
   -d, --dry-run         show what would happen, change nothing
@@ -1762,6 +1752,9 @@ Flags (work anywhere on the line):
                         unlink: also required tools
   --required            link: add the tools to required: in config.yml
   --no-color            the banner without colour (interactive, update)
+  --version             print "dotfiles <version>" and stop: the latest git
+                        tag (e.g. v2.1.7); before the clone, the newest tag
+                        on GitHub; offline, "unknown"
   Short flags combine: -dv
 
 The interactive setup and update start with a "dotfiles" banner on a
@@ -1796,10 +1789,6 @@ _version() {
       head -n 1 | sed 's|.*refs/tags/||')" || tag=""
   fi
   echo "${tag:-unknown}"
-}
-
-cmd_version() {
-  echo "dotfiles $(_version)"
 }
 
 # One line with the version, for help, status and doctor.
@@ -4428,6 +4417,16 @@ main() {
     *":$HOME/.local/bin:"*) ;;
     *) PATH="$HOME/.local/bin:$PATH" ;;
   esac
+  # --version (anywhere on the line): one line and stop, before the log,
+  # config.yml or the package cache, so it's quick and changes nothing.
+  local arg
+  for arg in "$@"; do
+    if [[ $arg == --version ]]; then
+      resolve_dotfiles
+      echo "dotfiles $(_version)"
+      exit 0
+    fi
+  done
   init_log
   _log_to_file "DEBUG" "──── run start: dotfiles.sh, args: $*"
 
@@ -4464,12 +4463,12 @@ main() {
     load_settings
   fi
   case "$cmd" in
-    help | version) ;;
+    help) ;;
     *) pkg_cache_load ;;
   esac
   # config.yml follows what's installed (doctor does it after its checks).
   case "$cmd" in
-    help | version | doctor) ;;
+    help | doctor) ;;
     *) _config_sync ;;
   esac
   warn_unused_flags "$cmd"
@@ -4483,7 +4482,6 @@ main() {
     status)    cmd_status "$@" ;;
     doctor)    cmd_doctor "$@" ;;
     help)      cmd_help "$@" ;;
-    version)   cmd_version "$@" ;;
     install | uninstall)
       log error "'$cmd' is gone: use 'dotfiles link' (installs and links) or 'dotfiles unlink' (removes and unlinks)"
       exit 2
