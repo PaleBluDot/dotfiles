@@ -30,7 +30,7 @@ or the config symlinks can't be made.
 ## Use
 
 ```text
-dotfiles                  interactive setup
+dotfiles                  interactive setup (checkbox lists with gum)
 dotfiles link [tool…]     install tools and link their configs (no tool = all in config.yml)
 dotfiles unlink [tool…]   remove tools and their links (no tool = pick from a list)
 dotfiles update           pull the repo, install what's missing, relink
