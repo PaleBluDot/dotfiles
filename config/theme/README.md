@@ -85,12 +85,12 @@ Helpers (Omarchy's renderer and `theme-set` both have them):
 | `pi.json.tpl` | pi | Omarchy |
 | `shell.toml.tpl` | Omarchy shell | Omarchy |
 | `starship-palette.toml.tpl` | starship, appended as `[palettes.<theme>]` | new |
-| `superfile.toml.tpl` | superfile, `~/.config/superfile/theme/omarchy.toml` | new |
+| `superfile.toml.tpl` | superfile, linked in as `~/.config/superfile/theme/omarchy.toml` | dotfiles |
 | `t3code.json.tpl` | t3code | Omarchy |
 | `tmux.conf.tpl` | tmux, `source-file -q` from `tmux.conf` | dotfiles |
 | `vscode-theme.json.tpl` | VS Code (as a local theme extension) | Omarchy |
 | `warp.yaml.tpl` | Warp custom theme | new |
-| `wezterm.lua.tpl` | WezTerm, `config.colors = dofile(...)` | new |
+| `wezterm.lua.tpl` | WezTerm, `config.colors = dofile(...)` | dotfiles |
 | `windows-terminal.json.tpl` | Windows Terminal colour scheme (`schemes`) | new |
 | `yazi-theme.toml.tpl` | yazi, `~/.config/yazi/theme.toml` (yazi's default layout, theme colours) | new |
 | `zellij.kdl.tpl` | zellij, `~/.config/zellij/themes/omarchy.kdl` | new |
@@ -104,6 +104,8 @@ Omarchy: `--extras`, from the hook).
 
 - **iTerm2:** `.itermcolors` needs each colour as fractions (0–1), which the
   variables can't give yet.
-- **gitlogue:** only built-in themes, no custom theme files.
+- **gitlogue:** only built-in themes, no custom theme files. Its config sets
+  `background = false`, so the terminal's themed background shows through
+  (the syntax colours stay tokyo-night).
 - **Terminal.app:** its profile format stores archived colour objects, not
   plain values.
