@@ -95,7 +95,9 @@ fi
 # ─── VS Code ─────────────────────────────────────────────────────────────
 # Rebuilds the local.dotfiles-themes extension when a theme's colours
 # changed (a no-op otherwise). Omarchy's own VS Code step ran before this
-# hook and already set workbench.colorTheme from the theme's vscode.json.
+# hook and already set workbench.colorTheme from the theme's vscode.json;
+# without Omarchy, bin/theme-set does that after this hook (the extension
+# is installed by then).
 if [[ -f $DOTFILES/config/dotfiles/hooks/vscode.sh ]]; then
   bash "$DOTFILES/config/dotfiles/hooks/vscode.sh" >/dev/null 2>&1 || true
 fi

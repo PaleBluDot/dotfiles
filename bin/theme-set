@@ -3,8 +3,8 @@
 # Ubuntu, macOS). Fills every template in config/theme/templates/ from the
 # theme's config/omarchy/themes/<slug>/colors.toml into the folder Omarchy
 # uses (~/.local/state/omarchy/current/theme/), so every tool reads one place,
-# then runs the after-steps (starship palette, bat cache, tmux and terminal
-# reload). A template renders only when its tool is installed: see
+# then runs the after-steps (starship palette, bat cache, VS Code colour theme,
+# tmux and terminal reload). A template renders only when its tool is installed: see
 # config/theme/tools. On a machine with Omarchy it hands the theme to
 # omarchy-theme-set, whose theme-set hook (60-dotfiles-theme) then runs
 # theme-set --extras for the templates Omarchy doesn't ship.
@@ -434,6 +434,119 @@ reload_programs() {
   fi
 }
 
+# ─── VS Code ─────────────────────────────────────────────────────────────
+# What omarchy-theme-set-vscode does on Omarchy: the theme's vscode.json
+# ({"name": "...", "extension": "..."}) names a colour theme and the
+# extension it comes from; that extension gets installed, the name goes into
+# workbench.colorTheme. local.dotfiles-themes is built and installed by
+# config/dotfiles/hooks/vscode.sh, which the hook ran just before this. A
+# theme without vscode.json leaves VS Code alone. Here, not in the hook: on
+# Omarchy the hook runs too, after Omarchy's own VS Code step.
+
+# One field from vscode.json (no jq: theme-set doesn't need it elsewhere).
+json_field() {
+  sed -n 's/.*"'"$1"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$2" | head -n 1
+}
+
+# The editors here, one "<command>|<settings.json>" line each.
+vscode_editors() {
+  local name cmd app user
+  for name in code code-insiders; do
+    cmd="$(command -v "$name" 2>/dev/null)" || cmd=""
+    app="Visual Studio Code"
+    user="Code"
+    if [ "$name" = code-insiders ]; then
+      app="Visual Studio Code - Insiders"
+      user="Code - Insiders"
+    fi
+    if [ "$(uname -s)" = Darwin ]; then
+      # The app's own CLI when "Install 'code' command in PATH" wasn't run.
+      if [ -z "$cmd" ] && [ -x "/Applications/$app.app/Contents/Resources/app/bin/$name" ]; then
+        cmd="/Applications/$app.app/Contents/Resources/app/bin/$name"
+      fi
+      user="$HOME/Library/Application Support/$user/User"
+    else
+      user="${XDG_CONFIG_HOME:-$HOME/.config}/$user/User"
+    fi
+    if [ -n "$cmd" ]; then
+      printf '%s|%s\n' "$cmd" "$user/settings.json"
+    fi
+  done
+}
+
+# settings.json is JSONC (comments, trailing commas), so it's edited as text,
+# as Omarchy does: the "workbench.colorTheme" value is replaced, or the key
+# goes in after the first {. Everything else stays as it is. Written through
+# a temp file and cat, so BSD sed is fine and a linked settings.json stays a
+# link.
+set_color_theme() {
+  local settings="$1" label="$2" tmp
+  if [ ! -s "$settings" ]; then
+    mkdir -p "$(dirname "$settings")" || return 1
+    printf '{\n  "workbench.colorTheme": "%s"\n}\n' "$label" >"$settings"
+    return
+  fi
+  tmp="$(mktemp "${TMPDIR:-/tmp}/theme-set.XXXXXX")" || return 1
+  LABEL="$label" awk '
+    BEGIN { key = "\"workbench\\.colorTheme\"[ \t]*:[ \t]*\"[^\"]*\""; new = "\"workbench.colorTheme\": \"" ENVIRON["LABEL"] "\"" }
+    { lines[NR] = $0 }
+    !found && $0 !~ /^[ \t]*\/\// && match($0, key) { found = NR; at = RSTART; len = RLENGTH }
+    !brace && $0 !~ /^[ \t]*\/\// && index($0, "{") { brace = NR }
+    END {
+      for (i = 1; i <= NR; i++) {
+        if (i == found) print substr(lines[i], 1, at - 1) new substr(lines[i], at + len)
+        else if (!found && i == brace) {
+          # After the {, on a line of its own ("{}" becomes three lines).
+          b = index(lines[i], "{"); rest = substr(lines[i], b + 1)
+          print substr(lines[i], 1, b)
+          print "  " new ","
+          if (rest ~ /[^ \t]/) print rest
+        } else print lines[i]
+      }
+    }
+  ' "$settings" >"$tmp" || { rm -f "$tmp"; return 1; }
+  if ! cmp -s "$tmp" "$settings"; then
+    cat "$tmp" >"$settings" || { rm -f "$tmp"; return 1; }
+  fi
+  rm -f "$tmp"
+}
+
+vscode_theme() {
+  local desc="$THEMES_DIR/$THEME/vscode.json" label ext line cmd settings
+  [ -f "$desc" ] || return 0
+  label="$(json_field name "$desc")"
+  ext="$(json_field extension "$desc")"
+  case "$label" in
+    "" | *[\"\\]*)
+      warn "$THEME: vscode.json needs a \"name\" without quotes or backslashes"
+      return 0
+      ;;
+  esac
+  # A malformed id skips the install, not the colorTheme write (as Omarchy).
+  case "$ext" in
+    "" | *[!A-Za-z0-9._-]*) ext="" ;;
+  esac
+  vscode_editors | while IFS= read -r line; do
+    cmd="${line%%|*}"
+    settings="${line#*|}"
+    if [ -n "$ext" ] && [ "$ext" != local.dotfiles-themes ] &&
+      ! "$cmd" --list-extensions 2>/dev/null | grep -Fxiq "$ext"; then
+      if [ "$DRY_RUN" = true ]; then
+        say "would install $ext with $cmd"
+      elif ! "$cmd" --install-extension "$ext" >/dev/null 2>&1; then
+        warn "VS Code: installing $ext with $cmd failed"
+      fi
+    fi
+    if [ "$DRY_RUN" = true ]; then
+      say "would set workbench.colorTheme to \"$label\" in $settings"
+    elif set_color_theme "$settings" "$label"; then
+      say "VS Code: $label ($settings)"
+    else
+      warn "VS Code: can't write $settings"
+    fi
+  done
+}
+
 apply_theme() {
   local colors="$THEMES_DIR/$THEME/colors.toml" previous
   if [ ! -f "$colors" ]; then
@@ -455,6 +568,7 @@ apply_theme() {
     if [ "$RELOAD" = true ]; then
       say "would reload running terminals (alacritty, kitty, ghostty)"
     fi
+    vscode_theme
     return 0
   fi
 
@@ -479,8 +593,14 @@ apply_theme() {
   previous="$(current_theme)"
   printf '%s\n' "$THEME" >"$STATE_DIR/theme.name.$$" && mv "$STATE_DIR/theme.name.$$" "$STATE_DIR/theme.name"
 
-  # The same hook Omarchy runs after a theme change (starship, bat, tmux).
-  # DOTFILES_THEME_SET=1: everything is rendered, no --extras run needed.
+  # The same hook Omarchy runs after a theme change (starship, bat, tmux,
+  # the local VS Code themes). DOTFILES_THEME_SET=1: everything is rendered,
+  # no --extras run needed. DOTFILES_PLATFORM=mac: vscode.sh looks for the
+  # app's own CLI too, as it does under dotfiles.sh.
+  if [ "$(uname -s)" = Darwin ]; then
+    DOTFILES_PLATFORM="${DOTFILES_PLATFORM:-mac}"
+    export DOTFILES_PLATFORM
+  fi
   if [ -f "$HOOK" ]; then
     if [ "$RELOAD" = true ]; then
       DOTFILES_THEME_SET=1 bash "$HOOK" "$THEME"
@@ -488,6 +608,7 @@ apply_theme() {
       DOTFILES_THEME_SET=1 DOTFILES_THEME_NO_RELOAD=1 bash "$HOOK" "$THEME"
     fi
   fi
+  vscode_theme
   if [ "$RELOAD" = true ]; then
     reload_programs
   fi
