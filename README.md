@@ -57,8 +57,9 @@ theme-set -n <theme>      dry run: render to a temp folder, change nothing
 `dotfiles.sh`: it fills [`config/theme/templates/`](config/theme) (for the
 tools installed here) from the theme's
 `config/omarchy/themes/<theme>/colors.toml` into
-`~/.local/state/omarchy/current/theme/`, then points starship and bat at it
-and reloads tmux and the terminals. With Omarchy installed it runs
+`~/.local/state/omarchy/current/theme/`, then points starship and bat at it,
+switches VS Code to the theme's colour theme (its `vscode.json`) and reloads
+tmux and the terminals. With Omarchy installed it runs
 `omarchy-theme-set` instead. On machines without Omarchy, `link` and
 `update` apply `settings.theme` if no theme was chosen yet, and keep the
 current one rendered.

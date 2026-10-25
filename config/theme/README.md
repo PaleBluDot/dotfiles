@@ -14,8 +14,15 @@ that show the tool is there (`theme-set tools` shows the result here).
   (output checked byte for byte against `omarchy-theme-set-templates`),
   swaps the folder in and writes `theme.name`. Then the theme-set hook
   (`config/omarchy/hooks/theme-set.d/60-dotfiles-theme`: starship palette,
-  bat cache, tmux reload) and a terminal reload (alacritty, kitty, and
-  ghostty on Linux). `dotfiles link` / `update` keep it current:
+  bat cache, tmux reload, the local VS Code themes), VS Code and a terminal
+  reload (alacritty, kitty, and ghostty on Linux). VS Code follows the
+  theme's `vscode.json`, as `omarchy-theme-set-vscode` does on Omarchy: for
+  `code` and `code-insiders` (on macOS also the apps' own CLIs) its
+  `extension` gets installed when missing (a marketplace id;
+  `local.dotfiles-themes` comes from the hook) and its `name` goes into
+  `workbench.colorTheme` in the editor's `settings.json` (edited as text:
+  comments and the other settings stay). No `vscode.json`, no change.
+  `dotfiles link` / `update` keep it current:
   `settings.theme` is only the first theme, a theme chosen here stays.
 - **With Omarchy**, `theme-set` runs `omarchy-theme-set`, which renders its
   own built-in templates (the "Omarchy" ones below, for every tool, its
