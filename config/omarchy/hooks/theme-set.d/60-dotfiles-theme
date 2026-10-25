@@ -1,7 +1,8 @@
 #!/bin/bash
 # Omarchy theme-set hook (also run by bin/theme-set on machines without
 # Omarchy, after it renders the templates): point starship, bat, superfile
-# and tmux at the new theme. $1 = the theme's slug (sonic-night).
+# and tmux at the new theme, rebuild the VS Code themes. $1 = the theme's
+# slug (sonic-night).
 #
 # The templates are already rendered into ~/.local/state/omarchy/current/theme/
 # when this runs. DOTFILES_THEME_NO_RELOAD=1 (theme-set --no-reload) leaves a
@@ -79,6 +80,15 @@ spf_themes="$HOME/.config/superfile/theme"
 if [[ -d $HOME/.config/superfile && -f $THEME_DIR/superfile.toml ]]; then
   mkdir -p "$spf_themes"
   ln -sfn "$THEME_DIR/superfile.toml" "$spf_themes/omarchy.toml"
+fi
+
+# ─── VS Code ─────────────────────────────────────────────────────────────
+# Rebuilds the local.dotfiles-themes extension when a theme's colours
+# changed (a no-op otherwise). Omarchy's own VS Code step ran before this
+# hook and already set workbench.colorTheme from the theme's vscode.json.
+vscode_hook="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../../dotfiles/hooks/vscode.sh"
+if [[ -f $vscode_hook ]]; then
+  bash "$vscode_hook" >/dev/null 2>&1 || true
 fi
 
 # ─── tmux ────────────────────────────────────────────────────────────────
