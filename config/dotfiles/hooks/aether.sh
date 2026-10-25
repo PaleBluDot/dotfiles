@@ -126,9 +126,10 @@ case "$(physical "$(dirname "$dest")")/" in
     ;;
 esac
 
-# A repo blueprint as this machine's copy, and back.
-render() { sed "s|\"config/|\"$DOTFILES/config/|g" "$1"; }
-unrender() { sed -e "s|\"$DOTFILES/config/|\"config/|g" -e "s|\"$HOME/.config/omarchy/|\"config/omarchy/|g" "$1"; }
+# A repo file as this machine's copy, and back. Other paths in $HOME
+# (~/Wallpapers, the default wallpaper folder) are kept as "~/...".
+render() { sed -e "s|\"config/|\"$DOTFILES/config/|g" -e "s|\"~/|\"$HOME/|g" "$1"; }
+unrender() { sed -e "s|\"$DOTFILES/config/|\"config/|g" -e "s|\"$HOME/.config/omarchy/|\"config/omarchy/|g" -e "s|\"$HOME/|\"~/|g" "$1"; }
 
 # New blueprints saved by Aether: into the repo first.
 if [[ -d $dest ]]; then
