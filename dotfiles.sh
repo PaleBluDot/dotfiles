@@ -1651,11 +1651,13 @@ EOF
       cat <<'EOF'
 dotfiles [-d] [-v] [--force]
 
-Interactive setup, two steps:
+Interactive setup, three steps:
   1. every tool used on this platform, the ones in config.yml switched on.
      Switched on = link (install + link), switched off = unlink (unlink +
      remove the package). Required tools can't be switched off here.
   2. which of the picked tools are required on this machine.
+  3. the theme (config/omarchy/themes; theme-set switches to it after the
+     tools are set up; keeping the current one changes nothing).
 
 With gum (installed first, priority: high): checkbox lists, with gum's
 keys shown under each list (x toggles, Enter = done); Esc = cancel
@@ -3434,6 +3436,18 @@ _gum_pick() {
     ${checked:+--selected "$checked"} -- "$@" </dev/tty
 }
 
+# gum choose, one row: header, the row to start on, then the rows.
+_gum_pick_one() {
+  local header="$1" start="$2" height
+  shift 2
+  height=$(($# + 2))
+  if [[ $height -gt 25 ]]; then
+    height=25
+  fi
+  gum choose --height "$height" --header "$header" \
+    ${start:+--selected "$start"} -- "$@" </dev/tty
+}
+
 # The interactive setup: every tool used on this platform. Step 1 picks
 # the tools ([x] = in config.yml; required ones can't be switched off),
 # step 2 which of them are required here. Then each picked tool is linked
@@ -3595,6 +3609,46 @@ _screen_tools() {
     done
   fi
 
+  # Step 3: the theme (bin/theme-set list: the repo's themes, * = the
+  # current one). Applied after the tools, so their templates render.
+  local -a themes=()
+  local line current_theme="" theme_pick=""
+  if [[ -f $DOTFILES/bin/theme-set ]]; then
+    while IFS= read -r line; do
+      [[ -n $line ]] || continue
+      # "* slug" = the current one, "  slug" the others.
+      if [[ $line == "* "* ]]; then
+        current_theme="${line:2}"
+      fi
+      themes+=("${line:2}")
+    done < <(bash "$DOTFILES/bin/theme-set" list 2>/dev/null)
+  fi
+  if [[ ${#themes[@]} -gt 0 ]]; then
+    ui ""
+    if _use_gum; then
+      if ! theme_pick="$(_gum_pick_one "Theme${current_theme:+ (now: $current_theme)} (keys below)" "$current_theme" "${themes[@]}")"; then
+        ui "Cancelled; nothing changed."
+        return 0
+      fi
+    else
+      ui "Theme${current_theme:+ (now: $current_theme)}:"
+      for ((n = 0; n < ${#themes[@]}; n++)); do
+        ui "$(printf '  %2d) %s' "$((n + 1))" "${themes[n]}")"
+      done
+      while true; do
+        _ask "Theme number, Enter = keep ${current_theme:-as it is}: "
+        if [[ -z $ANSWER ]]; then
+          break
+        fi
+        if [[ $ANSWER =~ ^[0-9]+$ && $ANSWER -ge 1 && $ANSWER -le ${#themes[@]} ]]; then
+          theme_pick="${themes[ANSWER - 1]}"
+          break
+        fi
+        ui "  a number from 1 to ${#themes[@]}"
+      done
+    fi
+  fi
+
   # Run order: priority: high, then required, then the rest.
   local -a order=()
   local pass
@@ -3650,6 +3704,19 @@ _screen_tools() {
       fi
     fi
   done
+
+  # The theme, when another one was picked (theme-set hands off to
+  # omarchy-theme-set on Omarchy).
+  if [[ -n $theme_pick && $theme_pick != "$current_theme" ]]; then
+    if [[ $DRY_RUN == true ]]; then
+      ui "  Test: theme $theme_pick"
+    elif bash "$DOTFILES/bin/theme-set" --quiet "$theme_pick"; then
+      ui "  theme: $theme_pick"
+    else
+      ui "  theme: switching to $theme_pick failed (see the messages above)"
+      INTERACTIVE_FAILED=true
+    fi
+  fi
 }
 
 # dotfiles with no command.
