@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.17.1](https://github.com/PaleBluDot/dotfiles/compare/v2.17.0...v2.17.1) (2026-10-26)
+
+
+### Bug Fixes
+
+* **config:** starburst backgrounds ([#90](https://github.com/PaleBluDot/dotfiles/issues/90)) ([c2d0452](https://github.com/PaleBluDot/dotfiles/commit/c2d0452315c19b90c3d8d31bd04b40135345e6ae)), closes [#86](https://github.com/PaleBluDot/dotfiles/issues/86)
+
 # [2.17.0](https://github.com/PaleBluDot/dotfiles/compare/v2.16.0...v2.17.0) (2026-10-25)
 
 
