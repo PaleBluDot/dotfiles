@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.17.4](https://github.com/PaleBluDot/dotfiles/compare/v2.17.3...v2.17.4) (2026-10-26)
+
+
+### Bug Fixes
+
+* **config:** secure boot tool ([#91](https://github.com/PaleBluDot/dotfiles/issues/91)) ([391e965](https://github.com/PaleBluDot/dotfiles/commit/391e965fd3ece472ff8dde811ac877eed57bed0a)), closes [#87](https://github.com/PaleBluDot/dotfiles/issues/87)
+
 ## [2.17.3](https://github.com/PaleBluDot/dotfiles/compare/v2.17.2...v2.17.3) (2026-10-26)
 
 
