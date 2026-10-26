@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.17.5](https://github.com/PaleBluDot/dotfiles/compare/v2.17.4...v2.17.5) (2026-10-26)
+
+
+### Bug Fixes
+
+* **config:** omarchy hook sudo ([#97](https://github.com/PaleBluDot/dotfiles/issues/97)) ([09762cf](https://github.com/PaleBluDot/dotfiles/commit/09762cf83ef2a5c321c9e2f45794a088943331b9)), closes [#96](https://github.com/PaleBluDot/dotfiles/issues/96) [#95](https://github.com/PaleBluDot/dotfiles/issues/95)
+
 ## [2.17.4](https://github.com/PaleBluDot/dotfiles/compare/v2.17.3...v2.17.4) (2026-10-26)
 
 
