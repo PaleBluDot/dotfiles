@@ -1,33 +1,45 @@
 name: Dry Release
 
+# Only pull requests into main, since merging there is what releases.
+# Checks the title (the squash merge uses it as the commit semantic-release
+# reads) and shows the version the branch would release. edited: a title
+# change runs it again.
 on:
-  push:
-    branches-ignore:
-      - main
   pull_request:
-    branches-ignore:
+    branches:
       - main
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
 
 jobs:
   Dry-Release:
     name: 🚀 Dry Release 🚀
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        node: [20]
-        os: ["ubuntu-latest"]
+    runs-on: ubuntu-latest
 
     steps:
+      - name: 🏷️ PR title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if [[ ! $TITLE =~ ^(feat|fix|perf|refactor|docs|style|test|build|ci|chore|revert)(\([a-z0-9-]+\))?!?:\ .+ ]]; then
+            echo "::error::PR title '$TITLE' isn't a conventional commit (type(scope): subject); the squash merge would release nothing"
+            exit 1
+          fi
+
       - name: 🛒 Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
           persist-credentials: false
 
       - name: ⚙️ Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v7
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 22
+          package-manager-cache: false
 
       - name: 📥 Install deps
         run: npm install
@@ -41,13 +53,11 @@ jobs:
       - name: 🚨 test
         run: npm run test --if-present
 
+      # semantic-release only looks at its release branches, so this run
+      # counts the PR branch as one; --no-ci lets it run on a pull request.
       - name: 🚀 Dry Release
-        run: npm run dry-release
+        run: npx semantic-release --dry-run --no-ci --branches "$BRANCH"
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          BRANCH: ${{ github.head_ref }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GIT_AUTHOR_NAME: ${{ secrets.GIT_NAME }}
-          GIT_AUTHOR_EMAIL: ${{ secrets.GIT_EMAIL }}
-          GIT_COMMITTER_NAME: ${{ secrets.GIT_NAME }}
-          GIT_COMMITTER_EMAIL: ${{ secrets.GIT_EMAIL }}
