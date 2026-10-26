@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.19.0](https://github.com/PaleBluDot/dotfiles/compare/v2.18.0...v2.19.0) (2026-10-26)
+
+
+### Features
+
+* **config:** move shell and tool files to XDG locations ([#102](https://github.com/PaleBluDot/dotfiles/issues/102)) ([25f8ce1](https://github.com/PaleBluDot/dotfiles/commit/25f8ce1e15b29919fff0812cdc52d106530084a2))
+
 # [2.18.0](https://github.com/PaleBluDot/dotfiles/compare/v2.17.5...v2.18.0) (2026-10-26)
 
 
