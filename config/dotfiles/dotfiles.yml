@@ -257,7 +257,6 @@ tools:
     package:
       arch: limine
     links:
-      limine/hooks/40-shim-limine-sync: /etc/boot/hooks/post.d/40-shim-limine-sync
       limine/hooks/50-omarchy-limine-style: /etc/boot/hooks/post.d/50-omarchy-limine-style
 
   # Debian and Fedora: hooks/massCode.sh installs the AppImage. massCode
@@ -329,6 +328,21 @@ tools:
       mac: ranger
     links:
       ranger: $HOME/.config/ranger
+
+  # Secure Boot the linux-surface way: Microsoft-signed shim in front of
+  # Limine, Limine and kernel images signed with our own MOK key. Pick it
+  # only on a machine that boots this way (omaSurface). The key never goes
+  # in the repo: hooks/secureboot.sh takes it from /etc/secureboot-mok or
+  # the 1Password document "Secure Boot MOK", then sets up shim and the
+  # firmware boot entry. Arch with Limine + mkinitcpio only for now.
+  secureboot:
+    package:
+      arch: [sbsigntools, mokutil, efibootmgr, aur/shim-signed]
+    command: sbsign
+    links:
+      secureboot/40-shim-limine-sync: /etc/boot/hooks/post.d/40-shim-limine-sync
+      secureboot/mok-sign: /etc/initcpio/post/mok-sign
+      secureboot/99-shim-limine-sync.hook: /etc/pacman.d/hooks/99-shim-limine-sync.hook
 
   # macOS and Windows come with OpenSSH. ssh/config has op:// references:
   # written filled in from 1Password.

@@ -1,0 +1,14 @@
+# Re-sign Limine for shim when the limine package changes.
+# Named 99-shim-* so it sorts after 99-omarchy-limine.hook, which copies the new
+# limine_x64.efi into place; this then signs that new copy.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = limine
+
+[Action]
+Description = Re-signing Limine for shim (grubx64.efi)...
+When = PostTransaction
+Exec = /etc/boot/hooks/post.d/40-shim-limine-sync
+Depends = sbsigntools

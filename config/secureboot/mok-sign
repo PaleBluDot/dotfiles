@@ -1,0 +1,14 @@
+#!/bin/bash
+# mkinitcpio post hook: sign each new UKI with the MOK key BEFORE Limine's tool
+# copies and fingerprints it (signing afterwards would break the menu's hash).
+# mkinitcpio calls this as: <kernel> <initramfs> [<uki>], so the UKI is the last argument.
+set -euo pipefail
+key=/etc/secureboot-mok/MOK.key
+crt=/etc/secureboot-mok/MOK.crt
+uki="${!#}"
+[[ $uki == *.efi && -f $uki && -r $key ]] || exit 0
+if sbverify --cert "$crt" "$uki" &>/dev/null; then
+  exit 0
+fi
+sbsign --key "$key" --cert "$crt" --output "$uki" "$uki"
+echo "mok-sign: signed $uki"
