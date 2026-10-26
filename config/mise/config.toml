@@ -1,11 +1,12 @@
 [tools]
+bun = "latest"
 claude = "latest"
 codex = "latest"
 copilot = "latest"
 gh = "latest"
 go = "latest"
 node = "26.7.0"
-opencode = "latest"
+opencode = { version = "latest", allow_builds = ["@opencode/cli"] }
 pi = "latest"
 python = "latest"
 
