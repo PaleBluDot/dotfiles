@@ -6,8 +6,10 @@
 # branding edit or an Omarchy update. On a fresh install none of those has
 # happened yet, so the boot menu wallpaper, its colors and the password
 # screen stay stock until the next theme change. This runs it once, now.
-# It only writes what changed, so a run with nothing new is quick and
-# changes nothing.
+# Only when it's needed: the theme was never built (no theme.json) or the
+# service's last run failed. Otherwise the watcher keeps it current, and
+# running it would ask for sudo on every link and update. --force runs it
+# anyway.
 #
 # Flags from dotfiles: --dry-run, --verbose, --force. Prints nothing when
 # there's nothing to do; "next: ..." lines go to dotfiles' Next steps.
@@ -15,13 +17,19 @@
 set -euo pipefail
 
 dry=false
+force=false
 for arg in "$@"; do
   case "$arg" in
     --dry-run) dry=true ;;
+    --force) force=true ;;
   esac
 done
 
 [[ ${DOTFILES_PLATFORM:-} == arch && -x /usr/local/sbin/surface-boot-theme-apply ]] || exit 0
+
+if [[ $force != true && -f /etc/surface-boot/theme.json ]] && ! systemctl is-failed --quiet surface-boot-theme.service; then
+  exit 0
+fi
 
 if [[ $dry == true ]]; then
   echo "dry run, would run: sudo systemctl start surface-boot-theme.service"
