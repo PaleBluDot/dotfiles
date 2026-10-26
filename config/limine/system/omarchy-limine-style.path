@@ -1,0 +1,8 @@
+[Unit]
+Description=Re-apply Omarchy Limine menu style when limine.conf changes
+
+[Path]
+PathChanged=/boot/limine.conf
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,6 @@
+[Unit]
+Description=Re-apply Omarchy Limine menu style
+
+[Service]
+Type=oneshot
+ExecStart=/etc/boot/hooks/post.d/50-omarchy-limine-style
