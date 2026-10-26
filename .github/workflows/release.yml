@@ -1,45 +1,50 @@
 name: Release
 
+# Releases only from main: on every push to it, or by hand from the Actions
+# tab (Run workflow), which is also how a failed release is retried. Tests
+# ran on the pull request (Dry Release), so this only builds and publishes.
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
+
+# One release at a time: a merge right after another waits for it.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+# Tag and release (contents), comment on released issues and PRs.
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
 
 jobs:
   Release:
     name: 🚀 Release 🚀
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        node: [20]
-        os: ["ubuntu-latest"]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
 
     steps:
       - name: 🛒 Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: ⚙️ Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
+          package-manager-cache: false
 
       - name: 📥 Install deps
         run: npm install
 
+      # npm publish ships the built files, so they're built here.
       - name: 🏗 Build
         run: npm run build --if-present
-
-      - name: 📝 Format
-        run: npm run format --if-present
-
-      - name: 🚨 test
-        run: npm run test --if-present
 
       - name: 🚀 Release
         run: npm run release
