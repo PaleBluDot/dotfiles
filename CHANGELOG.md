@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.17.2](https://github.com/PaleBluDot/dotfiles/compare/v2.17.1...v2.17.2) (2026-10-26)
+
+
+### Bug Fixes
+
+* **config:** mise bun and opencode ([#93](https://github.com/PaleBluDot/dotfiles/issues/93)) ([381bfcd](https://github.com/PaleBluDot/dotfiles/commit/381bfcdd86871fbb644660ae9ed35baeab0baebe)), closes [#89](https://github.com/PaleBluDot/dotfiles/issues/89)
+
 ## [2.17.1](https://github.com/PaleBluDot/dotfiles/compare/v2.17.0...v2.17.1) (2026-10-26)
 
 
