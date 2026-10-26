@@ -11,6 +11,8 @@ else
   export VISUAL='code-insiders --wait'
 fi
 
+SHELL_SESSIONS_DISABLE=1
+
 # CORE DIRECTORIES
 # Paths needed before .zshrc loads
 # -----------------------
@@ -68,6 +70,16 @@ export DOTNET_CLI_HOME="$XDG_DATA_HOME/dotnet"
 export CUDA_CACHE_PATH="$XDG_CACHE_HOME/nv"
 export GNUPGHOME="$XDG_DATA_HOME/gnupg"
 export COMPOSER_CACHE_DIR="$XDG_CACHE_HOME/composer"
+export DOCKER_CONFIG="$XDG_CONFIG_HOME/docker"
+export WAKATIME_HOME="$XDG_CONFIG_HOME/wakatime"
+export CLAUDE_CONFIG_DIR="$XDG_CONFIG_HOME/claude"
+export PYTHON_HISTORY="$XDG_STATE_HOME/python_history"
+export CODEX_HOME="$XDG_CONFIG_HOME/codex"
+export NPM_CONFIG_INIT_MODULE="$XDG_CONFIG_HOME/npm/config/npm-init.js"
+export NPM_CONFIG_TMP="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/npm"
+export TLDR_CACHE_DIR="$XDG_CACHE_HOME/tldr"
+export ATUIN_HOME="$XDG_DATA_HOME/atuin"
+export ATUIN_CONFIG_DIR="$XDG_CONFIG_HOME/atuin"
 
 # COMPLETION CACHE
 # Out of the repo (ZDOTDIR is config/zsh) and into the cache folder
