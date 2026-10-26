@@ -55,8 +55,10 @@ jobs:
 
       # semantic-release only looks at its release branches, so this run
       # counts the PR branch as one; --no-ci lets it run on a pull request.
+      # Without GITHUB_ACTIONS it reads the branch from git (the checkout
+      # above) instead of GITHUB_REF, which is refs/pull/<n>/merge here.
       - name: 🚀 Dry Release
-        run: npx semantic-release --dry-run --no-ci --branches "$BRANCH"
+        run: env -u GITHUB_ACTIONS npx semantic-release --dry-run --no-ci --branches "$BRANCH"
         env:
           BRANCH: ${{ github.head_ref }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
