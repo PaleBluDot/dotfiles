@@ -321,10 +321,13 @@ tools:
         linux: $HOME/.config/obsidian/user-flags.conf
 
   # System files: copies outside $HOME. The .path unit has [Install], so
-  # it's enabled; it starts the .service.
+  # it's enabled; it starts the .service. surface-boot-theme-apply draws the
+  # boot menu wallpaper with ImageMagick in FiraCode Nerd Font: without
+  # them it fails and the boot screens keep the stock look. hooks/omarchy.sh
+  # runs it once after linking.
   omarchy:
     package:
-      arch: omarchy
+      arch: [omarchy, imagemagick, ttf-firacode-nerd]
     links:
       omarchy: $HOME/.config/omarchy
       omarchy/system/surface-boot-theme-apply: /usr/local/sbin/surface-boot-theme-apply
