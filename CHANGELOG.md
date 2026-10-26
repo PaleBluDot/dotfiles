@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.17.3](https://github.com/PaleBluDot/dotfiles/compare/v2.17.2...v2.17.3) (2026-10-26)
+
+
+### Bug Fixes
+
+* **config:** boot menu setup ([#92](https://github.com/PaleBluDot/dotfiles/issues/92)) ([e2d585a](https://github.com/PaleBluDot/dotfiles/commit/e2d585a4810860f7d3e259ae945b8ff7541bd1da)), closes [#88](https://github.com/PaleBluDot/dotfiles/issues/88)
+
 ## [2.17.2](https://github.com/PaleBluDot/dotfiles/compare/v2.17.1...v2.17.2) (2026-10-26)
 
 
