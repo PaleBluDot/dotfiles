@@ -26,6 +26,7 @@ plugins=(
   zsh-syntax-highlighting
 )
 
+
 # COMPLETIONS
 # fpath must be set before oh-my-zsh loads so compinit picks it up
 # -----------------------
@@ -34,9 +35,11 @@ fpath+=${ZSH_CUSTOM:-${ZSH:-~/.config/zsh/oh-my-zsh}/custom}/plugins/zsh-complet
 source $ZSH/oh-my-zsh.sh
 
 # HISTORY
-# Override HISTFILE after oh-my-zsh sets it to ~/zsh_history
+# macOS's /etc/zshrc sets HISTFILE to $ZDOTDIR/.zsh_history after .zshenv
+# runs, so it has to be set again here
 # -----------------------
-HISTFILE="$HOME/.local/share/zsh/history"
+HISTFILE="$XDG_STATE_HOME/zsh/history"
+[[ -d ${HISTFILE:h} ]] || mkdir -p "${HISTFILE:h}"
 
 # TOOL DIRECTORIES
 # Interactive-only tool paths
@@ -54,6 +57,9 @@ eval "$(zoxide init zsh)"
 eval "$(op completion zsh)"; compdef _op op
 eval $(thefuck --alias)
 
+if (( $+commands[atuin] )); then
+  eval "$(atuin init zsh)"
+fi
 
 thefuck() {
   unfunction thefuck
@@ -88,3 +94,4 @@ echo
 fastfetch --pipe false
 echo
 checkDirtyRepos.sh
+

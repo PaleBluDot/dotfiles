@@ -51,6 +51,14 @@ tools:
     links:
       op/server.json: $HOME/.config/op/server.json
 
+  atuin:
+    package:
+      mac: atuin
+      arch: atuin
+      windows: Atuinsh.Atuin
+    links:
+      atuin: $HOME/.config/atuin
+
   aerospace:
     package:
       mac: nikitabobko/tap/aerospace
@@ -476,7 +484,6 @@ tools:
       mac: zsh
     links:
       zsh: $HOME/.config/zsh
-      zsh/.zshenv: $HOME/.zshenv
     clone:
       ohmyzsh/ohmyzsh: $HOME/.config/zsh/oh-my-zsh
       zsh-users/zsh-autosuggestions: $HOME/.config/zsh/oh-my-zsh/custom/plugins/zsh-autosuggestions

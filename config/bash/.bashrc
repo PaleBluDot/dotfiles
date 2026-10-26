@@ -172,3 +172,7 @@ detach() {
 # Intro message shown on terminal
 source welcome.sh
 command -v neofetch >/dev/null && neofetch
+
+if command -v atuin >/dev/null 2>&1; then
+    eval "$(atuin init bash)"
+fi
