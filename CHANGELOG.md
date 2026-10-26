@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.18.0](https://github.com/PaleBluDot/dotfiles/compare/v2.17.5...v2.18.0) (2026-10-26)
+
+
+### Features
+
+* **config:** github widget refresh ([#99](https://github.com/PaleBluDot/dotfiles/issues/99)) ([c47a974](https://github.com/PaleBluDot/dotfiles/commit/c47a974a6bc2b9077706c440fdd71698980f5a34)), closes [#98](https://github.com/PaleBluDot/dotfiles/issues/98)
+
 ## [2.17.5](https://github.com/PaleBluDot/dotfiles/compare/v2.17.4...v2.17.5) (2026-10-26)
 
 
