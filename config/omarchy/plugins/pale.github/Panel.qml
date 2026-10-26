@@ -56,7 +56,7 @@ Panel {
 
   // Flat list of clickable rows, in display order, for keyboard navigation.
   readonly property var rows: {
-    var out = [{ kind: "local" }, { kind: "remote" }]
+    var out = [{ kind: "local" }, { kind: "remote" }, { kind: "refresh" }]
     if (!authenticated) { out.push({ kind: "login" }); return out }
     for (var i = 0; i < sectionDefs.length; i++) {
       var s = section(sectionDefs[i].key)
@@ -117,6 +117,7 @@ Panel {
     if (r.kind === "login") login()
     else if (r.kind === "local") openLocal()
     else if (r.kind === "remote") openUrl(root.remoteUrl)
+    else if (r.kind === "refresh") refresh()
     else openUrl(r.url)
   }
 
@@ -266,6 +267,14 @@ Panel {
                   rowIndex: root.rowIndexOf("remote")
                   onActivated: root.openUrl(root.remoteUrl)
                 }
+                Chip_ {
+                  glyph: "󰑐"
+                  showCount: false
+                  opacity: statusProcess.running ? 0.5 : 1.0
+                  hint: statusProcess.running ? "Refreshing…" : "Refresh (r)"
+                  rowIndex: root.rowIndexOf("refresh")
+                  onActivated: root.refresh()
+                }
               }
             }
           }
@@ -350,6 +359,7 @@ Panel {
     id: chip
     property string glyph: ""
     property int count: 0
+    property bool showCount: true
     property string hint: ""
     property int rowIndex: -1
     signal activated()
@@ -380,6 +390,7 @@ Panel {
         anchors.verticalCenter: parent.verticalCenter
       }
       Text {
+        visible: chip.showCount
         text: String(chip.count)
         color: root.foreground
         font.family: root.fontFamily

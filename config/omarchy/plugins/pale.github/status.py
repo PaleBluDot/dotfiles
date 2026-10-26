@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Print GitHub status for the bar widget as JSON, using the gh CLI."""
-import json, os, re, shutil, subprocess
+import json, os, shutil, subprocess
 from concurrent.futures import ThreadPoolExecutor
 
-LIMIT = 10
+LIMIT = 3
+NOTIFICATIONS_URL = "https://github.com/notifications"
 LOCAL_ROOT = os.path.expanduser("~/Projects/github.com")
 
 def local_repos():
@@ -31,27 +32,15 @@ def gh(*args):
         raise RuntimeError((p.stderr or p.stdout).strip().splitlines()[-1] if (p.stderr or p.stdout).strip() else "gh failed")
     return p.stdout
 
-def html_url(api_url, repo_html):
-    if not api_url:
-        return repo_html
-    m = re.match(r"https://api\.github\.com/repos/([^/]+/[^/]+)/(pulls|issues|commits|releases)/(.+)$", api_url)
-    if not m:
-        return repo_html
-    repo, kind, rest = m.groups()
-    kind = {"pulls": "pull", "issues": "issues", "commits": "commit", "releases": "releases"}[kind]
-    if kind == "releases":
-        return f"https://github.com/{repo}/releases"
-    return f"https://github.com/{repo}/{kind}/{rest}"
-
 def notifications():
     data = json.loads(gh("api", "notifications?per_page=50"))
     items = [{
         "title": n.get("subject", {}).get("title", ""),
         "meta": f'{n.get("repository", {}).get("full_name", "")} · {n.get("subject", {}).get("type", "")} · {n.get("reason", "").replace("_", " ")}',
-        "url": html_url(n.get("subject", {}).get("url"), n.get("repository", {}).get("html_url", "https://github.com/notifications")),
+        "url": NOTIFICATIONS_URL,
     } for n in data]
     return {"count": len(data), "capped": len(data) >= 50, "items": items[:LIMIT],
-            "more": "https://github.com/notifications"}
+            "more": NOTIFICATIONS_URL}
 
 def search(query, more):
     data = json.loads(gh("api", "-X", "GET", "search/issues", "-f", f"q={query}", "-f", f"per_page={LIMIT}", "-f", "sort=updated"))
