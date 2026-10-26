@@ -119,7 +119,7 @@ fi
 
 # Enrolled in shim? mokutil compares the DER form of the certificate.
 der="$(mktemp)"
-sudo openssl x509 -in "$mok/MOK.crt" -outform DER -out /dev/stdout >"$der"
+sudo cat "$mok/MOK.crt" | openssl x509 -outform DER -out "$der"
 if ! mokutil --test-key "$der" 2>/dev/null | grep -q 'already enrolled'; then
   if mokutil --list-new 2>/dev/null | grep -q 'Omarchy Surface MOK'; then
     echo "next: reboot, then in the blue MokManager screen: Enroll MOK, Continue, Yes, the password you chose"
