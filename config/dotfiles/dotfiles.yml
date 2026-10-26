@@ -252,13 +252,21 @@ tools:
     links:
       lazygit: $HOME/.config/lazygit
 
-  # Boot hooks, run as root after every kernel or boot update.
+  # The boot menu: Omarchy (boots linux-surface directly) and a collapsed
+  # Advanced options (every kernel and the snapshots). 50-omarchy-limine-style
+  # reshapes /boot/limine.conf after every kernel or boot update (a boot
+  # hook) and after every snapshot (the .path unit: limine-snapper-sync
+  # rewrites the file without running boot hooks; it has [Install], so it's
+  # enabled). hooks/limine.sh sets TARGET_OS_NAME and BOOT_ORDER in
+  # /etc/default/limine and renames the generated menu entry once.
   limine:
     package:
       arch: limine
     links:
       limine/hooks/40-shim-limine-sync: /etc/boot/hooks/post.d/40-shim-limine-sync
       limine/hooks/50-omarchy-limine-style: /etc/boot/hooks/post.d/50-omarchy-limine-style
+      limine/system/omarchy-limine-style.service: /etc/systemd/system/omarchy-limine-style.service
+      limine/system/omarchy-limine-style.path: /etc/systemd/system/omarchy-limine-style.path
 
   # Debian and Fedora: hooks/massCode.sh installs the AppImage. massCode
   # loads every .json in ~/.massCode/themes (same path on every OS).
