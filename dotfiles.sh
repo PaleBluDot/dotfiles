@@ -182,7 +182,7 @@ _on_exit() {
   # What's installed now, for the next run's config.yml check: after
   # wipe, the tools it removed are still listed for link to set up again.
   case "${LOG_CMD:-}" in
-    link | unlink | update | wipe | interactive) _installed_state_save ;;
+    link | unlink | update | wipe | interactive | add | remove) _installed_state_save ;;
   esac
   log debug "run finished, exit code $code"
 }
@@ -1543,7 +1543,7 @@ parse_args() {
 warn_unused_flags() {
   local cmd="$1"
   case "$cmd" in
-    link | unlink | update | wipe | doctor | interactive) ;;
+    link | unlink | update | wipe | doctor | interactive | add | remove) ;;
     *)
       if [[ $DRY_RUN == true ]]; then
         log warn "--dry-run has no effect on '$cmd'"
@@ -1551,7 +1551,7 @@ warn_unused_flags() {
       ;;
   esac
   case "$cmd" in
-    link | unlink | update | interactive) ;;
+    link | unlink | update | interactive | add | remove) ;;
     *)
       if [[ $FORCE == true ]]; then
         log warn "--force has no effect on '$cmd'"
@@ -1571,6 +1571,48 @@ cmd_help() {
   local topic="${1:-}"
   case "$topic" in
     "") _help_main ;;
+    add)
+      cat <<'EOF'
+dotfiles add <tool...> [-d] [-v] [--force]
+
+Adopt an existing tool config from ~/.config/<tool> into dotfiles:
+  1. Copies ~/.config/<tool> into config/<tool> in the repo.
+  2. Detects the package that installed the tool on this machine.
+  3. Adds an entry into config/dotfiles/dotfiles.yml with the package
+     and links mapping.
+  4. Backs up ~/.config/<tool> to <tool>.bak (or deletes with --force).
+  5. Links the tool into place and registers it in config.yml (tools:).
+
+  -d  show what would happen, change nothing
+  -v  show every step
+  --force  overwrite existing repo config or dotfiles.yml entry
+
+Example:
+  dotfiles add starship
+  dotfiles add -dv nvim
+EOF
+      ;;
+    remove)
+      cat <<'EOF'
+dotfiles remove <tool...> [-d] [-v] [--force]
+
+Reverse dotfiles add without removing the installed package:
+  1. Removes the repo symlink at ~/.config/<tool>.
+  2. Restores ~/.config/<tool>.bak when it exists.
+  3. Removes the tool from config.yml and dotfiles.yml.
+  4. Removes config/<tool> from the repo.
+
+The live config must still be a link into this repo. Without --force, a
+missing backup stops the removal so the old config is not lost.
+
+  -d  show what would happen, change nothing
+  -v  show every step
+  --force  remove the link and repo copy even when no .bak exists
+
+Example:
+  dotfiles remove foot
+EOF
+      ;;
     link)
       cat <<'EOF'
 dotfiles link [tool...] [--required] [-d] [-v] [--force]
@@ -1787,6 +1829,8 @@ Usage: dotfiles [command] [tool...] [flags]
        dotfiles                 interactive setup (help interactive)
 
 Commands:
+  add <tool...>         adopt a ~/.config/<tool> folder into the repo
+  remove <tool...>      undo add, restore the old config, and remove the repo copy
   link [tool...]        install tools and link their configs (no tool = config.yml)
   unlink [tool...]      remove tools and their links (no tool = pick from a list)
   update                pull the repo, install new tools, check links
@@ -3064,6 +3108,323 @@ cmd_link() {
   _render_theme
   _summary linked "$good" "$bad"
   _next_steps
+  if [[ -n $bad ]]; then
+    exit 1
+  fi
+}
+
+# Detect the package name that installed $tool on the current OS, if any.
+_detect_tool_package() {
+  local tool="$1" cmd pkg="" lower real_cmd out
+  cmd="$(command -v "$tool" 2>/dev/null || true)"
+  if [[ -z $cmd ]]; then
+    lower="$(echo "$tool" | tr '[:upper:]' '[:lower:]')"
+    cmd="$(command -v "$lower" 2>/dev/null || true)"
+  fi
+  if [[ -n $cmd ]]; then
+    real_cmd="$(readlink -f "$cmd" 2>/dev/null || echo "$cmd")"
+  fi
+
+  case "$PKG_MANAGER" in
+    pacman)
+      if [[ -n ${real_cmd:-} ]]; then
+        out="$(pacman -Qo "$real_cmd" 2>/dev/null || pacman -Qo "$cmd" 2>/dev/null || true)"
+        if [[ -n $out ]]; then
+          pkg="$(awk '{for(i=1;i<=NF;i++) if($i=="by") {print $(i+1); exit}}' <<<"$out")"
+        fi
+      fi
+      if [[ -z $pkg ]]; then
+        pkg="$(pacman -Q "$tool" 2>/dev/null | awk '{print $1}' || true)"
+      fi
+      if [[ -n $pkg ]] && pacman -Qm "$pkg" >/dev/null 2>&1; then
+        pkg="aur/$pkg"
+      fi
+      ;;
+    apt)
+      if [[ -n ${real_cmd:-} ]]; then
+        out="$(dpkg -S "$real_cmd" 2>/dev/null || dpkg -S "$cmd" 2>/dev/null || true)"
+        if [[ -n $out ]]; then
+          pkg="${out%%:*}"
+        fi
+      fi
+      if [[ -z $pkg ]]; then
+        pkg="$(dpkg -l "$tool" 2>/dev/null | awk '/^ii/ {print $2; exit}' || true)"
+      fi
+      ;;
+    dnf)
+      if [[ -n ${real_cmd:-} ]]; then
+        pkg="$(rpm -q --qf '%{NAME}' -f "$real_cmd" 2>/dev/null || rpm -q --qf '%{NAME}' -f "$cmd" 2>/dev/null || true)"
+      fi
+      if [[ -z $pkg || $pkg == *"is not owned"* ]]; then
+        pkg="$(rpm -q --qf '%{NAME}' "$tool" 2>/dev/null || true)"
+      fi
+      if [[ $pkg == *"is not owned"* ]]; then
+        pkg=""
+      fi
+      ;;
+    brew)
+      if command -v brew >/dev/null 2>&1; then
+        pkg="$(brew list --formula -1 2>/dev/null | grep -x "$tool" || brew list --cask -1 2>/dev/null | grep -x "$tool" || true)"
+      fi
+      ;;
+    winget)
+      if command -v winget >/dev/null 2>&1; then
+        pkg="$(winget list -e --name "$tool" 2>/dev/null | awk 'NR>2 {print $2; exit}' || true)"
+      fi
+      ;;
+  esac
+  echo "$pkg"
+}
+
+# add <tool...>: adopt an existing ~/.config/<tool> into the repo:
+# copies it into config/<tool>, adds an entry in dotfiles.yml with detected
+# package on this machine and link to ~/.config/<tool>, backs up the original,
+# and links it into place (also adding it to config.yml tools:).
+cmd_add() {
+  _require_config
+  if [[ $# -eq 0 ]]; then
+    log error "add needs a tool name, e.g. dotfiles add starship"
+    exit 2
+  fi
+
+  TOOLS=("$@")
+  local arg tool src_config src_copy repo_config pkg good="" bad="" has_tool target bak yq_entry
+  for arg in "$@"; do
+    tool="${arg%/}"
+    tool="${tool##*/}"
+    if [[ ! $tool =~ ^[A-Za-z0-9._-]+$ ]]; then
+      log error "$tool: invalid tool name (use letters, numbers, ., _ or -)"
+      bad="${bad:+$bad, }$tool"
+      continue
+    fi
+    src_config="$HOME/.config/$tool"
+    repo_config="$DOTFILES/config/$tool"
+
+    if [[ ! -e $src_config && ! -L $src_config ]]; then
+      log error "$tool: $(_tilde "$src_config") does not exist"
+      bad="${bad:+$bad, }$tool"
+      continue
+    fi
+
+    if [[ -L $src_config ]]; then
+      target="$(_physical "$src_config")"
+      if [[ $target == "$(_physical "$repo_config")" ]]; then
+        log warn "$tool: $(_tilde "$src_config") is already linked to the repo"
+        continue
+      fi
+    fi
+
+    if [[ -e $repo_config || -L $repo_config ]]; then
+      if [[ $FORCE != true ]]; then
+        log error "$tool: config/$tool already exists in the repo; use --force to overwrite"
+        bad="${bad:+$bad, }$tool"
+        continue
+      fi
+      log warn "$tool: --force: overwriting existing config/$tool in the repo"
+      if [[ $DRY_RUN != true ]]; then
+        run_cmd rm -rf "$repo_config"
+      fi
+    fi
+
+    has_tool="$(_yq ".tools.\"$tool\" // \"\"" 2>/dev/null || true)"
+    if [[ -n $has_tool && $has_tool != "null" && $has_tool != '""' ]]; then
+      if [[ $FORCE != true ]]; then
+        log error "$tool: already exists in dotfiles.yml; use --force to overwrite"
+        bad="${bad:+$bad, }$tool"
+        continue
+      fi
+      log warn "$tool: --force: updating entry in dotfiles.yml"
+    fi
+
+    pkg="$(_detect_tool_package "$tool")"
+    if [[ -n $pkg ]]; then
+      log info "$tool: detected package on ${PLATFORM:-this platform}: $pkg"
+    else
+      log debug "$tool: no package detected on ${PLATFORM:-this platform}"
+    fi
+
+    # 1. Copy ~/.config/<tool> into config/<tool> in repo
+    if [[ $DRY_RUN == true ]]; then
+      log info "dry run, would copy $(_tilde "$src_config") -> config/$tool"
+    else
+      run_cmd mkdir -p "$DOTFILES/config"
+      src_copy="$src_config"
+      # Copy the target's contents when ~/.config/<tool> is an existing
+      # symlink. The symlink itself is moved to the backup below.
+      if [[ -L $src_copy ]]; then
+        src_copy="$(_physical "$src_copy")"
+      fi
+      if [[ -d $src_config ]]; then
+        run_cmd cp -R "$src_copy" "$repo_config"
+      else
+        run_cmd cp "$src_copy" "$repo_config"
+      fi
+      if [[ -d "$repo_config/.git" ]]; then
+        run_cmd rm -rf "$repo_config/.git"
+        log warn "$tool: removed .git from repo copy (nested repos not supported)"
+      fi
+      log success "$tool: copied $(_tilde "$src_config") -> config/$tool"
+    fi
+
+    # 2. Add entry to dotfiles.yml
+    if [[ $DRY_RUN == true ]]; then
+      log info "dry run, would add $tool to dotfiles.yml (package.${PLATFORM:-all}: ${pkg:-<none>}, links: $tool: \$HOME/.config/$tool)"
+    else
+      # Assign the complete entry so --force cannot leave stale package,
+      # command, links or clone fields from an older definition behind.
+      if [[ -n $pkg && -n ${PLATFORM:-} ]]; then
+        yq_entry=".tools.\"$tool\" = {\"package\": {\"$PLATFORM\": \"$pkg\"}, \"links\": {\"$tool\": \"\$HOME/.config/$tool\"}}"
+      else
+        yq_entry=".tools.\"$tool\" = {\"links\": {\"$tool\": \"\$HOME/.config/$tool\"}}"
+      fi
+      yq eval -i "$yq_entry" "$DOTFILES_TOOLS"
+      yq eval -i '.tools |= sort_keys(.)' "$DOTFILES_TOOLS"
+      log success "$tool: added to dotfiles.yml"
+    fi
+
+    # 3. Back up ~/.config/<tool> so linking won't conflict with a real folder
+    if [[ $DRY_RUN == true ]]; then
+      log info "dry run, would replace $(_tilde "$src_config") with symlink -> config/$tool"
+    else
+      if [[ $FORCE == true ]]; then
+        run_cmd rm -rf "$src_config"
+      else
+        bak="$src_config$BACKUP_SUFFIX"
+        if [[ -e $bak || -L $bak ]]; then
+          run_cmd rm -rf "$bak"
+        fi
+        run_cmd mv "$src_config" "$bak"
+        log warn "$tool: backed up $(_tilde "$src_config") to $(_tilde "$bak")"
+      fi
+    fi
+
+    # 4. Reload dotfiles.yml cache and link the tool
+    if [[ $DRY_RUN != true ]]; then
+      CFG_LOADED=false
+      CFG_TOOLS=""
+      _cfg_load
+      CHANGED=false
+      if ! _link_tool "$tool" tools; then
+        bad="${bad:+$bad, }$tool"
+      else
+        good="${good:+$good, }$tool"
+      fi
+    else
+      good="${good:+$good, }$tool"
+    fi
+  done
+
+  _render_theme
+  _summary "added and linked" "$good" "$bad"
+  if [[ -n $bad ]]; then
+    exit 1
+  fi
+}
+
+# remove <tool...>: reverse add without uninstalling the package. The source
+# must still be the repo link made by add, so an unrelated config is never
+# removed accidentally. The copied config remains in the repo.
+cmd_remove() {
+  _require_config
+  if [[ $# -eq 0 ]]; then
+    log error "remove needs a tool name, e.g. dotfiles remove foot"
+    exit 2
+  fi
+
+  TOOLS=("$@")
+  local arg tool src_config repo_config bak target has_tool good="" bad=""
+  for arg in "$@"; do
+    tool="$(basename "$arg")"
+    if [[ ! $tool =~ ^[A-Za-z0-9._-]+$ ]]; then
+      log error "$tool: invalid tool name (use letters, numbers, ., _ or -)"
+      if [[ -n $bad ]]; then bad="$bad, $tool"; else bad="$tool"; fi
+      continue
+    fi
+
+    src_config="$HOME/.config/$tool"
+    repo_config="$DOTFILES/config/$tool"
+    bak="$src_config$BACKUP_SUFFIX"
+
+    has_tool="$(_yq ".tools.\"$tool\" // \"\"" 2>/dev/null || true)"
+    if [[ -z $has_tool || $has_tool == "null" || $has_tool == '""' ]] && [[ $FORCE != true ]]; then
+      log error "$tool: no entry exists in dotfiles.yml"
+      if [[ -n $bad ]]; then bad="$bad, $tool"; else bad="$tool"; fi
+      continue
+    fi
+
+    target=""
+    if [[ -L $src_config ]]; then
+      target="$(_physical "$src_config")"
+      if [[ $target != "$(_physical "$repo_config")" && $FORCE != true ]]; then
+        log error "$tool: $(_tilde "$src_config") points outside the repo; leaving it alone"
+        if [[ -n $bad ]]; then bad="$bad, $tool"; else bad="$tool"; fi
+        continue
+      fi
+    elif [[ $FORCE != true ]]; then
+      log error "$tool: $(_tilde "$src_config") is not a repo symlink; leaving it alone"
+      if [[ -n $bad ]]; then bad="$bad, $tool"; else bad="$tool"; fi
+      continue
+    fi
+
+    if [[ $target == "$(_physical "$repo_config")" ]]; then
+      if [[ ! -e $bak && ! -L $bak && $FORCE != true ]]; then
+        log error "$tool: no backup at $(_tilde "$bak"); use --force to remove it without restoring the old config"
+        if [[ -n $bad ]]; then bad="$bad, $tool"; else bad="$tool"; fi
+        continue
+      fi
+    fi
+
+    if [[ $DRY_RUN == true ]]; then
+      if [[ $target == "$(_physical "$repo_config")" ]]; then
+        log info "dry run, would unlink $(_tilde "$src_config")"
+      elif [[ -L $src_config ]]; then
+        log warn "$tool: dry run, would leave the unrelated symlink $(_tilde "$src_config") alone"
+      elif [[ -e $src_config ]]; then
+        log warn "$tool: dry run, would leave the real config $(_tilde "$src_config") alone"
+      fi
+      if [[ $target == "$(_physical "$repo_config")" ]]; then
+        if [[ -e $bak || -L $bak ]]; then
+          log info "dry run, would restore $(_tilde "$bak") to $(_tilde "$src_config")"
+        else
+          log warn "$tool: dry run, no backup exists; --force would leave the config path absent"
+        fi
+      fi
+      log info "dry run, would remove $tool from config.yml and dotfiles.yml"
+      log info "dry run, would remove config/$tool from the repo"
+      if [[ -n $good ]]; then good="$good, $tool"; else good="$tool"; fi
+      continue
+    fi
+
+    if [[ $target == "$(_physical "$repo_config")" ]]; then
+      run_cmd rm -f "$src_config"
+      if [[ -e $bak || -L $bak ]]; then
+        if ! run_cmd mv "$bak" "$src_config"; then
+          log error "$tool: couldn't restore $(_tilde "$bak"); the repo link was removed"
+          if [[ -n $bad ]]; then bad="$bad, $tool"; else bad="$tool"; fi
+          continue
+        fi
+        log success "$tool: restored $(_tilde "$src_config") from $(_tilde "$bak")"
+      else
+        log warn "$tool: removed the repo link; no backup was available to restore"
+      fi
+    elif [[ -e $src_config || -L $src_config ]]; then
+      log warn "$tool: --force left the live config alone because it is not the repo link"
+    fi
+
+    if [[ -n $has_tool && $has_tool != "null" && $has_tool != '""' ]]; then
+      yq eval -i "del(.tools.\"$tool\")" "$DOTFILES_TOOLS"
+      log success "$tool: removed from dotfiles.yml"
+    fi
+    if ! _config_set "$tool" none; then
+      if [[ -n $bad ]]; then bad="$bad, $tool"; else bad="$tool"; fi
+      continue
+    fi
+    run_cmd rm -rf "$repo_config"
+    log success "$tool: removed config/$tool from the repo"
+    if [[ -n $good ]]; then good="$good, $tool"; else good="$tool"; fi
+  done
+
+  _summary removed "$good" "$bad"
   if [[ -n $bad ]]; then
     exit 1
   fi
@@ -4793,7 +5154,7 @@ main() {
   # Not a command: say so and show the help before anything is read or
   # written (a typo used to write config.yml first).
   case "$cmd" in
-    interactive | link | unlink | update | wipe | status | doctor | help) ;;
+    interactive | link | unlink | update | wipe | status | doctor | help | add | remove) ;;
     install | uninstall)
       log error "'$cmd' is gone: use 'dotfiles link' (installs and links) or 'dotfiles unlink' (removes and unlinks)"
       exit 2
@@ -4829,13 +5190,15 @@ main() {
   esac
   # config.yml follows what's installed (doctor does it after its checks).
   case "$cmd" in
-    help | doctor) ;;
+    help | doctor | add | remove) ;;
     *) _config_sync ;;
   esac
   warn_unused_flags "$cmd"
 
   case "$cmd" in
     interactive) cmd_interactive ;;
+    add)       cmd_add "$@" ;;
+    remove)    cmd_remove "$@" ;;
     link)      cmd_link "$@" ;;
     unlink)    cmd_unlink "$@" ;;
     update)    cmd_update "$@" ;;
