@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.21.0](https://github.com/PaleBluDot/dotfiles/compare/v2.20.0...v2.21.0) (2026-10-27)
+
+
+### Features
+
+* **config:** add glow and xdg-ninja packages ([#104](https://github.com/PaleBluDot/dotfiles/issues/104)) ([eec0e11](https://github.com/PaleBluDot/dotfiles/commit/eec0e110e75b4768536c81b0535e17128170595e))
+
 # [2.20.0](https://github.com/PaleBluDot/dotfiles/compare/v2.19.0...v2.20.0) (2026-10-27)
 
 
