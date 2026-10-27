@@ -204,6 +204,15 @@ tools:
     links:
       gobuster: $HOME/.config/gobuster
 
+  glow:
+    package:
+      arch: [glow, glow-fish-completion]
+      debian: glow
+      fedora: glow
+      mac: glow
+      windows: charmbracelet.glow
+
+
   # The interactive screens' checkbox lists (#82); installed first so the
   # first interactive run already has them.
   gum:
@@ -455,6 +464,11 @@ tools:
       windows: wez.wezterm
     links:
       wezterm: $HOME/.config/wezterm
+
+  xdg-ninja:
+    package:
+      arch: xdg-ninja
+      mac: xdg-ninja
 
   xdg-terminals.list:
     package:
