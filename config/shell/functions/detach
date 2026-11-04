@@ -1,0 +1,14 @@
+# shellcheck shell=bash
+# detach — detach from the current tmux session.
+#
+# Prints a message instead if you are not inside tmux.
+#
+# Usage:
+#   detach
+detach() {
+    if [ -n "$TMUX" ]; then
+        tmux detach
+    else
+        echo "Not in a tmux session — nothing to detach from."
+    fi
+}

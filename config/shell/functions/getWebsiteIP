@@ -1,0 +1,20 @@
+# shellcheck shell=bash
+# getWebsiteIP — look up the IP address of one or more hostnames.
+#
+# Runs `dscacheutil -q host -a name <host>` for each argument and prints the
+# full record it returns. macOS only (dscacheutil does not exist on Linux).
+#
+# Usage:
+#   getWebsiteIP <host> [host...]
+#   getWebsiteIP hosts <host> [host...]   # a leading "hosts" is ignored
+#
+# Example:
+#   getWebsiteIP example.com
+function getWebsiteIP() {
+  [ "$1" = "hosts" ] && shift
+  for x
+  do
+    # echo $(dscacheutil -q host -a name $x | awk '/^ip_address/{print $NF}')
+    dscacheutil -q host -a name $x
+  done
+}

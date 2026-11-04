@@ -1,0 +1,32 @@
+# shellcheck shell=bash
+# mkprj — create a new project folder under $GITHUB_DIR/<org>/ and open it.
+#
+# Lists the folders inside $GITHUB_DIR (your user and orgs), asks you to pick
+# one, asks for a project name, then creates the folder, cd's into it,
+# runs `git init`, and opens it with `code-insiders .` (`code .` without Insiders).
+#
+# Usage:
+#   mkprj
+#
+# Requires: $GITHUB_DIR (~/Projects/github.com) with one folder per user/org, and `code-insiders` or `code` on PATH.
+##! Need to add git init and gh creation.
+function mkprj() {
+	echo "Selected org:"
+	select org in $(exec ls "$GITHUB_DIR")
+
+	do
+		echo "You selected $org"
+		echo "Name of the project?"
+		read project
+		mkdir -p "$GITHUB_DIR/$org/$project"
+		cd "$GITHUB_DIR/$org/$project"
+		git init
+		if command -v code-insiders >/dev/null 2>&1; then
+			code-insiders .
+		else
+			code .
+		fi
+		echo "Project created in $GITHUB_DIR/$org/$project"
+		break;
+	done
+}

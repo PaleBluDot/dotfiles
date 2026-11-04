@@ -1,0 +1,14 @@
+# shellcheck shell=bash
+#! Create ENV varibale
+# setenv — set an environment variable for the current shell session only.
+#
+# Same as `export <VAR_NAME>=<value>`. It is gone when the shell closes.
+#
+# Usage:
+#   setenv <VAR_NAME> <value>
+#
+# Example:
+#   setenv GH_TOKEN abc123
+setenv() {
+  export $1=$2
+}

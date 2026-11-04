@@ -1,0 +1,19 @@
+# shellcheck shell=bash
+# husky — create a Husky git hook script in the current repo.
+#
+# Runs `npx husky add .husky/<hook> "<command>"`, which writes a hook file
+# that runs <command> when the git hook fires.
+#
+# Usage:
+#   husky <hook-name> "<command>"
+#
+# Example:
+#   husky pre-commit "npm test"
+#
+# Run it from the root of a repo that already has Husky set up.
+##! Need to add a check if already exist.
+function husky() {
+	printf '%b\n' "\n⏳ Creating…\n"
+	npx husky add .husky/"$1" "$2" # Local delete.
+	printf '%b\n' "\n✅ Husky script has been created.\n"
+}

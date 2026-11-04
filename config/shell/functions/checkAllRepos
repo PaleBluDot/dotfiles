@@ -1,0 +1,54 @@
+# shellcheck shell=bash
+# checkAllRepos — report the state of every repo under a root folder.
+#
+# Walks <root>/<org>/<repo> two levels deep, cd's into each repo, and
+# reports both uncommitted changes (via checkGit) and commits that are ahead
+# of the pushed upstream branch. Repos with no upstream branch get a warning.
+#
+# Usage:
+#   checkAllRepos              # scans the default root (set on the `root=` line)
+#   checkAllRepos ~/some/path  # scans a different root
+#
+# Requires: checkGit and the LIGHTRED / NC color variables (set in config/shell/env).
+function checkAllRepos() {
+	local root="${1:-/Users/psanchez/Documents/github.com}"
+
+	if [[ ! -d "$root" ]]; then
+		echo "Directory not found: $root"
+		return 1
+	fi
+
+	# org/repo = two levels of directories. zsh errors on a glob that matches
+	# nothing, so turn that off for this function; bash leaves it unexpanded,
+	# which the -d checks skip.
+	[[ -n $ZSH_VERSION ]] && setopt local_options null_glob
+	for org_dir in "$root"/*/; do
+		org_dir=${org_dir%/}
+		for repo_dir in "$org_dir"/*/; do
+			repo_dir=${repo_dir%/}
+			[[ -d "$repo_dir/.git" ]] || continue
+
+			local repo_label="${org_dir##*/}/${repo_dir##*/}"
+
+			# checkGit reads git status in the current directory, so
+			# subshell + cd keeps us from having to cd back afterward.
+			(
+				cd "$repo_dir" || exit
+				echo "${repo_label}:"
+				checkGit
+
+				# Commits made locally but never pushed to upstream.
+				local unpushed
+				unpushed=$(git log '@{u}..HEAD' --oneline 2>/dev/null)
+				local upstream_exit=$?
+
+				if [[ $upstream_exit -ne 0 ]]; then
+					echo "  ⚠️ ${LIGHTRED}No upstream branch set${NC}"
+				elif [[ -n "$unpushed" ]]; then
+					local count=$(echo "$unpushed" | wc -l | tr -d ' ')
+					echo "  ⬆️ ${LIGHTRED}$count unpushed commit(s)${NC}"
+				fi
+			)
+		done
+	done
+}

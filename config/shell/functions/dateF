@@ -1,0 +1,77 @@
+# shellcheck shell=bash
+# dateF — print today's date in a common format, prefixed with 📅.
+#
+# Usage:
+#   dateF <format> [-s | --separator <char>]
+#
+# Formats:
+#   yyyymmdd   full year, month, day
+#   mmddyyyy   month, day, full year
+#   mmddyy     month, day, short year
+#
+# Options:
+#   -s | --separator   character placed between the parts (default: none)
+#
+# Examples:
+#   dateF mmddyyyy                    # 10072026
+#   dateF mmddyy --separator "-"      # 10-07-26
+#
+# Running it with no or an unknown format prints this usage.
+##! Add more formats and roll this
+##! out to its own script.
+function dateF() {
+  separator=
+  format=
+
+  case $1 in
+    yyyymmdd )
+      case $2 in
+        -s | --separator )
+          separator=$3
+          echo "📅 $(date +%Y${separator}%m${separator}%d)"
+          ;;
+        * )
+          echo "📅 $(date +%Y${separator}%m${separator}%d)"
+          ;;
+      esac
+      ;;
+    mmddyyyy )
+      case $2 in
+        -s | --separator )
+          separator=$3
+          echo "📅 $(date +%m${separator}%d${separator}%Y)"
+          ;;
+        * )
+          echo "📅 $(date +%m${separator}%d${separator}%Y)"
+          ;;
+      esac
+      ;;
+    mmddyy )
+      case $2 in
+        -s | --separator )
+          separator=$3
+          echo "📅 $(date +%m${separator}%d${separator}%y)"
+          ;;
+        * )
+          echo "📅 $(date +%m${separator}%d${separator}%y)"
+          ;;
+      esac
+      ;;
+    * )
+			echo -e "Usage: dateF <commands> [--option]"
+      echo
+      echo -e "Commands:"
+      echo -e "  yyyymmdd            Shows fullYear month day"
+      echo -e "  mmddyyyy            Shows month day fullYear"
+      echo -e "  mmddyy              Shows month day shortYear"
+      echo
+      echo -e "Options:"
+      echo -e "  -s | --separator    Adds a separator"
+      echo
+      echo -e "Example:"
+      echo -e "  dateF mmddyyyy #10222023"
+      echo -e "  dateF mmddyy --separator \"-\" #10-22-23"
+      echo
+			;;
+  esac
+}

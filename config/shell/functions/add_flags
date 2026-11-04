@@ -1,0 +1,28 @@
+# shellcheck shell=bash
+# add_flags — turn a word list into CSpell "forbidden word" entries.
+#
+# Reads a file with one word per line. For each word it writes three
+# entries, each with a leading "!": the word as written, lowercase, and
+# uppercase. CSpell flags a "!word" entry as an error wherever it appears.
+# The output file is overwritten on every run.
+#
+# Usage:
+#   add_flags <word-list-file>
+#
+# Output: the OUTPUTFILE path set inside the function, under $GITHUB_DIR.
+# Requires: the GITHUB_DIR environment variable.
+function add_flags() {
+	local FILE=$1
+	local FLAG=\!
+	local OUTPUTFILE=${GITHUB_DIR}/PaleBluDot/aclu-emails/.config/dictionaries/flags.txt
+
+	cat $FILE | while read LINE; do \
+		CAPITALIZED=`echo "${LINE}" | tr '[a-z]' '[A-Z]'`
+		LOWERCASE=`echo "${LINE}" | tr '[A-Z]' '[a-z]'`
+
+		echo ${FLAG}${LINE};\
+		echo ${FLAG}${LOWERCASE};\
+		echo ${FLAG}${CAPITALIZED};\
+	done | \
+	> $OUTPUTFILE
+}

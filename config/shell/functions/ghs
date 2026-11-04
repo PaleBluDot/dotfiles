@@ -1,0 +1,26 @@
+# shellcheck shell=bash
+#! Github Repo Add Token
+# ghs — set a GitHub Actions secret on a repo, using the value of an
+# environment variable of the same name from your current shell.
+#
+# Pipes the value of $<SECRET_NAME> into `gh secret set <SECRET_NAME>` for
+# the repo <owner>/<repo-name>. The owner defaults to PaleBluDot.
+#
+# Usage:
+#   ghs <SECRET_NAME> <repo-name> [owner]
+#
+# Example:
+#   ghs NPM_TOKEN my-repo            # sets NPM_TOKEN on PaleBluDot/my-repo
+#   ghs NPM_TOKEN my-repo some-org   # sets it on some-org/my-repo
+#
+# Requires: an authenticated `gh` CLI, and the variable already set in the
+# current shell.
+ghs() {
+  if [[ ! $1 =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    echo "ghs: not a variable name: $1" >&2
+    return 1
+  fi
+  local value
+  eval "value=\${$1}"
+  printf '%s\n' "$value" | gh secret set "$1" --repo "${3:-PaleBluDot}/$2"
+}

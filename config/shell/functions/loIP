@@ -1,0 +1,27 @@
+# shellcheck shell=bash
+# loIP — print the local IP address of this machine.
+#
+# Uses `ip` if it is installed, otherwise falls back to `ifconfig`. In both
+# cases it prints the second field of every line containing "broadcast".
+#
+# Usage:
+#   loIP
+function loIP() {
+	ip=
+
+	if command -v ip &> /dev/null
+	then
+		echo "Using <ip>"
+		ip=$(ip add | grep "broadcast" | awk '{print $2}')
+		echo "$ip"
+		return
+	fi
+
+	echo "Using <ifconfig>"
+	ip=$(ifconfig | grep "broadcast" | awk '{print $2}')
+	echo "$ip"
+
+	# if [[ ! -z "$ip" ]]; then
+	# 		echo "$ip"
+	# fi
+}

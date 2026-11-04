@@ -1,0 +1,10 @@
+# shellcheck shell=bash
+# n — open nvim: the current folder with no argument, otherwise the given files
+# (Omarchy's bash function, for bash and zsh). `edit` is aliased to it in aliases.
+#
+# Usage:
+#   n
+#   n file.txt
+n() {
+  if (( $# == 0 )); then command nvim .; else command nvim "$@"; fi
+}

@@ -1,0 +1,20 @@
+# shellcheck shell=bash
+# getSystem — print what type of machine you are on.
+#
+# Currently prints "This is a Mac machine" when `uname` is Darwin and
+# "This is a Windows machine" for everything else. The Linux branch repeats
+# the Darwin test, so it never matches and Linux falls through to Windows.
+#
+# Usage:
+#   getSystem
+##! Need to update this for windows response
+##! MINGW64_NT and MINGW32_NT.
+function getSystem () {
+  if [[ "$(uname)" == "Darwin" ]]; then
+    echo "This is a Mac machine";
+  elif [[ "$(uname)" == "Darwin" ]]; then
+    echo "This is a Linux machine"
+  else
+    echo "This is a Windows machine"
+  fi
+}

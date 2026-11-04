@@ -1,0 +1,26 @@
+# shellcheck shell=bash
+# zd — smarter cd (Omarchy's bash function, for bash and zsh). `cd` is aliased to it in aliases.
+#
+# No argument goes home, a real directory is entered normally, anything else is
+# looked up with zoxide (`z`) and the directory it jumped to is printed.
+#
+# Usage:
+#   zd            # ~
+#   zd ~/Projects # normal cd
+#   zd dot        # zoxide jump to the best "dot" match
+#
+# Requires: zoxide (initialised in .zshrc). Without it, falls back to plain cd.
+zd() {
+  if (( $# == 0 )); then
+    builtin cd ~ || return
+  elif [[ -d $1 ]] || ! type z >/dev/null 2>&1; then
+    builtin cd "$@" || return
+  else
+    if ! z "$@"; then
+      echo "Error: Directory not found"
+      return 1
+    fi
+    printf "\U000F17A9 "
+    pwd
+  fi
+}

@@ -1,0 +1,89 @@
+# shellcheck shell=bash
+# getURLParams — break a long URL down so it is easy to read: protocol, domain
+# and slug on their own lines, then every query parameter, one per line, in
+# alphabetical order. Names and values are printed exactly as they are in the
+# URL (nothing is decoded, so %20 and friends stay visible). A parameter with
+# no value, like af=, is listed with a blank value. A #fragment, if the URL has
+# one, is printed last.
+#
+# The URL comes from the argument, from stdin, or from the clipboard when
+# neither is given. Whitespace and line breaks inside the URL are removed first,
+# so a URL wrapped over several lines still works.
+#
+# Usage:
+#   getURLParams 'https://example.com/a?x=1&y=2'   # quote it, the shell treats & as special
+#   getURLParams                                   # read the URL from the clipboard
+#   wl-paste | getURLParams                        # or pipe it in
+#
+# Clipboard: wl-paste (Wayland), xclip (X11) or pbpaste (macOS), whichever exists.
+# Colors are only used when printing to a terminal.
+function getURLParams() {
+  local url
+  if (( $# )); then
+    url="$*"
+  elif [[ ! -t 0 ]]; then
+    url=$(cat)
+  elif command -v wl-paste >/dev/null 2>&1; then
+    url=$(wl-paste --no-newline 2>/dev/null)
+  elif command -v xclip >/dev/null 2>&1; then
+    url=$(xclip -o -selection clipboard 2>/dev/null)
+  elif command -v pbpaste >/dev/null 2>&1; then
+    url=$(pbpaste)
+  fi
+  url=${url//[[:space:]]/}
+  if [[ -z $url ]]; then
+    echo "Usage: getURLParams '<url>'   (or copy a URL and run getURLParams)" >&2
+    return 1
+  fi
+
+  local label=$'\e[2m' key=$'\e[36m' bold=$'\e[1m' reset=$'\e[0m'
+  [[ -t 1 ]] || { label= key= bold= reset=; }
+
+  # Split off #fragment and ?query, then protocol://domain/slug.
+  local base=$url query= fragment=
+  if [[ $base == *'#'* ]]; then fragment=${base#*'#'}; base=${base%%'#'*}; fi
+  if [[ $base == *'?'* ]]; then query=${base#*'?'}; base=${base%%'?'*}; fi
+
+  local protocol= domain= slug=$base
+  if [[ $base == *://* ]]; then
+    protocol=${base%%://*}
+    domain=${base#*://}
+    if [[ $domain == */* ]]; then slug=/${domain#*/}; domain=${domain%%/*}; else slug=/; fi
+  fi
+
+  [[ -n $protocol ]] && printf '%sprotocol%s  %s\n' "$label" "$reset" "$protocol"
+  [[ -n $domain ]]   && printf '%sdomain%s    %s%s%s\n' "$label" "$reset" "$bold" "$domain" "$reset"
+  printf '%sslug%s      %s\n' "$label" "$reset" "$slug"
+
+  if [[ -n $query ]]; then
+    # One name=value per line, empty pieces (from && or a trailing &) dropped,
+    # sorted by name; -s keeps a repeated name in URL order.
+    local pairs= rest=$query pair
+    while [[ -n $rest ]]; do
+      pair=${rest%%&*}
+      if [[ $rest == *'&'* ]]; then rest=${rest#*&}; else rest=; fi
+      [[ -n $pair ]] && pairs+="$pair"$'\n'
+    done
+    pairs=$(printf '%s' "$pairs" | LC_ALL=C sort -f -s -t '=' -k 1,1)
+
+    local width=0 name
+    while IFS= read -r pair; do
+      name=${pair%%=*}
+      (( ${#name} > width )) && width=${#name}
+    done <<< "$pairs"
+
+    echo
+    while IFS= read -r pair; do
+      [[ -z $pair ]] && continue
+      name=${pair%%=*}
+      if [[ $pair == *=* ]]; then
+        printf '  %s%-*s%s  %s\n' "$key" "$width" "$name" "$reset" "${pair#*=}"
+      else
+        printf '  %s%s%s\n' "$key" "$name" "$reset"
+      fi
+    done <<< "$pairs"
+  fi
+
+  [[ -n $fragment ]] && printf '\n%sfragment%s  %s\n' "$label" "$reset" "$fragment"
+  return 0
+}

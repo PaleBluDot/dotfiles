@@ -1,0 +1,21 @@
+# shellcheck shell=bash
+# checkGit — report whether the current git repo has uncommitted changes.
+#
+# Counts the lines of `git status --porcelain` and prints a green line when
+# there are 0 changes or a red line with the count otherwise. It always
+# returns 0, so read the output rather than the exit status.
+#
+# Usage:
+#   checkGit        # run inside a git repo
+#
+# Requires: the color variables LIGHTGREEN, LIGHTRED and NC to be defined.
+function checkGit() {
+	COUNT=$(git status --porcelain | wc -l)
+
+	if [ $COUNT -eq "0" ]; then
+		echo "  🟢${LIGHTGREEN}$COUNT changes!${NC} Git repo is clean."
+	else
+		echo "  🔴${LIGHTRED}$COUNT changes!${NC} Git repo dirty."
+		return
+	fi
+}

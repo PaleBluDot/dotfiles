@@ -1,0 +1,19 @@
+# shellcheck shell=bash
+# exit — override of the built-in `exit` that is safe to use inside tmux.
+#
+# Inside tmux it detaches from the session instead of closing it, so your
+# session keeps running. Outside tmux it behaves like the normal `exit`.
+#
+# Usage:
+#   exit
+#
+# Because this replaces the built-in, any function that calls `exit`
+# (such as pushover and getHTTPCode) gets this behavior too. Use
+# `builtin exit` to bypass the override.
+exit() {
+    if [ -n "$TMUX" ]; then
+        tmux detach
+    else
+        builtin exit
+    fi
+}
