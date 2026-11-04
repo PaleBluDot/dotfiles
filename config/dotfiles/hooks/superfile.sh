@@ -2,7 +2,7 @@
 #
 # dotfiles hook: superfile (spf). Runs after its package and links (link,
 # update, interactive). Arch, Mac and Windows get superfile from package:
-# in dotfiles.yml; Debian and Fedora have no package, so this installs it
+# in manifest.yml; Debian and Fedora have no package, so this installs it
 # when spf is missing: Fedora from the Terra repo (dnf keeps it updated),
 # Debian with superfile's own installer, which update runs again when
 # there's a newer release.

@@ -236,10 +236,10 @@ resolve_dotfiles() {
     fi
   fi
 
-  # Two files: every tool (dotfiles.yml, in the repo), and what this machine
+  # Two files: every tool (manifest.yml, in the repo), and what this machine
   # uses (config.yml, a real file in ~/.config/dotfiles, never committed).
   if [[ -n $DOTFILES ]]; then
-    DOTFILES_TOOLS="$DOTFILES/config/dotfiles/dotfiles.yml"
+    DOTFILES_TOOLS="$DOTFILES/config/dotfiles/manifest.yml"
     HOOKS_DIR="$DOTFILES/config/dotfiles/hooks"
   else
     DOTFILES_TOOLS=""
@@ -259,7 +259,7 @@ DOTFILES_OS=""      # macos | linux | windows
 DOTFILES_DISTRO=""  # display only, Linux only: "<NAME> <kernel>"
 DISTRO_ID=""        # internal, Linux only: debian | pacman | fedora
 PKG_MANAGER=""      # internal: pacman | apt | dnf | brew | winget
-PLATFORM=""         # the dotfiles.yml key: arch | debian | fedora | mac | windows
+PLATFORM=""         # the manifest.yml key: arch | debian | fedora | mac | windows
 PLATFORM_KEYS="all" # the keys that apply here, most specific first: "arch linux all"
 
 # Print one field from an os-release file. The file is read, not sourced:
@@ -344,7 +344,7 @@ detect_os() {
     macos:*)      PKG_MANAGER="brew";   PLATFORM="mac" ;;
     windows:*)    PKG_MANAGER="winget"; PLATFORM="windows" ;;
   esac
-  # The dotfiles.yml keys that apply here, most specific first.
+  # The manifest.yml keys that apply here, most specific first.
   PLATFORM_KEYS="${PLATFORM:+$PLATFORM }"
   if [[ $DOTFILES_OS == linux ]]; then
     PLATFORM_KEYS+="linux "
@@ -358,7 +358,7 @@ detect_os() {
 
 # ════════════════════════════════════════════════════════════════════════
 # CONFIG FILES (#51)
-#   config/dotfiles/dotfiles.yml      every tool: package, links, clones (repo)
+#   config/dotfiles/manifest.yml      every tool: package, links, clones (repo)
 #   config/dotfiles/hooks/<tool>.sh   extra steps for a tool (repo, optional)
 #   ~/.config/dotfiles/config.yml     this machine: settings, required, tools
 # ════════════════════════════════════════════════════════════════════════
@@ -366,12 +366,12 @@ detect_os() {
 BACKUP_SUFFIX=".bak"
 THEME="starburst"   # settings.theme: the theme machines without Omarchy use
 
-# Run one yq query against a file (default: dotfiles.yml).
+# Run one yq query against a file (default: manifest.yml).
 _yq() {
   yq eval "$1" "${2:-$DOTFILES_TOOLS}"
 }
 
-# Read both files, once they can be read: dotfiles.yml (and the hooks),
+# Read both files, once they can be read: manifest.yml (and the hooks),
 # then this machine's config.yml (written from the old config.yaml on the
 # first run after #51), then its settings. Unset = built-in default.
 # Runs in the main shell: a first read inside $(…) or < <(…) would be lost
@@ -409,12 +409,12 @@ load_settings() {
   log debug "settings: backup_suffix=$BACKUP_SUFFIX log_file=${LOG_FILE:-<none>}"
 }
 
-# ─── dotfiles.yml and the hooks, read once per run ──────────────────────
+# ─── manifest.yml and the hooks, read once per run ──────────────────────
 # Every field the script needs comes out of one yq call and is kept in
 # shell variables, so asking for a tool's package or links costs nothing
 # (one yq call per question made update take ~17 s, and the interactive
 # screens ~3 min).
-#   CFG_TOOLS               tool names: dotfiles.yml order, then hook-only ones
+#   CFG_TOOLS               tool names: manifest.yml order, then hook-only ones
 #   CFG_<id>_PRIO           "high" (priority: high, or PRIORITY=high in the hook)
 #   CFG_<id>_HASPKG         1 when the tool has package:
 #   CFG_<id>_P_<platform>   "=name" for a package: entry (a list space-separated;
@@ -523,7 +523,7 @@ _cfg_load() {
     esac
   done <<<"$dump"
 
-  # Hooks: config/dotfiles/hooks/<tool>.sh. A hook with no dotfiles.yml
+  # Hooks: config/dotfiles/hooks/<tool>.sh. A hook with no manifest.yml
   # entry is a tool of its own (after the others, by name).
   local hook name high=""
   if [[ -n $HOOKS_DIR && -d $HOOKS_DIR ]]; then
@@ -544,7 +544,7 @@ _cfg_load() {
   fi
 }
 
-# Read dotfiles.yml and the hooks again (update, after the pull).
+# Read manifest.yml and the hooks again (update, after the pull).
 _cfg_reload() {
   local var
   # compgen -v lists the variables with that prefix (Bash 3.2 has it too).
@@ -557,13 +557,13 @@ _cfg_reload() {
   _cfg_load
 }
 
-# Every tool, one per line: dotfiles.yml order, then hook-only ones.
+# Every tool, one per line: manifest.yml order, then hook-only ones.
 manifest_tools() {
   _cfg_load
   printf '%s' "$CFG_TOOLS"
 }
 
-# True when the name is a tool (in dotfiles.yml or a hook).
+# True when the name is a tool (in manifest.yml or a hook).
 _tool_exists() {
   _cfg_load
   [[ $'\n'$CFG_TOOLS == *$'\n'"$1"$'\n'* ]]
@@ -638,7 +638,7 @@ _tool_is_used_here() {
   _cfg_pick "CFG_${CFG_ID}_P"
 }
 
-# gui: true in dotfiles.yml = the tool only works in a graphical session.
+# gui: true in manifest.yml = the tool only works in a graphical session.
 # This machine has a graphical interface: macOS and Windows always; Linux
 # when a graphical session is running or the system boots into one
 # (graphical.target), so an ssh session into a desktop machine counts too.
@@ -663,7 +663,7 @@ _not_used_reason() {
   if [[ -n ${!var:-} ]] && ! _gui_here; then
     echo "gui: true, and this machine has no graphical interface"
   else
-    echo "dotfiles.yml has no package for it here"
+    echo "manifest.yml has no package for it here"
   fi
 }
 
@@ -705,7 +705,7 @@ _tool_command_get() {
   fi
 }
 
-# A dest from dotfiles.yml as the script uses it: $HOME/… (or ~/…) becomes
+# A dest from manifest.yml as the script uses it: $HOME/… (or ~/…) becomes
 # relative to $HOME, anything else absolute stays (a system file). Into DEST.
 DEST=""
 _dest_norm() {
@@ -748,7 +748,7 @@ tool_links() {
   fi
 }
 
-# What a link is, from its files (nothing to write in dotfiles.yml), into
+# What a link is, from its files (nothing to write in manifest.yml), into
 # LINK_COPY, LINK_INJECT and LINK_ENABLE (true/false):
 #   copy    dest is outside $HOME (/etc, /usr): a root-owned copy, never a
 #           symlink (root must not run files you can edit)
@@ -918,7 +918,7 @@ _listed_tools() {
 }
 
 # The tools named in the arguments, in run order: priority: high, then
-# required here, then the rest; dotfiles.yml order within each.
+# required here, then the rest; manifest.yml order within each.
 _order_tools() {
   local wanted tool pass
   wanted=$'\n'"$(printf '%s\n' "$@")"$'\n'
@@ -1246,7 +1246,7 @@ _installed_state_save() {
 # Print the installed version of a package, or return 1 if it isn't
 # installed. Asks the package manager, because a package name often isn't
 # a command (bind provides dig and nslookup).
-# Several names (a list in dotfiles.yml): all must be installed; prints the
+# Several names (a list in manifest.yml): all must be installed; prints the
 # first one's version.
 package_version() {
   local name first="" version
@@ -1404,7 +1404,7 @@ _pm() {
   local -a cmd
 
   case "$action:$PKG_MANAGER" in
-    # aur/<name> (dotfiles.yml): an AUR package, installed with yay. yay
+    # aur/<name> (manifest.yml): an AUR package, installed with yay. yay
     # runs as you and asks for sudo itself; pacman removes it like any other.
     install:pacman)
       if [[ $package == aur/* ]]; then
@@ -1578,14 +1578,14 @@ dotfiles add <tool...> [-d] [-v] [--force]
 Adopt an existing tool config from ~/.config/<tool> into dotfiles:
   1. Copies ~/.config/<tool> into config/<tool> in the repo.
   2. Detects the package that installed the tool on this machine.
-  3. Adds an entry into config/dotfiles/dotfiles.yml with the package
+  3. Adds an entry into config/dotfiles/manifest.yml with the package
      and links mapping.
   4. Backs up ~/.config/<tool> to <tool>.bak (or deletes with --force).
   5. Links the tool into place and registers it in config.yml (tools:).
 
   -d  show what would happen, change nothing
   -v  show every step
-  --force  overwrite existing repo config or dotfiles.yml entry
+  --force  overwrite existing repo config or manifest.yml entry
 
 Example:
   dotfiles add starship
@@ -1599,7 +1599,7 @@ dotfiles remove <tool...> [-d] [-v] [--force]
 Reverse dotfiles add without removing the installed package:
   1. Removes the repo symlink at ~/.config/<tool>.
   2. Restores ~/.config/<tool>.bak when it exists.
-  3. Removes the tool from config.yml and dotfiles.yml.
+  3. Removes the tool from config.yml and manifest.yml.
   4. Removes config/<tool> from the repo.
 
 The live config must still be a link into this repo. Without --force, a
@@ -1624,7 +1624,7 @@ No tool = every tool in config.yml. --required adds the named tools to
 required: instead (unlink and the interactive screen keep those).
 
 Order: priority: high first, then the required tools, then the rest.
-A tool with nothing to install here (~ in dotfiles.yml, or no package:) is
+A tool with nothing to install here (~ in manifest.yml, or no package:) is
 still linked, and dotfiles checks that its command is there. A tool that
 isn't used on this platform is skipped. Repos under clone: are cloned once
 the links are in place, only when missing (an existing clone is never
@@ -1674,7 +1674,7 @@ EOF
 dotfiles unlink [tool...] [-d] [-v] [--force]
 
 Remove tools: the package, then its clones (only real clones of the repo
-dotfiles.yml names), then the config links (backups are put back), then
+manifest.yml names), then the config links (backups are put back), then
 the tool comes off config.yml. Doesn't ask before removing the package.
 Hook steps aren't undone.
 
@@ -1795,12 +1795,12 @@ dotfiles doctor [tool] [-d] [-v]
 Check that everything dotfiles needs is in place, and fix what it can:
   OS and package manager, git, yq (installs either when missing; on
   Debian/Ubuntu yq comes from its GitHub release, checksum-verified),
-  dotfiles.yml and config.yml, the dotfiles command link, PATH, and every
-  tool in dotfiles.yml (platform names, link sources, hooks).
+  manifest.yml and config.yml, the dotfiles command link, PATH, and every
+  tool in manifest.yml (platform names, link sources, hooks).
 
   dotfiles doctor          everything above
-  dotfiles doctor nvim     one tool: OS, yq and dotfiles.yml (git too when
-                           it clones a repo), then its dotfiles.yml
+  dotfiles doctor nvim     one tool: OS, yq and manifest.yml (git too when
+                           it clones a repo), then its manifest.yml
                            problems, package and command here, its hook,
                            and each link (source there, linked or not)
 
@@ -1924,11 +1924,11 @@ ui() {
   _log_to_file "INFO" "$*"
 }
 
-# Commands that read the tools need dotfiles.yml and yq. config.yml may
+# Commands that read the tools need manifest.yml and yq. config.yml may
 # be missing (a new machine): it's written by the first link.
 _require_config() {
   if [[ -z $DOTFILES_TOOLS || ! -f $DOTFILES_TOOLS ]]; then
-    log error "dotfiles.yml not found${DOTFILES_TOOLS:+ at $DOTFILES_TOOLS}; run: dotfiles.sh doctor"
+    log error "manifest.yml not found${DOTFILES_TOOLS:+ at $DOTFILES_TOOLS}; run: dotfiles.sh doctor"
     exit 1
   fi
   if ! command -v yq >/dev/null 2>&1; then
@@ -1936,7 +1936,7 @@ _require_config() {
     exit 1
   fi
   if [[ $CFG_LOADED != true ]]; then
-    log error "dotfiles.yml can't be read; run: dotfiles.sh doctor"
+    log error "manifest.yml can't be read; run: dotfiles.sh doctor"
     exit 1
   fi
 }
@@ -2001,7 +2001,7 @@ _link_state() {
   fi
 }
 
-# State of one dotfiles.yml link. An inject link is a filled-in file, not
+# State of one manifest.yml link. An inject link is a filled-in file, not
 # a symlink: "injected" when it's there, "symlink" when an old link is
 # still in its place.
 _tool_link_state() {
@@ -2486,12 +2486,12 @@ _summary() {
   fi
 }
 
-# Link one src/dest pair from dotfiles.yml. Returns 1 when the link isn't
+# Link one src/dest pair from manifest.yml. Returns 1 when the link isn't
 # in place afterwards.
 _link_one() {
   local tool="$1" src="$2" dest="$3"
   if [[ -z $src || -z $dest ]]; then
-    log error "$tool: a link in dotfiles.yml is missing its source or dest"
+    log error "$tool: a link in manifest.yml is missing its source or dest"
     return 1
   fi
   _link_flags_get "$src" "$dest"
@@ -2968,7 +2968,7 @@ _under_unfolded() {
 }
 
 # unlink, wipe: an old whole-folder link (~/.config/zsh -> config/zsh) from
-# before the tool linked files inside it. dotfiles.yml doesn't list it any
+# before the tool linked files inside it. manifest.yml doesn't list it any
 # more, so _unlink_configs wouldn't remove it.
 _unlink_old_folder_link() {
   local tool="$1" src dest parent done_list=""
@@ -2988,7 +2988,7 @@ _unlink_old_folder_link() {
 }
 
 # Remove a tool's clones (unlink, wipe). Only real git clones of the repo
-# dotfiles.yml names are removed; anything else at that path is left alone.
+# manifest.yml names are removed; anything else at that path is left alone.
 # A clone inside the repo (through an old folder link) goes only when git
 # ignores it. Run before the links come out: an old folder link is how the
 # clone is reached.
@@ -3287,7 +3287,7 @@ _detect_tool_package() {
 }
 
 # add <tool...>: adopt an existing ~/.config/<tool> into the repo:
-# copies it into config/<tool>, adds an entry in dotfiles.yml with detected
+# copies it into config/<tool>, adds an entry in manifest.yml with detected
 # package on this machine and link to ~/.config/<tool>, backs up the original,
 # and links it into place (also adding it to config.yml tools:).
 cmd_add() {
@@ -3339,11 +3339,11 @@ cmd_add() {
     has_tool="$(_yq ".tools.\"$tool\" // \"\"" 2>/dev/null || true)"
     if [[ -n $has_tool && $has_tool != "null" && $has_tool != '""' ]]; then
       if [[ $FORCE != true ]]; then
-        log error "$tool: already exists in dotfiles.yml; use --force to overwrite"
+        log error "$tool: already exists in manifest.yml; use --force to overwrite"
         bad="${bad:+$bad, }$tool"
         continue
       fi
-      log warn "$tool: --force: updating entry in dotfiles.yml"
+      log warn "$tool: --force: updating entry in manifest.yml"
     fi
 
     pkg="$(_detect_tool_package "$tool")"
@@ -3376,9 +3376,9 @@ cmd_add() {
       log success "$tool: copied $(_tilde "$src_config") -> config/$tool"
     fi
 
-    # 2. Add entry to dotfiles.yml
+    # 2. Add entry to manifest.yml
     if [[ $DRY_RUN == true ]]; then
-      log info "dry run, would add $tool to dotfiles.yml (package.${PLATFORM:-all}: ${pkg:-<none>}, links: $tool: \$HOME/.config/$tool)"
+      log info "dry run, would add $tool to manifest.yml (package.${PLATFORM:-all}: ${pkg:-<none>}, links: $tool: \$HOME/.config/$tool)"
     else
       # Assign the complete entry so --force cannot leave stale package,
       # command, links or clone fields from an older definition behind.
@@ -3389,7 +3389,7 @@ cmd_add() {
       fi
       yq eval -i "$yq_entry" "$DOTFILES_TOOLS"
       yq eval -i '.tools |= sort_keys(.)' "$DOTFILES_TOOLS"
-      log success "$tool: added to dotfiles.yml"
+      log success "$tool: added to manifest.yml"
     fi
 
     # 3. Back up ~/.config/<tool> so linking won't conflict with a real folder
@@ -3408,7 +3408,7 @@ cmd_add() {
       fi
     fi
 
-    # 4. Reload dotfiles.yml cache and link the tool
+    # 4. Reload manifest.yml cache and link the tool
     if [[ $DRY_RUN != true ]]; then
       CFG_LOADED=false
       CFG_TOOLS=""
@@ -3457,7 +3457,7 @@ cmd_remove() {
 
     has_tool="$(_yq ".tools.\"$tool\" // \"\"" 2>/dev/null || true)"
     if [[ -z $has_tool || $has_tool == "null" || $has_tool == '""' ]] && [[ $FORCE != true ]]; then
-      log error "$tool: no entry exists in dotfiles.yml"
+      log error "$tool: no entry exists in manifest.yml"
       if [[ -n $bad ]]; then bad="$bad, $tool"; else bad="$tool"; fi
       continue
     fi
@@ -3499,7 +3499,7 @@ cmd_remove() {
           log warn "$tool: dry run, no backup exists; --force would leave the config path absent"
         fi
       fi
-      log info "dry run, would remove $tool from config.yml and dotfiles.yml"
+      log info "dry run, would remove $tool from config.yml and manifest.yml"
       log info "dry run, would remove config/$tool from the repo"
       if [[ -n $good ]]; then good="$good, $tool"; else good="$tool"; fi
       continue
@@ -3523,7 +3523,7 @@ cmd_remove() {
 
     if [[ -n $has_tool && $has_tool != "null" && $has_tool != '""' ]]; then
       yq eval -i "del(.tools.\"$tool\")" "$DOTFILES_TOOLS"
-      log success "$tool: removed from dotfiles.yml"
+      log success "$tool: removed from manifest.yml"
     fi
     if ! _config_set "$tool" none; then
       if [[ -n $bad ]]; then bad="$bad, $tool"; else bad="$tool"; fi
@@ -3654,8 +3654,8 @@ _install_package() {
     if _tool_has_hook "$tool"; then
       log debug "$tool: not installed yet; nothing to install here, hooks/$tool.sh handles it"
     else
-      log warn "$tool: $cmd_name isn't installed, and dotfiles.yml has nothing to install it on ${PLATFORM:-this platform}"
-      NEXT_STEPS+="$tool: install $cmd_name (dotfiles.yml has nothing to install it on ${PLATFORM:-this platform})"$'\n'
+      log warn "$tool: $cmd_name isn't installed, and manifest.yml has nothing to install it on ${PLATFORM:-this platform}"
+      NEXT_STEPS+="$tool: install $cmd_name (manifest.yml has nothing to install it on ${PLATFORM:-this platform})"$'\n'
     fi
     return 0
   fi
@@ -3957,7 +3957,7 @@ _screen_tools() {
 
   ui ""
   if [[ ${#names[@]} -eq 0 ]]; then
-    ui "Tools: none for ${PLATFORM:-this platform} (add them to dotfiles.yml)"
+    ui "Tools: none for ${PLATFORM:-this platform} (add them to manifest.yml)"
     return 0
   fi
 
@@ -4450,7 +4450,7 @@ _update_pull() {
   count="$(grep -c '' <<<"$incoming")"
 
   if [[ $DRY_RUN == true ]]; then
-    log info "dry run: the installs and links below use dotfiles.yml as it is now; the pull may change it"
+    log info "dry run: the installs and links below use manifest.yml as it is now; the pull may change it"
   fi
   if ! run_cmd git -C "$DOTFILES" pull --rebase --autostash; then
     log error "git pull failed. Check: git -C \"$DOTFILES\" status. If a rebase is in progress, fix the files, then git rebase --continue (or git rebase --abort to undo)."
@@ -4475,7 +4475,7 @@ cmd_update() {
   if ! _update_pull; then
     exit 1
   fi
-  # The pull may have changed dotfiles.yml or the hooks: read them again.
+  # The pull may have changed manifest.yml or the hooks: read them again.
   if [[ $PULLED == true && $DRY_RUN != true ]]; then
     _cfg_reload
   fi
@@ -4667,7 +4667,7 @@ _first_run_setup() {
   log info "first run: setting up dotfiles.sh"
   _doctor_yq
   if [[ $YQ_OK != true ]]; then
-    log error "first run: yq is needed to read dotfiles.yml; fix the yq problem above, then run: $DOTFILES/dotfiles.sh"
+    log error "first run: yq is needed to read manifest.yml; fix the yq problem above, then run: $DOTFILES/dotfiles.sh"
     exit 1
   fi
   load_settings
@@ -4737,7 +4737,7 @@ _doctor_os() {
 # reason on stderr via log) when there's no native package for it.
 _prereq_package() {
   local tool="$1"
-  # In the script, not dotfiles.yml: yq is needed to read the config, and
+  # In the script, not manifest.yml: yq is needed to read the config, and
   # git to clone the repo it lives in.
   case "$tool:$PKG_MANAGER" in
     git:winget)  echo "Git.Git" ;;
@@ -4882,29 +4882,29 @@ _doctor_yq() {
 
 CONFIG_OK=false
 
-# dotfiles.yml: there, valid YAML, read.
+# manifest.yml: there, valid YAML, read.
 _doctor_config() {
   if [[ -z $DOTFILES ]]; then
-    _check_fail "dotfiles.yml: DOTFILES isn't set and the script isn't running from a clone"
+    _check_fail "manifest.yml: DOTFILES isn't set and the script isn't running from a clone"
     return 0
   fi
   if [[ ! -f $DOTFILES_TOOLS ]]; then
-    _check_fail "dotfiles.yml: not found at $DOTFILES_TOOLS"
+    _check_fail "manifest.yml: not found at $DOTFILES_TOOLS"
     return 0
   fi
   if [[ $YQ_OK != true ]]; then
-    _check_fail "dotfiles.yml: can't check it without mikefarah/yq"
+    _check_fail "manifest.yml: can't check it without mikefarah/yq"
     return 0
   fi
   # 2>&1 >/dev/null: keep only the error text, throw the parsed output away.
   local err
   if ! err="$(yq eval '.' "$DOTFILES_TOOLS" 2>&1 >/dev/null)"; then
-    _check_fail "dotfiles.yml: invalid YAML: $err"
+    _check_fail "manifest.yml: invalid YAML: $err"
     return 0
   fi
   _cfg_load
   if [[ $CFG_LOADED != true ]]; then
-    _check_fail "dotfiles.yml: yq can't read its tools: (is it a map of tools?)"
+    _check_fail "manifest.yml: yq can't read its tools: (is it a map of tools?)"
     return 0
   fi
   CONFIG_OK=true
@@ -4912,9 +4912,9 @@ _doctor_config() {
   for hook in "$HOOKS_DIR"/*.sh; do
     [[ -f $hook ]] && hooks=$((hooks + 1))
   done
-  _check_ok "dotfiles.yml: valid YAML, $(grep -c . <<<"$CFG_TOOLS") tools, $hooks hooks ($DOTFILES_TOOLS)"
+  _check_ok "manifest.yml: valid YAML, $(grep -c . <<<"$CFG_TOOLS") tools, $hooks hooks ($DOTFILES_TOOLS)"
   if [[ -f $DOTFILES/config/dotfiles/config.yaml ]]; then
-    log warn "config/dotfiles/config.yaml is the old layout; dotfiles.yml replaced it (#51). Delete it once config.yml is written"
+    log warn "config/dotfiles/config.yaml is the old layout; manifest.yml replaced it (#51). Delete it once config.yml is written"
   fi
 }
 
@@ -4961,7 +4961,7 @@ _doctor_machine() {
     fi
   done <<<"$CFG_REQUIRED$CFG_USED"
   if [[ -n $unknown ]]; then
-    log warn "config.yml: not tools (not in dotfiles.yml or hooks/): $unknown"
+    log warn "config.yml: not tools (not in manifest.yml or hooks/): $unknown"
   fi
   if [[ -n $elsewhere ]]; then
     log warn "config.yml: not used on ${PLATFORM:-this platform}, skipped: $elsewhere"
@@ -4969,7 +4969,7 @@ _doctor_machine() {
   _check_ok "config.yml: $(grep -c . <<<"$CFG_REQUIRED" || true) required, $(grep -c . <<<"$CFG_USED" || true) other tools ($shown)"
 }
 
-# Everything in dotfiles.yml that dotfiles would skip or misread: unknown
+# Everything in manifest.yml that dotfiles would skip or misread: unknown
 # fields, unknown platform names, priorities other than high, dests that
 # aren't $HOME/…, ~/… or a full path. One yq call, "tool<TAB>problem" lines.
 _doctor_yml_problems() {
@@ -5024,7 +5024,7 @@ _doctor_tools() {
   problems="$(_doctor_yml_problems)" || problems=""
   while IFS= read -r line; do
     [[ -n $line ]] || continue
-    log error "dotfiles.yml: ${line%%$'\t'*}: ${line#*$'\t'}"
+    log error "manifest.yml: ${line%%$'\t'*}: ${line#*$'\t'}"
   done <<<"$problems"
   while IFS= read -r tool; do
     count=$((count + 1))
@@ -5046,16 +5046,16 @@ _doctor_tools() {
 }
 
 # doctor <tool>: _doctor_tool's checks for one tool, each shown (no -v
-# needed), plus where its links stand and its dotfiles.yml problems. A
+# needed), plus where its links stand and its manifest.yml problems. A
 # link that isn't in place is a warning: dotfiles link fixes it.
 _doctor_tool_detail() {
   local tool="$1" line package command src dest state shown count=0 hook="$HOOKS_DIR/$1.sh"
   while IFS= read -r line; do
     [[ ${line%%$'\t'*} == "$tool" ]] || continue
-    _check_fail "dotfiles.yml: $tool: ${line#*$'\t'}"
+    _check_fail "manifest.yml: $tool: ${line#*$'\t'}"
   done < <(_doctor_yml_problems || true)
   if ! _tool_is_used_here "$tool"; then
-    log info "$tool: not used on ${PLATFORM:-this platform} (dotfiles.yml has no package for it here)"
+    log info "$tool: not used on ${PLATFORM:-this platform} (manifest.yml has no package for it here)"
     return 0
   fi
   package="$(tool_package "$tool")"

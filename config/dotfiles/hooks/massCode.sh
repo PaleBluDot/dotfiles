@@ -2,7 +2,7 @@
 #
 # dotfiles hook: massCode. Runs after its package and links (link, update,
 # interactive). Arch, Mac and Windows get massCode from package: in
-# dotfiles.yml; Debian and Fedora have no package, so this installs the
+# manifest.yml; Debian and Fedora have no package, so this installs the
 # latest AppImage from GitHub as ~/.local/bin/masscode (it updates itself;
 # update also installs a newer release over it), plus the FUSE library
 # AppImages need.
