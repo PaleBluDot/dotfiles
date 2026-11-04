@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.24.1](https://github.com/PaleBluDot/dotfiles/compare/v2.24.0...v2.24.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* **config:** gh credential helper in the tracked gitconfig ([#115](https://github.com/PaleBluDot/dotfiles/issues/115)) ([3aba9df](https://github.com/PaleBluDot/dotfiles/commit/3aba9dfd6c3d69642c3efd3d9595b43c814d6dbf)), closes [#114](https://github.com/PaleBluDot/dotfiles/issues/114)
+
 # [2.24.0](https://github.com/PaleBluDot/dotfiles/compare/v2.23.0...v2.24.0) (2026-11-04)
 
 
