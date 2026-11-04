@@ -4527,7 +4527,7 @@ _self_links() {
 
 # Git signs commits through 1Password's op-ssh-sign, whose path differs per
 # OS, and git's own config can't choose by OS. So dotfiles writes the path
-# for this machine into config/git/local.gitconfig (included by .gitconfig,
+# for this machine into config/git/local.gitconfig (included by gitconfig,
 # gitignored), and rewrites it when it's missing or wrong.
 _op_ssh_sign_path() {
   local helper=""

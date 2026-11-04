@@ -1,4 +1,4 @@
-# delta (git pager) colours. Include it from .gitconfig:
+# delta (git pager) colours. Include it from config/git/gitconfig:
 #   [include]
 #     path = ~/.local/state/omarchy/current/theme/delta.gitconfig
 [delta]
