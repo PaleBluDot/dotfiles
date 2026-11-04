@@ -1,0 +1,58 @@
+# shellcheck shell=bash
+# pushover — send a notification to the Pushover platform.
+#
+# Intended for sending script error messages to your phone. The message is
+# sent as HTML, prefixed with the hostname and followed by the current user
+# and a "View" link.
+#
+# Usage:
+#   pushover <message> [title] [priority] [url]
+#
+# Arguments (positional, in this order):
+#   message   Required. Text to send.
+#   title     Optional. Defaults to user@hostname.
+#   priority  Optional. Defaults to 0.
+#   url       Optional. Defaults to https://example.com/.
+#
+# Example:
+#   pushover "Backup finished" "Backup" 0
+#
+# Notes: with no arguments it prints the usage line and calls `exit 1`,
+# which closes your shell (or detaches tmux, see the exit override below).
+function pushover() {
+	APP_TOKEN="$PUSHOVER_TOKEN"
+	USER_TOKEN="$PUSHOVER_USER"
+	MESSAGE=$1
+	TITLE=$2
+	PRIORITY=$3
+	URL=$4
+	USER=$(whoami)
+	HOSTNAME=$(uname -n)
+
+	if [ $# -eq 0 ]; then
+		echo "Usage: pushover <message> [title] <priority> [url]"
+		exit 1
+	fi
+
+	if [ $# -lt 2 ]; then
+		TITLE="$USER@$HOSTNAME"
+		PRIORITY="0"
+		URL="https://example.com/"
+	fi
+
+	if [ $# -lt 3 ]; then
+		PRIORITY="0"
+		URL="https://example.com/"
+	fi
+
+	curl -s \
+  --form-string "token=$APP_TOKEN" \
+  --form-string "user=$USER_TOKEN" \
+  --form-string "html=1" \
+  --form-string "priority=$PRIORITY" \
+  --form-string "retry=60" \
+  --form-string "expire=3600" \
+  --form-string "title=$TITLE" \
+  --form-string "message=<b>$HOSTNAME:</b> $MESSAGE! <i>From user: $USER</i> <a href=\"$URL\"><b>View</b></a>" \
+  https://api.pushover.net/1/messages.json
+}

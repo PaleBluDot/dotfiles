@@ -1,0 +1,25 @@
+# shellcheck shell=bash
+# getHTTPCode — print the HTTP status code of a URL.
+#
+# Uses curl to fetch the status code and prints "Status Code: <code>".
+# The code is printed whether or not it is 200.
+#
+# Usage:
+#   getHTTPCode <url>
+#
+# Example:
+#   getHTTPCode https://example.com
+#
+# Note: on a 200 response it calls `exit 0`, which closes your shell (or
+# detaches tmux, see the exit override below) when run interactively.
+function getHTTPCode() {
+	local url=$1
+	status_code=$(curl --write-out "%{http_code}\n" --silent --output /dev/null "$url");
+
+  if [[ "$status_code" -ne 200 ]] ; then
+    echo "Status Code: $status_code"
+  else
+		echo "Status Code: $status_code"
+    exit 0
+  fi
+}

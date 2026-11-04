@@ -1,0 +1,89 @@
+# shellcheck shell=bash
+# edit — open a config you edit often by name, e.g. `edit starship`, `edit nvim`.
+#
+# Folders (nvim, hypr, yazi) open with the editor started inside them, so
+# LazyVim treats the folder as the project. Tab completes the names.
+# Anything that isn't a known name is opened as a normal file path.
+#
+# Usage:
+#   edit              # open $EDITOR
+#   edit starship     # ~/.config/starship/starship.toml
+#   edit list         # show every name and where it points
+#   edit notes.md     # any other file, like before
+#
+# Add a target: put a "name  path" line in _edit_targets below.
+_edit_targets=(
+  aliases    "$DOTFILES/config/shell/aliases"
+  functions  "$DOTFILES/config/shell/functions"
+  zshrc      "$DOTFILES/config/zsh/zshrc"
+  env        "$DOTFILES/config/shell/env"
+  starship   "$HOME/.config/starship/starship.toml"
+  nvim       "$HOME/.config/nvim"
+  hypr       "$HOME/.config/hypr"
+  bindings   "$HOME/.config/hypr/bindings.lua"
+  monitors   "$HOME/.config/hypr/monitors.lua"
+  ghostty    "$HOME/.config/ghostty/config.ghostty"
+  git        "$HOME/.config/git/config"
+  ssh        "$DOTFILES/config/ssh/config"
+  tmux       "$HOME/.config/tmux/tmux.conf"
+  yazi       "$HOME/.config/yazi"
+  lazygit    "$HOME/.config/lazygit/config.yml"
+  fastfetch  "$HOME/.config/fastfetch/config.jsonc"
+  shell      "$HOME/.config/omarchy/shell.toml"
+  branding   "$HOME/.config/omarchy/branding/settings.toml"
+)
+
+# drop the old `alias edit=$EDITOR` if this shell still has it (reload keeps old aliases)
+unalias edit 2>/dev/null
+# _edit_target <name> — print the path for a name in _edit_targets (exit 1 if unknown).
+_edit_target() {
+  local name= item
+  for item in "${_edit_targets[@]}"; do
+    if [[ -z $name ]]; then name=$item; continue; fi
+    [[ $name == "$1" ]] && { printf '%s\n' "$item"; return 0; }
+    name=
+  done
+  return 1
+}
+
+# _edit_names — print every name in _edit_targets, one per line.
+_edit_names() {
+  local name= item
+  for item in "${_edit_targets[@]}"; do
+    if [[ -z $name ]]; then name=$item; printf '%s\n' "$name"; else name=; fi
+  done
+}
+
+function edit() {
+  local target name shown
+  if (( $# == 0 )); then
+    command $EDITOR
+  elif [[ $1 == list ]]; then
+    for name in $(_edit_names | LC_ALL=C sort); do
+      shown=$(_edit_target "$name")
+      [[ $shown == "$HOME"* ]] && shown="~${shown#"$HOME"}"
+      printf '%-10s %s\n' "$name" "$shown"
+    done
+  elif target=$(_edit_target "$1"); then
+    if [[ -d $target ]]; then
+      (builtin cd "$target" && command $EDITOR .)
+    else
+      command $EDITOR "$target"
+    fi
+  else
+    command $EDITOR "$@"
+  fi
+}
+
+# Tab completion: the names above (plus list), then normal file names.
+if [[ -n $ZSH_VERSION ]]; then
+  _edit() {
+    _alternative "names:config:(list $(_edit_names | tr '\n' ' '))" 'files:file:_files'
+  }
+  whence -w compdef >/dev/null 2>&1 && compdef _edit edit
+elif [[ -n $BASH_VERSION ]]; then
+  _edit_complete() {
+    COMPREPLY=($(compgen -W "list $(_edit_names)" -- "${COMP_WORDS[COMP_CWORD]}"))
+  }
+  complete -o bashdefault -o default -F _edit_complete edit
+fi

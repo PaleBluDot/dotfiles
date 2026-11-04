@@ -1,0 +1,41 @@
+# shellcheck shell=bash
+# sysup — update all installed packages with the native package manager
+# for the OS you are on.
+#
+# Uses $OS_DISTRO and $OS_PKG, which .zshrc sets from osinfo when the terminal
+# starts, to pick the update command. Omarchy is checked first because it has
+# its own updater, which must be used instead of a plain pacman upgrade:
+#   omarchy  omarchy update -y
+#   brew     brew update && brew upgrade
+#   winget   winget upgrade --all
+#   pacman   sudo pacman -Syu --noconfirm
+#   dnf      sudo dnf upgrade -y
+#   apt      sudo apt update && sudo apt upgrade -y
+#
+# Usage:
+#   sysup
+#
+# Returns 1 with a message on stderr if $OS_PKG is unset or not supported.
+# Linux needs sudo; the -y / --noconfirm flags skip the confirmation prompt.
+sysup() {
+  if [[ ${OS_DISTRO:-} == omarchy ]]; then
+    omarchy update -y
+    return
+  fi
+
+  case "${OS_PKG:-}" in
+    brew)   brew update && brew upgrade ;;
+    winget) winget upgrade --all --accept-package-agreements --accept-source-agreements ;;
+    pacman) sudo pacman -Syu --noconfirm ;;
+    dnf)    sudo dnf upgrade -y ;;
+    apt)    sudo apt update && sudo apt upgrade -y ;;
+    "")
+      echo "sysup: OS_PKG is not set; open a new terminal or run reload" >&2
+      return 1
+      ;;
+    *)
+      echo "sysup: unsupported package manager: $OS_PKG" >&2
+      return 1
+      ;;
+  esac
+}

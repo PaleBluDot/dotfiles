@@ -85,7 +85,9 @@ function y() {
 # Aliases and functions (shared with bash, in config/shell), theme, welcome message
 # -----------------------
 [[ ! -f $DOTFILES/config/shell/aliases ]] || source $DOTFILES/config/shell/aliases
-[[ ! -f $DOTFILES/config/shell/functions ]] || source $DOTFILES/config/shell/functions
+# one file per function in config/shell/functions/ ((N.) = files only, none is fine)
+for _fn_file in $DOTFILES/config/shell/functions/*(N.); do source $_fn_file; done
+unset _fn_file
 
 
 # Welcome screen

@@ -1,0 +1,30 @@
+# shellcheck shell=bash
+# delete — delete a git branch locally and on the remote.
+#
+# Runs `git branch -D <branch>` (force delete, even if unmerged) and then
+# `git push origin --delete <branch>`. With no argument it prints a reminder
+# instead of deleting anything.
+#
+# Usage:
+#   delete <branch-name>
+#
+# Example:
+#   delete feature/old-idea
+#
+# Run it inside the repo. Git will refuse to delete the branch you are
+# currently on.
+##! Need to add a check to see if
+##! branch is removed on remote.
+function delete {
+	# Branch name present?
+	if [[ -z "$1" ]]; then
+			printf '%b\n' "\n ~T Oops… you forgot to provide the branch name"
+			printf '%b\n' " ~I E.g. gbdel branch_name\n"
+	else
+			# Start deleteing.
+			printf '%b\n' "\n⏳ Deleting…\n"
+			git branch -D "$1" # Local delete.
+			git push origin --delete "$1" # Remote delete.
+			printf '%b\n' "\n✅ Git branch $1 was deleted from local and remote.\n"
+	fi
+}

@@ -1,0 +1,33 @@
+# shellcheck shell=bash
+# gobust — run gobuster against a site using your wordlist.
+#
+# Mode "dns" runs `gobuster dns -d <url>`. Any other mode runs
+# `gobuster -d https://<url>`. The wordlist is ~/.config/gobuster.txt.
+#
+# Usage:
+#   gobust <mode> <url>
+#
+# Example:
+#   gobust dns example.com
+#
+# Requires: gobuster on PATH and the wordlist file above.
+# Only use this on sites you own or have permission to test.
+function gobust() {
+	MODE=$1
+	URL=$2
+	WORDLIST=~/.config/gobuster.txt
+
+	if [ -z $URL ]
+	then
+		echo "Error: no URL provided"
+	fi
+
+	if [ "$MODE" = "dns" ]
+	then
+		# echo "Using mode: $MODE"
+		gobuster $MODE -d $URL -w "$WORDLIST"
+	else
+		# echo "Using mode: dir"
+		gobuster -d "https://$URL" -w "$WORDLIST"
+	fi
+}

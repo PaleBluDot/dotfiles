@@ -163,8 +163,12 @@ case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$P
 if [ -n "$DOTFILES" ] && [ -f "$DOTFILES/config/shell/aliases" ]; then
     . "$DOTFILES/config/shell/aliases"
 fi
-if [ -n "$DOTFILES" ] && [ -f "$DOTFILES/config/shell/functions" ]; then
-    . "$DOTFILES/config/shell/functions"
+# one file per function in config/shell/functions/
+if [ -n "$DOTFILES" ] && [ -d "$DOTFILES/config/shell/functions" ]; then
+    for _fn_file in "$DOTFILES"/config/shell/functions/*; do
+        [ -f "$_fn_file" ] && . "$_fn_file"
+    done
+    unset _fn_file
 fi
 
 # my basic alias and functions to get a system up and running
