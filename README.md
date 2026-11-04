@@ -37,6 +37,7 @@ dotfiles update           pull the repo, install what's missing, relink
 dotfiles wipe             undo everything dotfiles set up here (to test again)
 dotfiles status [tool]
 dotfiles doctor [tool]    check (and fix) what dotfiles needs (one tool: only its checks)
+dotfiles list <type>      names only: aliases, functions or tools (pipe into fzf or grep)
 dotfiles help [command]
 ```
 

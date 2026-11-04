@@ -384,7 +384,7 @@ load_settings() {
   # In the main shell, so every $(…) after it has the answer.
   _gui_here || true
   case "$LOG_CMD" in
-    help) ;;
+    help | list) ;;
     *) _config_migrate ;;
   esac
   _machine_load
@@ -1814,12 +1814,29 @@ Example:
   dotfiles doctor nvim
 EOF
       ;;
+    list)
+      cat <<'EOF'
+dotfiles list aliases|functions|tools
+
+Names only, one per line, so it pipes into fzf or grep:
+  aliases     every alias in config/shell/aliases, sorted, each once
+              (the ones set only for zsh or only for bash too)
+  functions   every function in config/shell/functions/, sorted
+  tools       every tool, in manifest.yml order, then the hook-only ones
+
+Changes nothing. aliases and functions work without yq.
+
+Examples:
+  dotfiles list aliases | fzf
+  dotfiles list tools | grep -c .
+EOF
+      ;;
     help)
       cat <<'EOF'
 dotfiles help [command]
 
 Show the overview, or help for one command:
-  link, unlink, interactive, update, wipe, status, doctor, help
+  link, unlink, interactive, update, wipe, status, doctor, list, help
 EOF
       ;;
     *)
@@ -1845,6 +1862,7 @@ Commands:
   wipe                  undo everything dotfiles set up here (for re-testing)
   status [tool]         what's installed and linked
   doctor [tool]         check (and fix) what dotfiles needs
+  list <type>           names only: aliases, functions or tools
   help [command]        this overview, or help for one command
 
 Flags (work anywhere on the line):
@@ -2290,6 +2308,61 @@ _status_tool() {
       *) out "    problem:  $(_link_state_text "$state" "$(_dest_path "$dest")")" ;;
     esac
   done < <(tool_links "$tool")
+}
+
+# ─── list ────────────────────────────────────────────────────────────────
+# Names only, one per line, so it pipes into fzf or grep: the shared
+# aliases, the shared functions, or every tool. Reads the repo; changes
+# nothing. Errors go to stderr.
+
+_list_usage() {
+  echo "usage: dotfiles list aliases|functions|tools" >&2
+}
+
+# Every alias name in config/shell/aliases, sorted, each once. The file is
+# read, not sourced, so aliases set only for zsh or only for bash show too.
+_list_aliases() {
+  local file="$DOTFILES/config/shell/aliases"
+  if [[ -z $DOTFILES || ! -f $file ]]; then
+    log error "no aliases file${DOTFILES:+ at $file}"
+    exit 1
+  fi
+  sed -n 's/^[[:space:]]*alias[[:space:]]\{1,\}\([^=[:space:]]\{1,\}\)=.*/\1/p' "$file" | LC_ALL=C sort -u
+}
+
+# Every function: config/shell/functions/ has one file per function, named
+# after it.
+_list_functions() {
+  local dir="$DOTFILES/config/shell/functions" file
+  if [[ -z $DOTFILES || ! -d $dir ]]; then
+    log error "no functions folder${DOTFILES:+ at $dir}"
+    exit 1
+  fi
+  for file in "$dir"/*; do
+    if [[ -f $file ]]; then
+      printf '%s\n' "${file##*/}"
+    fi
+  done | LC_ALL=C sort
+}
+
+cmd_list() {
+  if [[ $# -ne 1 ]]; then
+    _list_usage
+    exit 2
+  fi
+  case "$1" in
+    aliases) _list_aliases ;;
+    functions) _list_functions ;;
+    tools)
+      _require_config
+      manifest_tools
+      ;;
+    *)
+      log error "unknown list: $1"
+      _list_usage
+      exit 2
+      ;;
+  esac
 }
 
 cmd_status() {
@@ -5267,7 +5340,7 @@ main() {
   # Not a command: say so and show the help before anything is read or
   # written (a typo used to write config.yml first).
   case "$cmd" in
-    interactive | link | unlink | update | wipe | status | doctor | help | add | remove) ;;
+    interactive | link | unlink | update | wipe | status | doctor | help | add | remove | list) ;;
     install | uninstall)
       log error "'$cmd' is gone: use 'dotfiles link' (installs and links) or 'dotfiles unlink' (removes and unlinks)"
       exit 2
@@ -5298,12 +5371,12 @@ main() {
     load_settings
   fi
   case "$cmd" in
-    help) ;;
+    help | list) ;;
     *) pkg_cache_load ;;
   esac
   # config.yml follows what's installed (doctor does it after its checks).
   case "$cmd" in
-    help | doctor | add | remove) ;;
+    help | doctor | add | remove | list) ;;
     *) _config_sync ;;
   esac
   warn_unused_flags "$cmd"
@@ -5318,6 +5391,7 @@ main() {
     wipe)      cmd_wipe "$@" ;;
     status)    cmd_status "$@" ;;
     doctor)    cmd_doctor "$@" ;;
+    list)      cmd_list "$@" ;;
     help)      cmd_help "$@" ;;
   esac
 }
