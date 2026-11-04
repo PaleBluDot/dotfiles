@@ -37,6 +37,28 @@ if [[ ${DOTFILES_PLATFORM:-} != arch ]]; then
   exit 0
 fi
 
+# True when the output of the command (after the first argument) has the
+# text in it. Not "cmd | grep -q": under pipefail that takes the command's
+# exit code too, and mokutil --test-key exits 1 when the key IS enrolled.
+has() {
+  local text="$1" out
+  shift
+  out="$("$@" 2>/dev/null)" || true
+  [[ $out == *"$text"* ]]
+}
+
+# Everything below reads root-only files (/boot, $mok), so sudo first. A
+# dry run never asks for a password: it only goes on when sudo is cached.
+if [[ $dry == true ]]; then
+  if ! sudo -n true 2>/dev/null; then
+    echo "dry run, would check /boot and $mok (needs sudo; skipped in a dry run)"
+    exit 0
+  fi
+elif ! sudo -v; then
+  echo "next: secureboot: needs sudo to check /boot and $mok; run: dotfiles link secureboot"
+  exit 0
+fi
+
 # The EFI partition: wherever Limine is (Omarchy mounts it at /boot).
 # /boot is root-only, so look through sudo.
 esp=""
@@ -93,7 +115,7 @@ fi
 
 # The firmware entry that starts shim. Disk and partition number from the
 # partition mounted at $esp (it changes between installs).
-if ! efibootmgr 2>/dev/null | grep -q 'Limine (shim)'; then
+if ! has 'Limine (shim)' efibootmgr; then
   part="$(findmnt -no SOURCE "$esp")"
   disk="/dev/$(lsblk -no PKNAME "$part")"
   num="$(cat "/sys/class/block/${part##*/}/partition")"
@@ -120,17 +142,17 @@ fi
 # Enrolled in shim? mokutil compares the DER form of the certificate.
 der="$(mktemp)"
 sudo cat "$mok/MOK.crt" | openssl x509 -outform DER -out "$der"
-if ! mokutil --test-key "$der" 2>/dev/null | grep -q 'already enrolled'; then
-  if mokutil --list-new 2>/dev/null | grep -q 'Omarchy Surface MOK'; then
+if ! has 'already enrolled' mokutil --test-key "$der"; then
+  if has 'Omarchy Surface MOK' mokutil --list-new; then
     echo "next: reboot, then in the blue MokManager screen: Enroll MOK, Continue, Yes, the password you chose"
   else
     echo "next: enroll the MOK key: sudo mokutil --import $mok/MOK.der (after: sudo openssl x509 -in $mok/MOK.crt -outform DER -out $mok/MOK.der), then reboot and enroll it in MokManager"
   fi
 fi
 rm -f "$der"
-if mokutil --list-new 2>/dev/null | grep -q 'CN=linux-surface'; then
+if has 'CN=linux-surface' mokutil --list-new; then
   echo "next: reboot, then in the blue MokManager screen enroll the linux-surface key (password: surface)"
 fi
-if ! mokutil --sb-state 2>/dev/null | grep -q 'SecureBoot enabled'; then
+if ! has 'SecureBoot enabled' mokutil --sb-state; then
   echo "next: once the MOK keys are enrolled and the machine boots through \"Limine (shim)\": Surface UEFI (Volume Up + Power) > Security > Secure Boot > \"Microsoft & 3rd party CA\""
 fi
