@@ -142,15 +142,19 @@ fi
 # Enrolled in shim? mokutil compares the DER form of the certificate.
 der="$(mktemp)"
 sudo cat "$mok/MOK.crt" | openssl x509 -outform DER -out "$der"
+# Waiting to be enrolled: found by the certificate's own subject (CN=…), so
+# any name works. The waiting list (MokNew) is root-only, hence sudo.
+subject="$(openssl x509 -inform DER -in "$der" -noout -subject -nameopt esc_2253,esc_ctrl,esc_msb,utf8,sep_comma_plus_space,sname)"
+subject="${subject#subject=}"
 if ! has 'already enrolled' mokutil --test-key "$der"; then
-  if has 'Omarchy Surface MOK' mokutil --list-new; then
+  if has "$subject" sudo mokutil --list-new; then
     echo "next: reboot, then in the blue MokManager screen: Enroll MOK, Continue, Yes, the password you chose"
   else
     echo "next: enroll the MOK key: sudo mokutil --import $mok/MOK.der (after: sudo openssl x509 -in $mok/MOK.crt -outform DER -out $mok/MOK.der), then reboot and enroll it in MokManager"
   fi
 fi
 rm -f "$der"
-if has 'CN=linux-surface' mokutil --list-new; then
+if has 'CN=linux-surface' sudo mokutil --list-new; then
   echo "next: reboot, then in the blue MokManager screen enroll the linux-surface key (password: surface)"
 fi
 if ! has 'SecureBoot enabled' mokutil --sb-state; then
