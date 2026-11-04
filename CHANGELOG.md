@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.23.0](https://github.com/PaleBluDot/dotfiles/compare/v2.22.0...v2.23.0) (2026-11-04)
+
+
+### Features
+
+* **function:** deleteBranch function ([#111](https://github.com/PaleBluDot/dotfiles/issues/111)) ([9df71ab](https://github.com/PaleBluDot/dotfiles/commit/9df71abc264b1769ebc49f19b0edab2fedbe787a)), closes [#110](https://github.com/PaleBluDot/dotfiles/issues/110)
+
 # [2.22.0](https://github.com/PaleBluDot/dotfiles/compare/v2.21.0...v2.22.0) (2026-11-04)
 
 
