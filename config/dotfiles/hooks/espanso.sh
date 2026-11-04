@@ -2,7 +2,7 @@
 #
 # dotfiles hook: espanso. Runs after its package and links (link, update,
 # interactive). Arch, Mac and Windows get espanso from package: in
-# dotfiles.yml; Debian and Fedora have no package, so this installs it
+# manifest.yml; Debian and Fedora have no package, so this installs it
 # first (Fedora from the Terra repo, Debian from the latest GitHub
 # release; update installs a newer one over it). Makes espanso start at
 # boot: registers it as a service (a systemd user service on Linux, a
@@ -37,7 +37,7 @@ done
 
 # espanso has an X11 build and a Wayland build: the session picks. dotfiles
 # only runs this on a machine with a graphical interface (gui: true in
-# dotfiles.yml); from ssh, with no session to ask, Wayland, the default on
+# manifest.yml); from ssh, with no session to ask, Wayland, the default on
 # Debian and Fedora.
 session=wayland
 if [[ ${XDG_SESSION_TYPE:-} == x11 ]] ||

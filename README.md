@@ -68,12 +68,12 @@ current one rendered.
 
 | File | Where | Holds |
 |---|---|---|
-| [`config/dotfiles/dotfiles.yml`](config/dotfiles/dotfiles.yml) | repo | every tool: its package per platform, its links, repos to clone |
+| [`config/dotfiles/manifest.yml`](config/dotfiles/manifest.yml) | repo | every tool: its package per platform, its links, repos to clone |
 | [`config/dotfiles/hooks/<tool>.sh`](config/dotfiles/hooks) | repo | extra steps for a tool (optional) |
 | `~/.config/dotfiles/config.yml` | each machine, never committed | `settings:`, `required:`, `tools:` |
 
 ```yaml
-# dotfiles.yml
+# manifest.yml
 tools:
   fd:
     package:
@@ -90,7 +90,7 @@ Platforms: `arch`, `debian`, `fedora`, `mac`, `windows`, and `linux` (all
 three). `~` as a package = used there, nothing to install (part of the OS).
 A link outside `$HOME` becomes a root-owned copy, and a file with `op://`
 references is filled in from 1Password; nothing to write for either. The
-comments at the top of `dotfiles.yml` explain each field.
+comments at the top of `manifest.yml` explain each field.
 
 A hook runs after its tool's package and links (`link`, `update`, the
 interactive setup), gets `--dry-run`, `--verbose` and `--force`, and prints
@@ -112,7 +112,7 @@ removed by `unlink` (only `unlink --force`) or the interactive setup;
 the old `config.yaml` writes it from that file's `enabled:` / `locked:`
 values.
 
-It follows what's installed, every run: a tool from `dotfiles.yml`
+It follows what's installed, every run: a tool from `manifest.yml`
 installed here goes into `tools:`, and one removed outside dotfiles comes
 off. A tool you add by hand stays until `link` installs it, and moving one
 between the lists by hand is kept (`~/.local/state/dotfiles/installed`

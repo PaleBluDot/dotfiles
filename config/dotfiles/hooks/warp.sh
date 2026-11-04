@@ -2,7 +2,7 @@
 #
 # dotfiles hook: warp. Runs after its package and links (link, update,
 # interactive). Arch, Mac and Windows get Warp from package: in
-# dotfiles.yml; Debian and Fedora get it from Warp's own apt or dnf repo,
+# manifest.yml; Debian and Fedora get it from Warp's own apt or dnf repo,
 # which this adds (signed with Warp's key) before installing warp-terminal.
 # Updates then come with the system's.
 #
