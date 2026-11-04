@@ -1,0 +1,124 @@
+# shellcheck shell=bash
+# deleteBranch — delete git branches: the local branch, the branch on origin,
+# and the worktree it's checked out in.
+#
+# Usage:
+#   deleteBranch <branch>              that branch, no questions
+#   deleteBranch <branch> <branch>…    each branch in the list, no questions
+#   deleteBranch                       every branch that exists both locally and
+#                                      on origin; asks "Delete <branch>? [y/N]" for each
+#
+# A named branch is deleted wherever it exists (local, origin, worktree). With
+# no names, a branch that exists in only one place is left alone.
+#
+# A worktree with uncommitted changes is never removed without asking: it says
+# how many files, and on a no the branch and its worktree are kept.
+#
+# Protected, never deleted (there is no force): main, origin's default
+# branch, the branch you're on, and the branch checked out in the main
+# checkout.
+#
+# Run it inside the repo.
+function deleteBranch {
+	if ! git rev-parse --git-dir >/dev/null 2>&1; then
+		echo "deleteBranch: not inside a git repo" >&2
+		return 1
+	fi
+
+	local remote=origin current default main_branch locals remotes b failed=0
+	local -a branches=()
+	current=$(git branch --show-current 2>/dev/null)
+	default=$(git symbolic-ref --quiet --short "refs/remotes/$remote/HEAD" 2>/dev/null)
+	default=${default#"$remote"/}
+	# Branch checked out in the main checkout (first worktree), which can't be removed.
+	main_branch=$(git worktree list --porcelain | awk '/^branch /{sub("refs/heads/", "", $2); print $2; exit}')
+	locals=$(git for-each-ref --format='%(refname:short)' refs/heads)
+	if ! remotes=$(git ls-remote --heads "$remote" 2>/dev/null | sed 's|.*refs/heads/||'); then
+		echo "deleteBranch: can't reach $remote; only local branches and worktrees will be handled" >&2
+		remotes=
+	fi
+
+	if (( $# )); then
+		branches=("$@")
+	else
+		# No names: only branches that exist both locally and on origin.
+		while IFS= read -r b; do
+			[[ -n $b ]] && printf '%s\n' "$remotes" | grep -qxF -- "$b" && branches+=("$b")
+		done <<<"$locals"
+		if (( ${#branches[@]} == 0 )); then
+			echo "deleteBranch: no branch exists both locally and on $remote; nothing to do"
+			return 0
+		fi
+	fi
+
+	local wt shown dirty where has_local has_remote
+	for b in "${branches[@]}"; do
+		if [[ $b == main || $b == "$default" || $b == "$current" || $b == "$main_branch" ]]; then
+			echo "🔒 $b is protected; not deleting it"
+			continue
+		fi
+
+		has_local=false has_remote=false wt= dirty=0
+		printf '%s\n' "$locals" | grep -qxF -- "$b" && has_local=true
+		printf '%s\n' "$remotes" | grep -qxF -- "$b" && has_remote=true
+		wt=$(git worktree list --porcelain | awk -v ref="refs/heads/$b" '/^worktree /{w=substr($0, 10)} $0 == "branch " ref {print w; exit}')
+		[[ -n $wt ]] && dirty=$(git -C "$wt" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+		shown=$wt
+		[[ $shown == "$HOME"/* ]] && shown="~${shown#"$HOME"}"
+
+		if [[ $has_local == false && $has_remote == false && -z $wt ]]; then
+			echo "❓ $b doesn't exist locally or on $remote"
+			failed=1
+			continue
+		fi
+
+		where=
+		[[ $has_local == true ]] && where+="local, "
+		[[ $has_remote == true ]] && where+="$remote, "
+		if [[ -n $wt ]]; then
+			where+="worktree $shown"
+			(( dirty > 0 )) && where+=" with $dirty uncommitted file(s)"
+		else
+			where=${where%, }
+		fi
+
+		if (( $# == 0 )); then
+			_deleteBranch_ask "Delete $b ($where)? [y/N] " || { echo "   kept $b"; continue; }
+		elif (( dirty > 0 )); then
+			echo "⚠️  $b is checked out in $shown, which has $dirty uncommitted file(s)"
+			_deleteBranch_ask "   Remove that worktree and delete $b? [y/N] " || { echo "   kept $b"; continue; }
+		fi
+
+		if [[ -n $wt ]]; then
+			if (( dirty > 0 )); then
+				git worktree remove --force "$wt" || { failed=1; continue; }
+			else
+				git worktree remove "$wt" || { failed=1; continue; }
+			fi
+			echo "   removed worktree $shown"
+		fi
+		if [[ $has_local == true ]]; then
+			git branch -D "$b" >/dev/null || { failed=1; continue; }
+			echo "   deleted local $b"
+		fi
+		if [[ $has_remote == true ]]; then
+			git push --quiet "$remote" --delete "$b" || { failed=1; continue; }
+			echo "   deleted $remote/$b"
+		fi
+		echo "✅ $b"
+	done
+	return $failed
+}
+
+# _deleteBranch_ask "<prompt>" — true on y/yes. Reads the answer from the terminal
+# when there is one (so a list being looped over isn't eaten), else stdin.
+_deleteBranch_ask() {
+	local reply
+	printf '%s' "$1"
+	if { : </dev/tty; } 2>/dev/null; then
+		read -r reply </dev/tty
+	else
+		read -r reply
+	fi
+	[[ $reply == [yY] || $reply == [yY][eE][sS] ]]
+}
