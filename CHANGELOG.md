@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+## [2.25.1](https://github.com/PaleBluDot/dotfiles/compare/v2.25.0...v2.25.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* **config:** secureboot hook says the MOK key isn't enrolled when it is ([#121](https://github.com/PaleBluDot/dotfiles/issues/121)) ([39ce612](https://github.com/PaleBluDot/dotfiles/commit/39ce612007f803ec3b609f4918425310482bc913)), closes [#120](https://github.com/PaleBluDot/dotfiles/issues/120)
+
 # [2.25.0](https://github.com/PaleBluDot/dotfiles/compare/v2.24.1...v2.25.0) (2026-11-04)
 
 
