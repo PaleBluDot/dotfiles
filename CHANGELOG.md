@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.24.0](https://github.com/PaleBluDot/dotfiles/compare/v2.23.0...v2.24.0) (2026-11-04)
+
+
+### Features
+
+* **config:** remove dots from file names in config/ ([#113](https://github.com/PaleBluDot/dotfiles/issues/113)) ([777b1c7](https://github.com/PaleBluDot/dotfiles/commit/777b1c7d7be76456ee7d91bcdfda5f5b6405134b)), closes [#112](https://github.com/PaleBluDot/dotfiles/issues/112)
+
 # [2.23.0](https://github.com/PaleBluDot/dotfiles/compare/v2.22.0...v2.23.0) (2026-11-04)
 
 
