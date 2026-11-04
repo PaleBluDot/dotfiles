@@ -1,0 +1,6 @@
+# ~/.profile: read by login shells. There's no ~/.bash_profile, so a bash
+# login shell (tty, ssh, a macOS Terminal window) reads this and loads
+# ~/.bashrc, the same setup as every other bash window.
+if [ -n "$BASH_VERSION" ] && [ -f "$HOME/.bashrc" ]; then
+    . "$HOME/.bashrc"
+fi

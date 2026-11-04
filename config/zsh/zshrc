@@ -77,15 +77,15 @@ function y() {
 
 # OS DETECTION
 # OS_NAME, OS_DISTRO, OS_LIKE, OS_VERSION, OS_PKG, ... from bin/osinfo,
-# set once here so .aliases and .functions can branch on them
+# set once here so config/shell/aliases and functions can branch on them
 # -----------------------
 (( $+commands[osinfo] )) && eval "$(osinfo --env)"
 
 # LOCAL CONFIG
-# Aliases, functions, theme, welcome message
+# Aliases and functions (shared with bash, in config/shell), theme, welcome message
 # -----------------------
-[[ ! -f $DOTFILES/config/zsh/.aliases ]] || source $DOTFILES/config/zsh/.aliases
-[[ ! -f $DOTFILES/config/zsh/.functions ]] || source $DOTFILES/config/zsh/.functions
+[[ ! -f $DOTFILES/config/shell/aliases ]] || source $DOTFILES/config/shell/aliases
+[[ ! -f $DOTFILES/config/shell/functions ]] || source $DOTFILES/config/shell/functions
 
 
 # Welcome screen

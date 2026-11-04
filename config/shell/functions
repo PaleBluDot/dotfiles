@@ -1,3 +1,11 @@
+# Shared shell functions, loaded by both zsh (.zshrc) and bash (.bashrc).
+# Keep everything here in syntax that runs in both shells.
+
+# Colors used by checkGit, checkAllRepos and checkAllReposQuiet.
+LIGHTGREEN=$'\e[1;32m'
+LIGHTRED=$'\e[1;31m'
+NC=$'\e[0m'
+
 # mkprj — create a new project folder under $GITHUB_DIR/<org>/ and open it.
 #
 # Lists the folders inside $GITHUB_DIR (your user and orgs), asks you to pick
@@ -20,7 +28,7 @@ function mkprj() {
 		mkdir -p "$GITHUB_DIR/$org/$project"
 		cd "$GITHUB_DIR/$org/$project"
 		git init
-		if (( $+commands[code-insiders] )); then
+		if command -v code-insiders >/dev/null 2>&1; then
 			code-insiders .
 		else
 			code .
@@ -44,9 +52,9 @@ function mkprj() {
 # Run it from the root of a repo that already has Husky set up.
 ##! Need to add a check if already exist.
 function husky() {
-	echo "\n⏳ Creating…\n"
+	printf '%b\n' "\n⏳ Creating…\n"
 	npx husky add .husky/"$1" "$2" # Local delete.
-	echo "\n✅ Husky script has been created.\n"
+	printf '%b\n' "\n✅ Husky script has been created.\n"
 }
 
 # loIP — print the local IP address of this machine.
@@ -119,7 +127,7 @@ function gobust() {
 		echo "Error: no URL provided"
 	fi
 
-	if [ $MODE = "dns" ] 2&> /dev/null
+	if [ "$MODE" = "dns" ]
 	then
 		# echo "Using mode: $MODE"
 		gobuster $MODE -d $URL -w "$WORDLIST"
@@ -218,8 +226,7 @@ function checkGit() {
 #   checkAllRepos              # scans the default root (set on the `root=` line)
 #   checkAllRepos ~/some/path  # scans a different root
 #
-# Requires: zsh (uses zsh glob qualifiers), checkGit, and the LIGHTRED / NC
-# color variables.
+# Requires: checkGit and the LIGHTRED / NC color variables (set at the top of this file).
 function checkAllRepos() {
 	local root="${1:-/Users/psanchez/Documents/github.com}"
 
@@ -228,13 +235,17 @@ function checkAllRepos() {
 		return 1
 	fi
 
-	# org/repo = two levels of directories.
-	# (/N) qualifier: / = dirs only, N = don't error if nothing matches.
-	for org_dir in "$root"/*(/N); do
-		for repo_dir in "$org_dir"/*(/N); do
+	# org/repo = two levels of directories. zsh errors on a glob that matches
+	# nothing, so turn that off for this function; bash leaves it unexpanded,
+	# which the -d checks skip.
+	[[ -n $ZSH_VERSION ]] && setopt local_options null_glob
+	for org_dir in "$root"/*/; do
+		org_dir=${org_dir%/}
+		for repo_dir in "$org_dir"/*/; do
+			repo_dir=${repo_dir%/}
 			[[ -d "$repo_dir/.git" ]] || continue
 
-			local repo_label="${org_dir:t}/${repo_dir:t}"
+			local repo_label="${org_dir##*/}/${repo_dir##*/}"
 
 			# checkGit reads git status in the current directory, so
 			# subshell + cd keeps us from having to cd back afterward.
@@ -272,19 +283,22 @@ function checkAllRepos() {
 # Example (in .zshrc):
 #   out=$(checkAllReposQuiet); [[ -n "$out" ]] && echo "$out"
 #
-# Requires: zsh and the LIGHTRED / NC color variables.
+# Requires: the LIGHTRED / NC color variables (set at the top of this file).
 function checkAllReposQuiet() {
 	local root="${1:-/Users/psanchez/Documents/github.com}"
 	[[ -d "$root" ]] || return
 
-	for org_dir in "$root"/*(/N); do
-		for repo_dir in "$org_dir"/*(/N); do
+	[[ -n $ZSH_VERSION ]] && setopt local_options null_glob
+	for org_dir in "$root"/*/; do
+		org_dir=${org_dir%/}
+		for repo_dir in "$org_dir"/*/; do
+			repo_dir=${repo_dir%/}
 			[[ -d "$repo_dir/.git" ]] || continue
 
 			(
 				cd "$repo_dir" || exit
 
-				local repo_label="${org_dir:t}/${repo_dir:t}"
+				local repo_label="${org_dir##*/}/${repo_dir##*/}"
 
 				local dirty_count
 				dirty_count=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
@@ -382,14 +396,14 @@ function add_flags() {
 function delete {
 	# Branch name present?
 	if [[ -z "$1" ]]; then
-			echo "\n ~T Oops… you forgot to provide the branch name"
-			echo " ~I E.g. gbdel branch_name\n"
+			printf '%b\n' "\n ~T Oops… you forgot to provide the branch name"
+			printf '%b\n' " ~I E.g. gbdel branch_name\n"
 	else
 			# Start deleteing.
-			echo "\n⏳ Deleting…\n"
+			printf '%b\n' "\n⏳ Deleting…\n"
 			git branch -D "$1" # Local delete.
 			git push origin --delete "$1" # Remote delete.
-			echo "\n✅ Git branch $1 was deleted from local and remote.\n"
+			printf '%b\n' "\n✅ Git branch $1 was deleted from local and remote.\n"
 	fi
 }
 
@@ -505,10 +519,16 @@ function dateF() {
 #   ghs NPM_TOKEN my-repo            # sets NPM_TOKEN on PaleBluDot/my-repo
 #   ghs NPM_TOKEN my-repo some-org   # sets it on some-org/my-repo
 #
-# Requires: zsh (uses ${(P)1}), an authenticated `gh` CLI, and the variable
-# already set in the current shell.
+# Requires: an authenticated `gh` CLI, and the variable already set in the
+# current shell.
 ghs() {
-  echo ${(P)1} | gh secret set $1 --repo ${3:-PaleBluDot}/$2
+  if [[ ! $1 =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    echo "ghs: not a variable name: $1" >&2
+    return 1
+  fi
+  local value
+  eval "value=\${$1}"
+  printf '%s\n' "$value" | gh secret set "$1" --repo "${3:-PaleBluDot}/$2"
 }
 
 
@@ -605,7 +625,7 @@ sysup() {
       ;;
   esac
 }
-# zd — smarter cd (Omarchy's bash function, ported for zsh). `cd` is aliased to it in .aliases.
+# zd — smarter cd (Omarchy's bash function, for bash and zsh). `cd` is aliased to it in aliases.
 #
 # No argument goes home, a real directory is entered normally, anything else is
 # looked up with zoxide (`z`) and the directory it jumped to is printed.
@@ -619,7 +639,7 @@ sysup() {
 zd() {
   if (( $# == 0 )); then
     builtin cd ~ || return
-  elif [[ -d $1 ]] || ! (( $+functions[z] )); then
+  elif [[ -d $1 ]] || ! type z >/dev/null 2>&1; then
     builtin cd "$@" || return
   else
     if ! z "$@"; then
@@ -632,7 +652,7 @@ zd() {
 }
 
 # n — open nvim: the current folder with no argument, otherwise the given files
-# (Omarchy's bash function, ported for zsh). `edit` is aliased to it in .aliases.
+# (Omarchy's bash function, for bash and zsh). `edit` is aliased to it in aliases.
 #
 # Usage:
 #   n
@@ -655,10 +675,10 @@ n() {
 #
 # Add a target: put a "name  path" line in _edit_targets below.
 _edit_targets=(
-  aliases    "$ZDOTDIR/.aliases"
-  functions  "$ZDOTDIR/.functions"
-  zshrc      "$ZDOTDIR/.zshrc"
-  zshenv     "$ZDOTDIR/.zshenv"
+  aliases    "$DOTFILES/config/shell/aliases"
+  functions  "$DOTFILES/config/shell/functions"
+  zshrc      "$DOTFILES/config/zsh/zshrc"
+  env        "$DOTFILES/config/shell/env"
   starship   "$HOME/.config/starship/starship.toml"
   nvim       "$HOME/.config/nvim"
   hypr       "$HOME/.config/hypr"
@@ -677,15 +697,36 @@ _edit_targets=(
 
 # drop the old `alias edit=$EDITOR` if this shell still has it (reload keeps old aliases)
 unalias edit 2>/dev/null
+# _edit_target <name> — print the path for a name in _edit_targets (exit 1 if unknown).
+_edit_target() {
+  local name= item
+  for item in "${_edit_targets[@]}"; do
+    if [[ -z $name ]]; then name=$item; continue; fi
+    [[ $name == "$1" ]] && { printf '%s\n' "$item"; return 0; }
+    name=
+  done
+  return 1
+}
+
+# _edit_names — print every name in _edit_targets, one per line.
+_edit_names() {
+  local name= item
+  for item in "${_edit_targets[@]}"; do
+    if [[ -z $name ]]; then name=$item; printf '%s\n' "$name"; else name=; fi
+  done
+}
+
 function edit() {
-  local -A targets=("${_edit_targets[@]}")
+  local target name shown
   if (( $# == 0 )); then
     command $EDITOR
   elif [[ $1 == list ]]; then
-    local name
-    for name in ${(ko)targets}; do printf '%-10s %s\n' "$name" "${targets[$name]/#$HOME/~}"; done
-  elif [[ -n ${targets[$1]} ]]; then
-    local target=${targets[$1]}
+    for name in $(_edit_names | LC_ALL=C sort); do
+      shown=$(_edit_target "$name")
+      [[ $shown == "$HOME"* ]] && shown="~${shown#"$HOME"}"
+      printf '%-10s %s\n' "$name" "$shown"
+    done
+  elif target=$(_edit_target "$1"); then
     if [[ -d $target ]]; then
       (builtin cd "$target" && command $EDITOR .)
     else
@@ -696,8 +737,104 @@ function edit() {
   fi
 }
 
-_edit() {
-  local -A targets=("${_edit_targets[@]}")
-  _alternative "names:config:(list ${(k)targets})" 'files:file:_files'
+# Tab completion: the names above (plus list), then normal file names.
+if [[ -n $ZSH_VERSION ]]; then
+  _edit() {
+    _alternative "names:config:(list $(_edit_names | tr '\n' ' '))" 'files:file:_files'
+  }
+  whence -w compdef >/dev/null 2>&1 && compdef _edit edit
+elif [[ -n $BASH_VERSION ]]; then
+  _edit_complete() {
+    COMPREPLY=($(compgen -W "list $(_edit_names)" -- "${COMP_WORDS[COMP_CWORD]}"))
+  }
+  complete -o bashdefault -o default -F _edit_complete edit
+fi
+
+# getURLParams — break a long URL down so it is easy to read: protocol, domain
+# and slug on their own lines, then every query parameter, one per line, in
+# alphabetical order. Names and values are printed exactly as they are in the
+# URL (nothing is decoded, so %20 and friends stay visible). A parameter with
+# no value, like af=, is listed with a blank value. A #fragment, if the URL has
+# one, is printed last.
+#
+# The URL comes from the argument, from stdin, or from the clipboard when
+# neither is given. Whitespace and line breaks inside the URL are removed first,
+# so a URL wrapped over several lines still works.
+#
+# Usage:
+#   getURLParams 'https://example.com/a?x=1&y=2'   # quote it, the shell treats & as special
+#   getURLParams                                   # read the URL from the clipboard
+#   wl-paste | getURLParams                        # or pipe it in
+#
+# Clipboard: wl-paste (Wayland), xclip (X11) or pbpaste (macOS), whichever exists.
+# Colors are only used when printing to a terminal.
+function getURLParams() {
+  local url
+  if (( $# )); then
+    url="$*"
+  elif [[ ! -t 0 ]]; then
+    url=$(cat)
+  elif command -v wl-paste >/dev/null 2>&1; then
+    url=$(wl-paste --no-newline 2>/dev/null)
+  elif command -v xclip >/dev/null 2>&1; then
+    url=$(xclip -o -selection clipboard 2>/dev/null)
+  elif command -v pbpaste >/dev/null 2>&1; then
+    url=$(pbpaste)
+  fi
+  url=${url//[[:space:]]/}
+  if [[ -z $url ]]; then
+    echo "Usage: getURLParams '<url>'   (or copy a URL and run getURLParams)" >&2
+    return 1
+  fi
+
+  local label=$'\e[2m' key=$'\e[36m' bold=$'\e[1m' reset=$'\e[0m'
+  [[ -t 1 ]] || { label= key= bold= reset=; }
+
+  # Split off #fragment and ?query, then protocol://domain/slug.
+  local base=$url query= fragment=
+  if [[ $base == *'#'* ]]; then fragment=${base#*'#'}; base=${base%%'#'*}; fi
+  if [[ $base == *'?'* ]]; then query=${base#*'?'}; base=${base%%'?'*}; fi
+
+  local protocol= domain= slug=$base
+  if [[ $base == *://* ]]; then
+    protocol=${base%%://*}
+    domain=${base#*://}
+    if [[ $domain == */* ]]; then slug=/${domain#*/}; domain=${domain%%/*}; else slug=/; fi
+  fi
+
+  [[ -n $protocol ]] && printf '%sprotocol%s  %s\n' "$label" "$reset" "$protocol"
+  [[ -n $domain ]]   && printf '%sdomain%s    %s%s%s\n' "$label" "$reset" "$bold" "$domain" "$reset"
+  printf '%sslug%s      %s\n' "$label" "$reset" "$slug"
+
+  if [[ -n $query ]]; then
+    # One name=value per line, empty pieces (from && or a trailing &) dropped,
+    # sorted by name; -s keeps a repeated name in URL order.
+    local pairs= rest=$query pair
+    while [[ -n $rest ]]; do
+      pair=${rest%%&*}
+      if [[ $rest == *'&'* ]]; then rest=${rest#*&}; else rest=; fi
+      [[ -n $pair ]] && pairs+="$pair"$'\n'
+    done
+    pairs=$(printf '%s' "$pairs" | LC_ALL=C sort -f -s -t '=' -k 1,1)
+
+    local width=0 name
+    while IFS= read -r pair; do
+      name=${pair%%=*}
+      (( ${#name} > width )) && width=${#name}
+    done <<< "$pairs"
+
+    echo
+    while IFS= read -r pair; do
+      [[ -z $pair ]] && continue
+      name=${pair%%=*}
+      if [[ $pair == *=* ]]; then
+        printf '  %s%-*s%s  %s\n' "$key" "$width" "$name" "$reset" "${pair#*=}"
+      else
+        printf '  %s%s%s\n' "$key" "$name" "$reset"
+      fi
+    done <<< "$pairs"
+  fi
+
+  [[ -n $fragment ]] && printf '\n%sfragment%s  %s\n' "$label" "$reset" "$fragment"
+  return 0
 }
-(( $+functions[compdef] )) && compdef _edit edit

@@ -1,4 +1,5 @@
-# ~/.bashrc: executed by bash(1) for non-login shells.
+# ~/.bashrc: executed by bash(1) for non-login shells, and for login shells
+# through ~/.profile.
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
 
@@ -6,6 +7,18 @@
 # non-interactive shells. Skipped on every other machine.
 if [[ -r /usr/share/omarchy/default/bash/env-bootstrap ]]; then
     source /usr/share/omarchy/default/bash/env-bootstrap
+fi
+
+# Shared environment (XDG folders, PATH, EDITOR, DOTFILES, …), the same file
+# zsh reads through ~/.zshenv. Found through the dotfiles command link that
+# dotfiles.sh makes (~/.local/bin/dotfiles -> …/dotfiles/dotfiles.sh).
+_dotfiles_link="$HOME/.local/bin/dotfiles"
+if [ -z "$DOTFILES" ] && [ -L "$_dotfiles_link" ]; then
+    DOTFILES="$(cd "$(dirname "$(readlink -f "$_dotfiles_link")")" && pwd)"
+fi
+unset _dotfiles_link
+if [ -n "$DOTFILES" ] && [ -f "$DOTFILES/config/shell/env" ]; then
+    . "$DOTFILES/config/shell/env"
 fi
 
 # If not running interactively, don't do anything
@@ -119,7 +132,22 @@ fi
 # the generic defaults above so Omarchy's win, and before your own below so
 # yours win.
 if [[ -n ${OMARCHY_PATH:-} && -r $OMARCHY_PATH/default/bash/rc ]]; then
+    # Omarchy defines ga() and gd(), the same names as aliases in
+    # config/shell/aliases. On a reload (fresh, reload) those aliases already
+    # exist and bash expands them inside Omarchy's "ga() {", a syntax error.
+    # Drop them first; config/shell/aliases sets them again below.
+    unalias ga gd 2>/dev/null
     source "$OMARCHY_PATH/default/bash/rc"
+    # Omarchy's ga (new worktree + branch) is called gwt here and its gd
+    # (remove that worktree + branch) is gwtr, so ga and gd stay the aliases.
+    if declare -F ga >/dev/null; then
+        eval "$(declare -f ga | sed -e '1s/^ga /gwt /' -e 's/Usage: ga /Usage: gwt /')"
+        unset -f ga
+    fi
+    if declare -F gd >/dev/null; then
+        eval "$(declare -f gd | sed -e '1s/^gd /gwtr /')"
+        unset -f gd
+    fi
 fi
 
 # PATH additions (were in Omarchy's own ~/.bashrc): composer's global tools,
@@ -131,23 +159,12 @@ case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$P
 # You may want to put all your additions into a separate file like
 # ~/.bash_aliases, instead of adding them here directly.
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
-# DOTFILES: wherever this machine's repo is, found through the dotfiles
-# command link that dotfiles.sh makes (~/.local/bin/dotfiles ->
-# …/dotfiles/dotfiles.sh).
-_dotfiles_link="$HOME/.local/bin/dotfiles"
-if [ -z "$DOTFILES" ] && [ -L "$_dotfiles_link" ]; then
-    DOTFILES="$(cd "$(dirname "$(readlink -f "$_dotfiles_link")")" && pwd)"
-    export DOTFILES
+# Aliases and functions, shared with zsh.
+if [ -n "$DOTFILES" ] && [ -f "$DOTFILES/config/shell/aliases" ]; then
+    . "$DOTFILES/config/shell/aliases"
 fi
-unset _dotfiles_link
-if [ -n "$DOTFILES" ] && [ -f "$DOTFILES/config/zsh/.aliases" ]; then
-    . "$DOTFILES/config/zsh/.aliases"
-fi
-
-# Functions definitions.
-# You may want to put all your additions into a separate file like
-if [ -f $HOME/.functions ]; then
-    . $HOME/.functions
+if [ -n "$DOTFILES" ] && [ -f "$DOTFILES/config/shell/functions" ]; then
+    . "$DOTFILES/config/shell/functions"
 fi
 
 # my basic alias and functions to get a system up and running

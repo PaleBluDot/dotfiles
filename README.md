@@ -53,7 +53,7 @@ theme-set list            the themes, * = current
 theme-set -n <theme>      dry run: render to a temp folder, change nothing
 ```
 
-[`bin/theme-set`](bin/theme-set) (on `PATH` through `.zshenv`) works without
+[`bin/theme-set`](bin/theme-set) (on `PATH` through `config/shell/env`) works without
 `dotfiles.sh`: it fills [`config/theme/templates/`](config/theme) (for the
 tools installed here) from the theme's
 `config/omarchy/themes/<theme>/colors.toml` into

@@ -10,8 +10,13 @@ fi
 
 alias c="clear"
 alias cl="clear"
-alias fenv='source "$ZDOTDIR/.zshenv"'
-alias fresh="source $ZDOTDIR/.zshrc; clear"
+alias fenv='source "$DOTFILES/config/shell/env"'
+if [[ -n "$ZSH_VERSION" ]]
+then
+	alias fresh='source "${ZDOTDIR:-$HOME}/.zshrc"; clear'
+else
+	alias fresh='source ~/.bashrc; clear'
+fi
 alias aliasUpdate="fresh 2>&1 && c"
 alias histg="history | fzf"
 alias findAlias="alias | fzf"
@@ -36,10 +41,10 @@ alias ix='tdl cx'
 # !------------------------------------
 # @@@ FILE EDITS
 # !------------------------------------
-# alias edit="$EDITOR"   # replaced by the edit() function in .functions
-alias ea="$EDITOR $DOTFILES/config/zsh/.aliases"
-alias ef="$EDITOR $DOTFILES/config/zsh/.functions"
-alias ee="$EDITOR $DOTFILES/config/zsh/.zshenv"
+# alias edit="$EDITOR"   # replaced by the edit() function in functions
+alias ea="$EDITOR $DOTFILES/config/shell/aliases"
+alias ef="$EDITOR $DOTFILES/config/shell/functions"
+alias ee="$EDITOR $DOTFILES/config/shell/env"
 alias vi="nvim"
 alias vim="nvim"
 alias base="$EDITOR ~/Library/CloudStorage/OneDrive-Personal/Documents/Espanso/match/base.yml"
@@ -200,9 +205,9 @@ alias group="cat /etc/group"
 # Insiders is the main VS Code. Until it's installed (AUR on Arch), plain
 # code stays code and is the editor. Here, not in .zshenv: Homebrew's PATH
 # (.zprofile) isn't set yet there.
-if (( $+commands[code-insiders] )); then
+if command -v code-insiders >/dev/null 2>&1; then
   alias code="code-insiders"
-elif [[ $VISUAL == code-insiders* ]] && (( $+commands[code] )); then
+elif [[ $VISUAL == code-insiders* ]] && command -v code >/dev/null 2>&1; then
   export VISUAL='code --wait'
 fi
 alias teach="code --extensions-dir ~/code_profiles/teach/exts --user-data-dir ~/code_profiles/teach/data"

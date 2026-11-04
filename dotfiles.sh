@@ -1630,6 +1630,11 @@ isn't used on this platform is skipped. Repos under clone: are cloned once
 the links are in place, only when missing (an existing clone is never
 touched). Then config/dotfiles/hooks/<tool>.sh runs, if there is one.
 
+A tool that used to link its whole folder and now links files inside it:
+the old folder link becomes a real folder, and clones that were made
+through it (so really inside the repo, gitignored) are moved out of the
+repo into it instead of being cloned again.
+
 What's in the way of a link:
   nothing                   link it
   already our link          "already linked"
@@ -1637,7 +1642,8 @@ What's in the way of a link:
   a real folder             leave it alone (warn)
   a link to somewhere else  ask, replace it
 
-Never touches anything inside the repo (through a linked folder).
+Never touches anything inside the repo (through a linked folder), apart
+from moving gitignored clones out of it as above.
 
 System files (a dest outside $HOME, e.g. omarchy, limine) get a
 root-owned copy instead of a symlink. When one is missing or differs from
@@ -1667,9 +1673,10 @@ EOF
       cat <<'EOF'
 dotfiles unlink [tool...] [-d] [-v] [--force]
 
-Remove tools: the package, then the config links (backups are put back),
-then the tool comes off config.yml. Doesn't ask before removing the
-package. Hook steps aren't undone.
+Remove tools: the package, then its clones (only real clones of the repo
+dotfiles.yml names), then the config links (backups are put back), then
+the tool comes off config.yml. Doesn't ask before removing the package.
+Hook steps aren't undone.
 
   dotfiles unlink             interactive: pick from the tools in config.yml
   dotfiles unlink cowsay      that tool
@@ -1718,14 +1725,15 @@ dotfiles wipe [-d] [-v]
 
 Undo everything dotfiles set up on this machine, to test it again from
 scratch:
-  - every tool used here: remove its links and system copies (backups are
-    put back), and for the tools in config.yml its package (not the
-    required ones)
+  - every tool used here: remove its clones, its links and system copies
+    (backups are put back), and for the tools in config.yml its package
+    (not the required ones)
   - then dotfiles' own link (~/.local/bin/dotfiles)
 
 Kept: required packages, config.yml (so "dotfiles.sh link" sets up the
-same tools again), and everything in the repo: no file in it is changed
-or removed. The log stays too. Hook steps aren't undone. A package others
+same tools again), and everything the repo tracks: no tracked file is
+changed or removed (a gitignored clone inside it is removed with its
+tool). The log stays too. Hook steps aren't undone. A package others
 depend on (e.g. Omarchy's) can't be removed: wipe reports it and carries
 on.
 
@@ -2761,6 +2769,11 @@ _link_path() {
   fi
 
   state="$(_link_state "$src_path" "$dest_path")"
+  # Dry run: the old folder link above dest would have been replaced by an
+  # empty real folder, so dest would be missing (see _unfold_tool_link).
+  if [[ $DRY_RUN == true ]] && _under_unfolded "$dest_path"; then
+    state=missing
+  fi
   log debug "$tool: $shown is $state"
   _tighten_private_parent "$tool" "$(dirname "$dest_path")"
 
@@ -2784,7 +2797,8 @@ _link_path() {
   # folder), whatever is there is the repo's own file: moving, deleting or
   # adding to it would change the repo. The folder decides, not dest
   # itself: an old symlink pointing into the repo can still be replaced.
-  if _inside_repo "$(dirname "$dest_path")"; then
+  if _inside_repo "$(dirname "$dest_path")" &&
+    ! { [[ $DRY_RUN == true ]] && _under_unfolded "$dest_path"; }; then
     log error "$tool: $shown is inside the repo (through $(_tilde "$(_linked_parent "$dest_path")")); not touching it"
     return 1
   fi
@@ -2892,10 +2906,13 @@ _clone_one() {
 
 # A tool that used to link its whole folder (~/.config/aether -> config/aether)
 # and now links parts of it: the old folder link is replaced by a real folder,
-# or the new links would land inside the repo.
-UNFOLDED=""   # dry run: folder links that would have been replaced
+# or the new links would land inside the repo. Clones that were made through
+# the old folder link (~/.config/zsh/oh-my-zsh, really config/zsh/oh-my-zsh)
+# are moved out of the repo into the real folder, so they aren't left
+# behind in the repo or cloned a second time.
+UNFOLDED=""   # folder links replaced (or, in a dry run, that would have been)
 _unfold_tool_link() {
-  local tool="$1" src dest parent target
+  local tool="$1" src dest parent target repo cdest old new moves moved skip
   while IFS=$'\t' read -r src dest; do
     [[ $dest == /* || -z $dest ]] && continue
     parent="$(dirname "$HOME/$dest")"
@@ -2903,15 +2920,108 @@ _unfold_tool_link() {
     if [[ -L $parent ]]; then
       target="$(_physical "$parent")"
       if [[ $target == "$(_physical "$DOTFILES/config/$tool")" ]]; then
+        # Clones under the folder. One inside another (a plugin inside
+        # oh-my-zsh) moves along with it, so it isn't moved on its own.
+        moves=""
+        while IFS=$'\t' read -r repo cdest; do
+          new="$HOME/$cdest"
+          [[ $new == "$parent"/* ]] || continue
+          old="$target/${new#"$parent"/}"
+          [[ -d $old/.git ]] || continue
+          skip=false
+          while IFS=$'\t' read -r moved _; do
+            [[ -n $moved && $old == "$moved"/* ]] && skip=true
+          done <<<"$moves"
+          [[ $skip == true ]] && continue
+          # Only what git ignores: never move something the repo tracks.
+          git -C "$DOTFILES" check-ignore -q "$old" 2>/dev/null || continue
+          moves+="$old"$'\t'"$new"$'\n'
+        done < <(tool_clones "$tool")
         run_cmd rm "$parent"
         run_cmd mkdir -p "$parent"
         UNFOLDED+="$parent"$'\n'
         if [[ $DRY_RUN != true ]]; then
           log info "$tool: $(_tilde "$parent") linked the whole folder; it's a real folder now, with links and copies inside"
         fi
+        while IFS=$'\t' read -r old new; do
+          [[ -z $old ]] && continue
+          run_cmd mkdir -p "$(dirname "$new")"
+          run_cmd mv "$old" "$new"
+          if [[ $DRY_RUN != true ]]; then
+            log info "$tool: moved the clone ${old#"$(_physical "$DOTFILES")"/} out of the repo to $(_tilde "$new")"
+          fi
+        done <<<"$moves"
       fi
     fi
   done < <(tool_links "$tool")
+}
+
+# True when path is under a folder link that _unfold_tool_link replaced. In
+# a dry run the link is still there, so such a path looks like it's inside
+# the repo; it isn't once the folder is real.
+_under_unfolded() {
+  local path="$1" folder
+  while IFS= read -r folder; do
+    [[ -n $folder && $path == "$folder"/* ]] && return 0
+  done <<<"$UNFOLDED"
+  return 1
+}
+
+# unlink, wipe: an old whole-folder link (~/.config/zsh -> config/zsh) from
+# before the tool linked files inside it. dotfiles.yml doesn't list it any
+# more, so _unlink_configs wouldn't remove it.
+_unlink_old_folder_link() {
+  local tool="$1" src dest parent done_list=""
+  while IFS=$'\t' read -r src dest; do
+    [[ $dest == /* || -z $dest ]] && continue
+    parent="$(dirname "$HOME/$dest")"
+    [[ $'\n'$done_list$'\n' == *$'\n'"$parent"$'\n'* ]] && continue
+    done_list+="$parent"$'\n'
+    if [[ -L $parent && $(_physical "$parent") == "$(_physical "$DOTFILES/config/$tool")" ]]; then
+      CHANGED=true
+      run_cmd rm "$parent"
+      if [[ $DRY_RUN != true ]]; then
+        log success "$tool: unlinked the old folder link $(_tilde "$parent")"
+      fi
+    fi
+  done < <(tool_links "$tool")
+}
+
+# Remove a tool's clones (unlink, wipe). Only real git clones of the repo
+# dotfiles.yml names are removed; anything else at that path is left alone.
+# A clone inside the repo (through an old folder link) goes only when git
+# ignores it. Run before the links come out: an old folder link is how the
+# clone is reached.
+_unclone_tool() {
+  local tool="$1" repo dest path shown url ok=true i
+  local -a pairs=()
+  while IFS= read -r repo; do
+    pairs+=("$repo")
+  done < <(tool_clones "$tool")
+  # Last clone first: plugins before the clone they sit in.
+  for ((i = ${#pairs[@]} - 1; i >= 0; i--)); do
+    IFS=$'\t' read -r repo dest <<<"${pairs[i]}"
+    path="$HOME/$dest"
+    shown="$(_tilde "$path")"
+    [[ -d $path/.git ]] || continue
+    url="$(git -C "$path" remote get-url origin 2>/dev/null || true)"
+    if [[ ${url%.git} != "${repo%.git}" ]]; then
+      log warn "$tool: $shown is a clone of ${url:-something else}, not $repo; left it alone"
+      ok=false
+      continue
+    fi
+    if _inside_repo "$path" && ! git -C "$DOTFILES" check-ignore -q "$(_physical "$path")" 2>/dev/null; then
+      log warn "$tool: $shown is inside the repo and not gitignored; left it alone"
+      ok=false
+      continue
+    fi
+    CHANGED=true
+    run_cmd rm -rf "$path"
+    if [[ $DRY_RUN != true ]]; then
+      log success "$tool: removed the clone $shown"
+    fi
+  done
+  [[ $ok == true ]]
 }
 
 # Link one tool's configs and clone its repos. Returns 1 when a link isn't
@@ -3682,9 +3792,14 @@ _unlink_tool() {
   if ! _remove_package "$tool"; then
     return 1
   fi
+  # Clones before links: an old folder link may be how a clone is reached.
+  if ! _unclone_tool "$tool"; then
+    return 1
+  fi
   if ! _unlink_configs "$tool"; then
     return 1
   fi
+  _unlink_old_folder_link "$tool"
   if [[ $KEEP_CONFIG != true ]]; then
     _config_set "$tool" none
   fi
@@ -4278,9 +4393,13 @@ cmd_wipe() {
     if _tool_is_listed "$tool" && ! _tool_is_required "$tool" && ! _remove_package "$tool"; then
       failed="${failed:+$failed, }$tool (package)"
     fi
+    if ! _unclone_tool "$tool"; then
+      failed="${failed:+$failed, }$tool (clones)"
+    fi
     if ! _unlink_configs "$tool"; then
       failed="${failed:+$failed, }$tool (links)"
     fi
+    _unlink_old_folder_link "$tool"
   done
   _wipe_self
 
@@ -4476,13 +4595,7 @@ _path_check() {
   local file
   case "${SHELL##*/}" in
     zsh) file="~/.zshenv" ;;
-    bash)
-      if [[ $DOTFILES_OS == macos ]]; then
-        file="~/.bash_profile"
-      else
-        file="~/.bashrc"
-      fi
-      ;;
+    bash) file="~/.bashrc" ;;
     *) file="your shell's startup file" ;;
   esac
   log warn "$shown isn't on PATH, so the 'dotfiles' command won't be found. Add this line to $file, then open a new terminal:"
