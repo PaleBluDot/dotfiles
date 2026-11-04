@@ -78,7 +78,8 @@ tools:
       all: bash
       windows: Git.Git   # Git Bash
     links:
-      bash/.bashrc: $HOME/.bashrc
+      bash/bashrc: $HOME/.bashrc
+      shell/profile: $HOME/.profile
 
   bat:
     package:
@@ -497,7 +498,9 @@ tools:
       linux: zsh
       mac: zsh
     links:
-      zsh: $HOME/.config/zsh
+      zsh/zshrc: $HOME/.config/zsh/.zshrc
+      zsh/zprofile: $HOME/.config/zsh/.zprofile
+      shell/env: $HOME/.zshenv
     clone:
       ohmyzsh/ohmyzsh: $HOME/.config/zsh/oh-my-zsh
       zsh-users/zsh-autosuggestions: $HOME/.config/zsh/oh-my-zsh/custom/plugins/zsh-autosuggestions
