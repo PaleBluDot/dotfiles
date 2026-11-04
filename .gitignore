@@ -66,3 +66,13 @@ config/cspell/node_modules/
 
 # bat: the current theme, installed by the omarchy theme-set hook (generated)
 config/bat/themes/omarchy.tmTheme
+
+# Neovim (LazyVim) scratch files, from the old config/nvim/.gitignore
+config/nvim/**/tt.*
+config/nvim/**/.tests
+config/nvim/doc/tags
+config/nvim/**/debug
+config/nvim/**/.repro
+config/nvim/**/foo.*
+config/nvim/**/*.log
+config/nvim/**/data

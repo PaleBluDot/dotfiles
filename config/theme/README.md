@@ -73,7 +73,7 @@ Helpers (Omarchy's renderer and `theme-set` both have them):
 | `btop.theme.tpl` | btop (`color_theme`) | Omarchy |
 | `chromium.theme.tpl` | Chromium/Brave theme colour (Omarchy) | Omarchy |
 | `claude.json.tpl` | Claude Code theme | Omarchy |
-| `delta.gitconfig.tpl` | delta, `[include]` from `.gitconfig` (uses bat's `omarchy` theme) | new |
+| `delta.gitconfig.tpl` | delta, `[include]` from `config/git/gitconfig` (uses bat's `omarchy` theme) | new |
 | `eza.yml.tpl` | eza, `~/.config/eza/theme.yml` | new |
 | `foot.ini.tpl` | foot (`include=`) | Omarchy |
 | `fzf.sh.tpl` | fzf, sourced from the shell (`FZF_DEFAULT_OPTS`) | new |
