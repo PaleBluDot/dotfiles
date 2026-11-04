@@ -15,6 +15,10 @@
 -- enabled with `:LazyExtras`
 vim.g.lazyvim_picker = "telescope"
 
+-- TypeScript LSP to use.
+-- Can be one of: vtsls, tsc
+vim.g.lazyvim_ts_lsp = "tsc"
+
 -- Optionally setup the terminal to use
 -- This sets `vim.o.shell` and does some additional configuration for:
 -- * pwsh
