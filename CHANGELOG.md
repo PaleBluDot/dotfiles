@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.26.0](https://github.com/PaleBluDot/dotfiles/compare/v2.25.1...v2.26.0) (2026-11-04)
+
+
+### Features
+
+* **script:** dotfiles list aliases | functions | tools ([#123](https://github.com/PaleBluDot/dotfiles/issues/123)) ([7787692](https://github.com/PaleBluDot/dotfiles/commit/778769271b8bc883f495882bd9fd461be8e8be8c)), closes [#122](https://github.com/PaleBluDot/dotfiles/issues/122)
+
 ## [2.25.1](https://github.com/PaleBluDot/dotfiles/compare/v2.25.0...v2.25.1) (2026-11-04)
 
 
