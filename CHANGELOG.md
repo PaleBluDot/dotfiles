@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.25.0](https://github.com/PaleBluDot/dotfiles/compare/v2.24.1...v2.25.0) (2026-11-04)
+
+
+### Features
+
+* **config:** use tsc for TypeScript and a custom Vue setup in nvim ([#116](https://github.com/PaleBluDot/dotfiles/issues/116)) ([cac0d58](https://github.com/PaleBluDot/dotfiles/commit/cac0d58e37b595ab739311999b0ad0623eac1a03))
+
 ## [2.24.1](https://github.com/PaleBluDot/dotfiles/compare/v2.24.0...v2.24.1) (2026-11-04)
 
 
