@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.22.0](https://github.com/PaleBluDot/dotfiles/compare/v2.21.0...v2.22.0) (2026-11-04)
+
+
+### Features
+
+* **config:** share shell config between bash and zsh ([#107](https://github.com/PaleBluDot/dotfiles/issues/107)) ([d321e74](https://github.com/PaleBluDot/dotfiles/commit/d321e7486cf4a8a1a5f5b29f38a082f56fdb466c)), closes [#106](https://github.com/PaleBluDot/dotfiles/issues/106)
+
 # [2.21.0](https://github.com/PaleBluDot/dotfiles/compare/v2.20.0...v2.21.0) (2026-10-27)
 
 
