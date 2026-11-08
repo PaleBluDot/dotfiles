@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.29.0](https://github.com/PaleBluDot/dotfiles/compare/v2.28.0...v2.29.0) (2026-11-08)
+
+
+### Features
+
+* **function:** sshregister, add this machine to 1Password + ssh ([#126](https://github.com/PaleBluDot/dotfiles/issues/126)) ([2dabc92](https://github.com/PaleBluDot/dotfiles/commit/2dabc927562553e9ff9b2976acc5a5e729972d64))
+
 # [2.28.0](https://github.com/PaleBluDot/dotfiles/compare/v2.27.0...v2.28.0) (2026-11-08)
 
 
