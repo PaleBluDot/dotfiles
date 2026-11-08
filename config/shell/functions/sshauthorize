@@ -1,0 +1,175 @@
+# shellcheck shell=bash
+# sshauthorize — build ~/.ssh/authorized_keys from SSH keys picked in 1Password.
+#
+# Lists the "SSH Key" items in the 1Password vault "Personal" (bluetrix,
+# Macbook, uConsole, ...) in fzf with the ones already authorized selected:
+# Tab toggles, Enter writes the file. Each key is written with its item's
+# name as the comment, inside a marked section:
+#
+#   # >>> sshauthorize: keys from 1Password, managed by sshauthorize >>>
+#   ssh-ed25519 AAAA... Macbook
+#   # <<< sshauthorize <<<
+#
+# Lines outside that section are kept as they are (keys from elsewhere),
+# except copies of 1Password keys, which move into the section so a key is
+# never listed twice. The old file is saved as authorized_keys.bak, and it
+# says which keys were added and removed.
+#
+# Usage:
+#   sshauthorize                  pick in fzf (a numbered list without fzf)
+#   sshauthorize <item>...        authorize exactly these items, no picker
+#                                 (names as in 1Password, any case)
+#   sshauthorize --list           show what's authorized now, by item name
+#   --vault <name>                another vault (default: Personal)
+#
+# Requires: op (signed in, or it asks for your 1Password password), jq.
+sshauthorize() {
+	local vault=Personal list=false file="$HOME/.ssh/authorized_keys"
+	local begin="# >>> sshauthorize: keys from 1Password, managed by sshauthorize >>>"
+	local end="# <<< sshauthorize <<<"
+	local names="" arg
+	while (( $# )); do
+		case $1 in
+		--list) list=true ;;
+		--vault) vault=${2:-}; shift ;;
+		-h | --help)
+			sed -n '2,/^sshauthorize()/{/^sshauthorize()/d;s/^# \{0,1\}//;p;}' "$DOTFILES/config/shell/functions/sshauthorize"
+			return 0
+			;;
+		-*)
+			echo "sshauthorize: unknown option $1 (see sshauthorize --help)" >&2
+			return 2
+			;;
+		*) names+="$1"$'\n' ;;
+		esac
+		shift
+	done
+
+	for arg in op jq; do
+		command -v "$arg" >/dev/null 2>&1 || { echo "sshauthorize: $arg isn't installed" >&2; return 1; }
+	done
+	if ! op whoami >/dev/null 2>&1; then
+		eval "$(op signin)" || { echo "sshauthorize: 1Password sign-in failed or was cancelled" >&2; return 1; }
+	fi
+
+	# All SSH keys in the vault: "<name>\t<type> <key>", sorted by name.
+	local keys
+	keys=$(op item list --categories "SSH Key" --vault "$vault" --format json |
+		op item get - --format json |
+		jq -r 'select(.category == "SSH_KEY") | [.title, (first(.fields[]? | select(.id == "public_key" or .label == "public key") | .value) // "")] | @tsv' |
+		awk -F'\t' '$2 != "" { split($2, k, " "); print $1 "\t" k[1] " " k[2] }' |
+		sort -f)
+	if [[ -z $keys ]]; then
+		echo "sshauthorize: no SSH keys found in the 1Password vault $vault" >&2
+		return 1
+	fi
+
+	# Keys in the file now: "<type> <key>\t<comment>" (options before the key are skipped).
+	local current=""
+	[[ -f $file ]] && current=$(awk '
+		/^[[:space:]]*(#|$)/ { next }
+		{ for (i = 1; i < NF; i++) if ($(i + 1) ~ /^AAAA/) { c = ""; for (j = i + 2; j <= NF; j++) c = c (c == "" ? "" : " ") $j; print $i " " $(i + 1) "\t" c; next } }
+	' "$file")
+
+	if [[ $list == true ]]; then
+		if [[ -z $current ]]; then
+			echo "No keys in $file"
+			return 0
+		fi
+		echo "Authorized in ~${file#"$HOME"}:"
+		# name from 1Password when the key is there, else the line's own comment
+		KEYS="$keys" awk -F'\t' '
+			BEGIN { n = split(ENVIRON["KEYS"], l, "\n"); for (i = 1; i <= n; i++) { split(l[i], f, "\t"); name[f[2]] = f[1] } }
+			{ if ($1 in name) print "  " name[$1]; else print "  " ($2 == "" ? "(no comment)" : $2) "  (not in 1Password)" }
+		' <<<"$current"
+		return 0
+	fi
+
+	# Pick: named items, fzf, or a numbered list.
+	local picked="" n line choice
+	if [[ -n $names ]]; then
+		picked=$(NAMES="$names" awk -F'\t' '
+			BEGIN { n = split(ENVIRON["NAMES"], w, "\n"); for (i = 1; i <= n; i++) if (w[i] != "") want[tolower(w[i])] = w[i] }
+			tolower($1) in want { print; delete want[tolower($1)] }
+			END { for (k in want) { print "sshauthorize: no SSH key \"" want[k] "\" in 1Password" > "/dev/stderr"; bad = 1 } exit bad }
+		' <<<"$keys") || return 1
+	elif command -v fzf >/dev/null 2>&1; then
+		# start with the authorized keys selected: pos(N)+select for each
+		local bind="start:" i=0
+		while IFS=$'\t' read -r line arg; do
+			i=$((i + 1))
+			grep -qxF -- "$arg" <<<"$(cut -f1 <<<"$current")" && bind+="pos($i)+select+"
+		done <<<"$keys"
+		bind+="first"
+		picked=$(fzf --multi --delimiter='\t' --with-nth=1 --bind "$bind" \
+			--header 'Tab: toggle  Enter: write authorized_keys  Esc: cancel' \
+			--prompt 'Authorize> ' --height=~50% --reverse <<<"$keys") || {
+			echo "sshauthorize: cancelled; nothing changed"
+			return 1
+		}
+	else
+		n=0
+		echo "SSH keys in 1Password ($vault); * = authorized now:"
+		while IFS=$'\t' read -r line arg; do
+			n=$((n + 1))
+			if grep -qxF -- "$arg" <<<"$(cut -f1 <<<"$current")"; then echo "  $n) * $line"; else echo "  $n)   $line"; fi
+		done <<<"$keys"
+		printf 'Numbers to authorize, separated by spaces (Enter keeps the * ones): '
+		{ read -r choice </dev/tty; } 2>/dev/null || { echo; echo "sshauthorize: no terminal; nothing changed" >&2; return 1; }
+		if [[ -z $choice ]]; then
+			picked=$(CUR="$(cut -f1 <<<"$current")" awk -F'\t' 'BEGIN { n = split(ENVIRON["CUR"], c, "\n"); for (i = 1; i <= n; i++) have[c[i]] = 1 } $2 in have' <<<"$keys")
+		else
+			for n in $(tr -cs '0-9' ' ' <<<"$choice"); do
+				line=$(sed -n "${n}p" <<<"$keys")
+				[[ -n $line ]] && picked+="$line"$'\n'
+			done
+			picked=${picked%$'\n'}
+		fi
+	fi
+	# alphabetical in the file, whatever order they were picked in
+	[[ -n $picked ]] && picked=$(sort -f -u <<<"$picked")
+
+	# New file: lines outside the section that aren't 1Password keys, then the section.
+	local tmp
+	tmp=$(mktemp) || return 1
+	{
+		if [[ -f $file ]]; then
+			KEYS="$keys" BEGIN_M="$begin" END_M="$end" awk '
+				BEGIN { n = split(ENVIRON["KEYS"], l, "\n"); for (i = 1; i <= n; i++) { split(l[i], f, "\t"); op[f[2]] = 1 } }
+				$0 == ENVIRON["BEGIN_M"] { skip = 1; next }
+				$0 == ENVIRON["END_M"] { skip = 0; next }
+				skip { next }
+				{ for (i = 1; i < NF; i++) if ($(i + 1) ~ /^AAAA/ && (($i " " $(i + 1)) in op)) next }
+				{ lines[++m] = $0 }
+				END { while (m > 0 && lines[m] ~ /^[[:space:]]*$/) m--; for (i = 1; i <= m; i++) print lines[i]; if (m) print "" }
+			' "$file"
+		fi
+		echo "$begin"
+		[[ -n $picked ]] && awk -F'\t' '{ print $2 " " $1 }' <<<"$picked"
+		echo "$end"
+	} >"$tmp"
+
+	mkdir -p -m 700 "$HOME/.ssh"
+	if [[ -f $file ]]; then
+		if cmp -s "$tmp" "$file"; then
+			rm -f "$tmp"
+			echo "authorized_keys is already up to date"
+			return 0
+		fi
+		cp -p "$file" "$file.bak"
+	fi
+	cat "$tmp" >"$file" && rm -f "$tmp"
+	chmod 600 "$file"
+
+	# What changed, by 1Password name.
+	CUR="$(cut -f1 <<<"$current")" PICKED="$(cut -f2 <<<"$picked")" awk -F'\t' '
+		BEGIN {
+			n = split(ENVIRON["CUR"], c, "\n"); for (i = 1; i <= n; i++) had[c[i]] = 1
+			n = split(ENVIRON["PICKED"], p, "\n"); for (i = 1; i <= n; i++) now[p[i]] = 1
+		}
+		($2 in now) && !($2 in had) { print "  + " $1; changed = 1 }
+		!($2 in now) && ($2 in had) { print "  - " $1; changed = 1 }
+		END { if (!changed) print "  (same keys; file tidied)" }
+	' <<<"$keys"
+	echo "Wrote ~${file#"$HOME"} ($(grep -c . <<<"$picked") key(s) from 1Password)${current:+; old file in authorized_keys.bak}"
+}
