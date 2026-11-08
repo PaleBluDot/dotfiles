@@ -69,6 +69,15 @@ if [[ $TERM == linux ]] ||
   export STARSHIP_CONFIG="$HOME/.config/starship/tty.toml"
 fi
 
+# SSH agent on Linux without the 1Password desktop app (no desktop): the
+# systemd user ssh-agent (systemctl --user enable --now ssh-agent.socket),
+# keys loaded into it from 1Password with the op CLI. ssh/config uses
+# 1Password's own agent instead whenever it's running.
+if [[ $(uname) == Linux && ! -S $HOME/.1password/agent.sock && -z ${SSH_AUTH_SOCK:-} &&
+  -S ${XDG_RUNTIME_DIR:-/run/user/$UID}/ssh-agent.socket ]]; then
+  export SSH_AUTH_SOCK="${XDG_RUNTIME_DIR:-/run/user/$UID}/ssh-agent.socket"
+fi
+
 # bat: the current theme's colours once the theme hook has installed them
 # as bat's "omarchy" theme; otherwise --theme in bat's config (knuckles).
 [[ -f $HOME/.config/bat/themes/omarchy.tmTheme ]] && export BAT_THEME="omarchy"
@@ -90,6 +99,9 @@ export CARGO_HOME="$XDG_DATA_HOME/cargo"
 export DOTNET_CLI_HOME="$XDG_DATA_HOME/dotnet"
 export CUDA_CACHE_PATH="$XDG_CACHE_HOME/nv"
 export GNUPGHOME="$XDG_DATA_HOME/gnupg"
+# gpg refuses to run at all when its home folder is missing (makepkg's
+# signature checks fail with it on a fresh machine), so make it.
+[[ -d $GNUPGHOME ]] || mkdir -p -m 700 "$GNUPGHOME"
 export COMPOSER_CACHE_DIR="$XDG_CACHE_HOME/composer"
 export DOCKER_CONFIG="$XDG_CONFIG_HOME/docker"
 export WAKATIME_HOME="$XDG_CONFIG_HOME/wakatime"
