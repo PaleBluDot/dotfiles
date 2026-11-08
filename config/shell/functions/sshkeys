@@ -1,0 +1,83 @@
+# shellcheck shell=bash
+# sshkeys — load this machine's SSH keys from 1Password into the ssh-agent.
+#
+# For machines without the 1Password desktop app (no desktop), where ssh and
+# git signing use the systemd user ssh-agent instead (see config/shell/env).
+# The agent keeps keys in memory only, so they're gone after a reboot; this
+# puts them back. Asks only for your 1Password password (the account is
+# already added to op), and nothing at all if op is still signed in.
+#
+# Keys loaded, from the 1Password vault "Personal":
+#   Signing         signs git commits (user.signingkey)
+#   <short host>    this machine's ssh login key, e.g. surfarch; its public
+#                   key is also written to ~/.ssh/<host>.pub if missing,
+#                   which ssh/config offers (IdentityFile ~/.ssh/%L.pub)
+#
+# Usage:
+#   sshkeys          load the keys now
+#   sshkeys --auto   for shell startup (zshrc, bashrc): only on a terminal,
+#                    only when the agent is empty, and asks once per boot
+#                    (cancel it and new shells won't ask again; run
+#                    sshkeys by hand)
+#
+# Does nothing when 1Password's own agent is running (desktop app).
+sshkeys() {
+	local auto=false host vault=Personal item failed=0 marker
+	[[ ${1:-} == --auto ]] && auto=true
+	host=$(uname -n)
+	host=${host%%.*}
+	marker="${XDG_RUNTIME_DIR:-/tmp}/sshkeys-asked"
+
+	if [[ -S $HOME/.1password/agent.sock ]]; then
+		[[ $auto == true ]] || echo "sshkeys: 1Password's own agent is running; nothing to load"
+		return 0
+	fi
+
+	if [[ $auto == true ]]; then
+		# a terminal, op installed, not asked yet this boot
+		[[ $- == *i* && -t 0 && -t 1 ]] || return 0
+		command -v op >/dev/null 2>&1 || return 0
+		[[ -e $marker ]] && return 0
+		# ssh-add -l: 0 = has keys, 1 = empty, 2 = no agent
+		ssh-add -l >/dev/null 2>&1
+		[[ $? -eq 1 ]] || return 0
+		: >"$marker"
+		echo "sshkeys: the ssh-agent is empty; loading your keys from 1Password"
+	else
+		if ! command -v op >/dev/null 2>&1; then
+			echo "sshkeys: op (1Password CLI) isn't installed" >&2
+			return 1
+		fi
+		ssh-add -l >/dev/null 2>&1
+		if [[ $? -eq 2 ]]; then
+			echo "sshkeys: no ssh-agent at ${SSH_AUTH_SOCK:-(SSH_AUTH_SOCK not set)}" >&2
+			echo "         systemctl --user enable --now ssh-agent.socket, then open a new shell" >&2
+			return 1
+		fi
+	fi
+
+	# Sign in only if op isn't already; just the password for an added account.
+	if ! op whoami >/dev/null 2>&1; then
+		eval "$(op signin)" || {
+			echo "sshkeys: 1Password sign-in failed or was cancelled; run sshkeys to try again" >&2
+			return 1
+		}
+	fi
+
+	for item in Signing "$host"; do
+		# Straight from op into the agent: the private key never touches disk.
+		if op read "op://$vault/$item/private key?ssh-format=openssh" | ssh-add -q - 2>/dev/null; then
+			echo "   loaded $item"
+		else
+			echo "   couldn't load $item (no SSH key item \"$item\" in $vault?)" >&2
+			failed=1
+		fi
+	done
+
+	local pub
+	if [[ ! -f $HOME/.ssh/$host.pub ]] && pub=$(op read "op://$vault/$host/public key" 2>/dev/null) && [[ -n $pub ]]; then
+		printf '%s\n' "$pub" >"$HOME/.ssh/$host.pub" && echo "   wrote ~/.ssh/$host.pub"
+	fi
+
+	return $failed
+}

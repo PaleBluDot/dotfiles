@@ -170,6 +170,10 @@ if [ -n "$DOTFILES" ] && [ -d "$DOTFILES/config/shell/functions" ]; then
     unset _fn_file
 fi
 
+# SSH keys from 1Password after a reboot, on machines without its desktop
+# app: asks for the 1Password password once per boot (functions/sshkeys)
+declare -F sshkeys >/dev/null && sshkeys --auto
+
 eval "$(zoxide init bash)"
 
 # Starship prompt. STARSHIP_CONFIG (config/shell/env) picks starship.toml,
