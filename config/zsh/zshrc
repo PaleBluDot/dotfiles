@@ -89,6 +89,10 @@ function y() {
 for _fn_file in $DOTFILES/config/shell/functions/*(N.); do source $_fn_file; done
 unset _fn_file
 
+# SSH keys from 1Password after a reboot, on machines without its desktop
+# app: asks for the 1Password password once per boot (functions/sshkeys)
+(( $+functions[sshkeys] )) && sshkeys --auto
+
 
 # Welcome screen
 [[ ! -x "$(command -v welcome.sh)" ]] || source welcome.sh &&
