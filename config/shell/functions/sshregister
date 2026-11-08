@@ -1,0 +1,200 @@
+# shellcheck shell=bash
+# sshregister — register this machine in 1Password and the ssh config template.
+#
+# Three steps, each skipped when it's already done:
+#   1. SSH key: an "SSH Key" item named after the short hostname (e.g.
+#      surfarch) in the vault "Personal". None yet: generated in 1Password
+#      (ed25519), its public key written to ~/.ssh/<host>.pub, loaded into
+#      the ssh-agent (no desktop app) and, if you say yes, added to GitHub
+#      as a login key.
+#   2. Server entry: a "Server" item <host> in the vault "lab" with
+#      hostname (this machine's IP), username and port, like the others.
+#   3. Template: a "Host <host>" block in config/ssh/config, under the
+#      section you pick, reading those fields with op:// references. Then
+#      it offers to run `dotfiles link ssh` to rebuild ~/.ssh/config.
+# The template change is left uncommitted in the repo for you to commit.
+#
+# Usage:
+#   sshregister [options]
+#     --ip <address>      IP for the server entry (default: the LAN address,
+#                         the one with the default route)
+#     --tailscale         use the Tailscale 100.x address instead
+#     --user <name>       username (default: you, $USER)
+#     --port <port>       ssh port (default 22; a Port line is only added
+#                         to the template when it isn't 22)
+#     --section <name>    template section, e.g. Servers (default: asks;
+#                         a new name adds a new section at the end)
+#
+# Requires: op (signed in, or it asks for your 1Password password), and
+# $DOTFILES for the template.
+sshregister() {
+	local host ip="" user="${USER:-$(id -un)}" port=22 section="" tailscale=false
+	local key_vault=Personal lab_vault=lab template pub created_key=false
+	host=$(uname -n)
+	host=${host%%.*}
+	template="${DOTFILES:-}/config/ssh/config"
+
+	while (( $# )); do
+		case $1 in
+		--ip) ip=${2:-}; shift ;;
+		--tailscale) tailscale=true ;;
+		--user) user=${2:-}; shift ;;
+		--port) port=${2:-}; shift ;;
+		--section) section=${2:-}; shift ;;
+		-h | --help)
+			sed -n '2,/^sshregister()/{/^sshregister()/d;s/^# \{0,1\}//;p;}' "$DOTFILES/config/shell/functions/sshregister"
+			return 0
+			;;
+		*)
+			echo "sshregister: unknown option $1 (see sshregister --help)" >&2
+			return 2
+			;;
+		esac
+		shift
+	done
+
+	if ! command -v op >/dev/null 2>&1; then
+		echo "sshregister: op (1Password CLI) isn't installed" >&2
+		return 1
+	fi
+	if [[ ! -f $template ]]; then
+		echo "sshregister: no ssh config template at ${template} (is DOTFILES set?)" >&2
+		return 1
+	fi
+	if [[ ! $port =~ ^[0-9]+$ || -z $user ]]; then
+		echo "sshregister: --port must be a number and --user can't be empty" >&2
+		return 2
+	fi
+
+	# IP: given, Tailscale, or the address with the default route.
+	if [[ -z $ip && $tailscale == true ]]; then
+		ip=$(tailscale ip -4 2>/dev/null | head -n1)
+		[[ -n $ip ]] || { echo "sshregister: no Tailscale address (is tailscale up?)" >&2; return 1; }
+	elif [[ -z $ip ]]; then
+		if command -v ip >/dev/null 2>&1; then
+			ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "src") {print $(i + 1); exit}}')
+		else # macOS
+			ip=$(ipconfig getifaddr "$(route -n get default 2>/dev/null | awk '/interface:/ {print $2}')" 2>/dev/null)
+		fi
+		[[ -n $ip ]] || { echo "sshregister: couldn't find this machine's IP; pass --ip" >&2; return 1; }
+	fi
+
+	# Template section first, so nothing is created when none is picked.
+	local in_template=false
+	grep -qE "^Host[[:space:]]+$host([[:space:]]|$)" "$template" && in_template=true
+	if [[ $in_template == false ]]; then
+		# Sections are the one-word "# Name" lines (Network, Servers, ...).
+		local sections n=0 line choice
+		sections=$(grep -E '^# [A-Za-z]+$' "$template" | sed 's/^# //')
+		if [[ -z $section ]]; then
+			echo "  Section in config/ssh/config for $host:"
+			while IFS= read -r line; do
+				n=$((n + 1))
+				echo "    $n) $line"
+			done <<<"$sections"
+			printf '  Number, or a new section name: '
+			{ read -r choice </dev/tty; } 2>/dev/null || choice=""
+			if [[ $choice =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= n )); then
+				section=$(sed -n "${choice}p" <<<"$sections")
+			else
+				section=$choice
+			fi
+			[[ -n $section ]] || { echo "sshregister: no section picked; nothing changed" >&2; return 1; }
+		fi
+	fi
+
+	if ! op whoami >/dev/null 2>&1; then
+		eval "$(op signin)" || { echo "sshregister: 1Password sign-in failed or was cancelled" >&2; return 1; }
+	fi
+
+	echo "Registering $host ($user@$ip, port $port)"
+
+	# 1. SSH key ---------------------------------------------------------------
+	local category
+	category=$(op item get "$host" --vault "$key_vault" --format json 2>/dev/null | jq -r '.category' 2>/dev/null)
+	if [[ $category == SSH_KEY ]]; then
+		echo "✓ SSH key $key_vault/$host exists"
+	elif [[ -n $category ]]; then
+		echo "sshregister: $key_vault/$host exists but is a $category item, not an SSH key; rename it first" >&2
+		return 1
+	else
+		op item create --category "SSH Key" --vault "$key_vault" --title "$host" --ssh-generate-key ed25519 >/dev/null ||
+			{ echo "sshregister: couldn't create the SSH key in 1Password" >&2; return 1; }
+		created_key=true
+		echo "✓ created SSH key $key_vault/$host"
+	fi
+
+	if [[ ! -f $HOME/.ssh/$host.pub ]]; then
+		pub=$(op read "op://$key_vault/$host/public key") && [[ -n $pub ]] &&
+			printf '%s\n' "$pub" >"$HOME/.ssh/$host.pub" && echo "  wrote ~/.ssh/$host.pub"
+	fi
+	# Into the agent when there's no 1Password agent (sshkeys does this after a reboot).
+	local agent_rc
+	ssh-add -l >/dev/null 2>&1
+	agent_rc=$? # 0 = has keys, 1 = empty, 2 = no agent
+	if [[ ! -S $HOME/.1password/agent.sock && $agent_rc -ne 2 && -f $HOME/.ssh/$host.pub ]] &&
+		! ssh-add -L 2>/dev/null | grep -qF "$(cut -d' ' -f2 "$HOME/.ssh/$host.pub")"; then
+		op read "op://$key_vault/$host/private key?ssh-format=openssh" | ssh-add -q - 2>/dev/null &&
+			echo "  loaded it into the ssh-agent"
+	fi
+	if [[ $created_key == true ]] && command -v gh >/dev/null 2>&1 &&
+		_sshregister_ask "  Add it to GitHub as a login key? [y/N] "; then
+		gh ssh-key add "$HOME/.ssh/$host.pub" --title "$host" --type authentication ||
+			echo "  (needs: gh auth refresh -h github.com -s admin:public_key)" >&2
+	fi
+
+	# 2. Server entry ----------------------------------------------------------
+	if op item get "$host" --vault "$lab_vault" >/dev/null 2>&1; then
+		echo "✓ server entry $lab_vault/$host exists (left as it is)"
+	else
+		op item create --category Server --vault "$lab_vault" --title "$host" \
+			"hostname[text]=$ip" "username=$user" "port[text]=$port" >/dev/null ||
+			{ echo "sshregister: couldn't create $lab_vault/$host in 1Password" >&2; return 1; }
+		echo "✓ created server entry $lab_vault/$host"
+	fi
+
+	# 3. Template --------------------------------------------------------------
+	if [[ $in_template == true ]]; then
+		echo "✓ Host $host is already in config/ssh/config"
+		return 0
+	fi
+
+	local block tmp
+	block="Host $host
+    HostName {{ op://$lab_vault/$host/hostname }}
+    User {{ op://$lab_vault/$host/username }}"
+	[[ $port != 22 ]] && block+="
+    Port {{ op://$lab_vault/$host/port }}"
+
+	tmp=$(mktemp) || return 1
+	if grep -qxF "# $section" "$template"; then
+		# After the section's last host, keeping the blank lines that separate
+		# it from the next section after the new block.
+		SEC="# $section" BLOCK="$block" awk '
+			$0 == ENVIRON["SEC"] { insec = 1; print; next }
+			insec && /^# [A-Za-z]+$/ { print ""; print ENVIRON["BLOCK"]; printf "%s", gap; gap = ""; insec = 0; print; next }
+			insec && /^[[:space:]]*$/ { gap = gap $0 "\n"; next }
+			insec { printf "%s", gap; gap = ""; print; next }
+			{ print }
+			END { if (insec) { print ""; print ENVIRON["BLOCK"]; printf "%s", gap } }
+		' "$template" >"$tmp"
+	else
+		{ cat "$template"; printf '\n\n# %s\n%s\n' "$section" "$block"; } >"$tmp"
+	fi
+	cat "$tmp" >"$template" && rm -f "$tmp"
+	echo "✓ added Host $host to config/ssh/config (# $section); commit it when you're happy"
+
+	if command -v dotfiles >/dev/null 2>&1 && _sshregister_ask "  Rebuild ~/.ssh/config now (dotfiles link ssh)? [Y/n] " yes; then
+		dotfiles link ssh
+	fi
+}
+
+# _sshregister_ask "<prompt>" [yes] — true on y/yes; with "yes", an empty
+# answer is yes too. Reads from the terminal.
+_sshregister_ask() {
+	local reply
+	printf '%s' "$1"
+	{ read -r reply </dev/tty; } 2>/dev/null || { echo; return 1; }
+	[[ -z $reply && ${2:-} == yes ]] && return 0
+	[[ $reply == [yY] || $reply == [yY][eE][sS] ]]
+}
