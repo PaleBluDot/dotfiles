@@ -80,7 +80,41 @@ sshregister() {
 		[[ -n $ip ]] || { echo "sshregister: couldn't find this machine's IP; pass --ip" >&2; return 1; }
 	fi
 
-	# Template section first, so nothing is created when none is picked.
+	# Signed in = a call that needs a valid session works (op whoami
+	# isn't enough). Otherwise sign in: just the password.
+	if ! op vault list >/dev/null 2>&1; then
+		local _session
+		if ! _session=$(op signin) || ! eval "$_session" || ! op vault list >/dev/null 2>&1; then
+			echo "sshregister: 1Password sign-in failed or was cancelled" >&2
+			return 1
+		fi
+	fi
+
+	echo "Registering $host ($user@$ip, port $port)"
+
+	# What's there already, from listing each vault: an error reading
+	# 1Password stops here, it's never taken for "not there" (that would
+	# create a second key or entry).
+	local key_items lab_items category has_lab=false
+	if ! key_items=$(op item list --vault "$key_vault" --format json 2>&1); then
+		echo "sshregister: couldn't read the 1Password vault $key_vault: $key_items" >&2
+		return 1
+	fi
+	if ! lab_items=$(op item list --vault "$lab_vault" --format json 2>&1); then
+		echo "sshregister: couldn't read the 1Password vault $lab_vault: $lab_items" >&2
+		return 1
+	fi
+	category=$(jq -r --arg t "$host" 'first(.[] | select(.title == $t) | .category) // ""' <<<"$key_items")
+	[[ -n $(jq -r --arg t "$host" 'first(.[] | select(.title == $t) | .id) // ""' <<<"$lab_items") ]] && has_lab=true
+	if [[ -n $category && $category != SSH_KEY ]]; then
+		echo "sshregister: $key_vault/$host exists but is a $category item, not an SSH key; rename it first" >&2
+		return 1
+	fi
+	[[ $category == SSH_KEY ]] && echo "✓ SSH key $key_vault/$host exists"
+	[[ $has_lab == true ]] && echo "✓ server entry $lab_vault/$host exists (left as it is)"
+
+	# Template section next, before anything is created: no section
+	# picked, nothing created.
 	local in_template=false
 	grep -qE "^Host[[:space:]]+$host([[:space:]]|$)" "$template" && in_template=true
 	if [[ $in_template == false ]]; then
@@ -104,21 +138,8 @@ sshregister() {
 		fi
 	fi
 
-	if ! op whoami >/dev/null 2>&1; then
-		eval "$(op signin)" || { echo "sshregister: 1Password sign-in failed or was cancelled" >&2; return 1; }
-	fi
-
-	echo "Registering $host ($user@$ip, port $port)"
-
 	# 1. SSH key ---------------------------------------------------------------
-	local category
-	category=$(op item get "$host" --vault "$key_vault" --format json 2>/dev/null | jq -r '.category' 2>/dev/null)
-	if [[ $category == SSH_KEY ]]; then
-		echo "✓ SSH key $key_vault/$host exists"
-	elif [[ -n $category ]]; then
-		echo "sshregister: $key_vault/$host exists but is a $category item, not an SSH key; rename it first" >&2
-		return 1
-	else
+	if [[ $category != SSH_KEY ]]; then
 		op item create --category "SSH Key" --vault "$key_vault" --title "$host" --ssh-generate-key ed25519 >/dev/null ||
 			{ echo "sshregister: couldn't create the SSH key in 1Password" >&2; return 1; }
 		created_key=true
@@ -145,9 +166,7 @@ sshregister() {
 	fi
 
 	# 2. Server entry ----------------------------------------------------------
-	if op item get "$host" --vault "$lab_vault" >/dev/null 2>&1; then
-		echo "✓ server entry $lab_vault/$host exists (left as it is)"
-	else
+	if [[ $has_lab != true ]]; then
 		op item create --category Server --vault "$lab_vault" --title "$host" \
 			"hostname[text]=$ip" "username=$user" "port[text]=$port" >/dev/null ||
 			{ echo "sshregister: couldn't create $lab_vault/$host in 1Password" >&2; return 1; }

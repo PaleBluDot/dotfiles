@@ -48,13 +48,25 @@ sshauthorize() {
 	for arg in op jq; do
 		command -v "$arg" >/dev/null 2>&1 || { echo "sshauthorize: $arg isn't installed" >&2; return 1; }
 	done
-	if ! op whoami >/dev/null 2>&1; then
-		eval "$(op signin)" || { echo "sshauthorize: 1Password sign-in failed or was cancelled" >&2; return 1; }
+	# Signed in = a call that needs a valid session works (op whoami
+	# isn't enough). Otherwise sign in: just the password.
+	if ! op vault list >/dev/null 2>&1; then
+		local _session
+		if ! _session=$(op signin) || ! eval "$_session" || ! op vault list >/dev/null 2>&1; then
+			echo "sshauthorize: 1Password sign-in failed or was cancelled" >&2
+			return 1
+		fi
 	fi
 
 	# All SSH keys in the vault: "<name>\t<type> <key>", sorted by name.
 	local keys
-	keys=$(op item list --categories "SSH Key" --vault "$vault" --format json |
+	# An error reading 1Password is said as such, not as "no keys".
+	local list
+	if ! list=$(op item list --categories "SSH Key" --vault "$vault" --format json 2>&1); then
+		echo "sshauthorize: couldn't read the 1Password vault $vault: $list" >&2
+		return 1
+	fi
+	keys=$(printf '%s' "$list" |
 		op item get - --format json |
 		jq -r 'select(.category == "SSH_KEY") | [.title, (first(.fields[]? | select(.id == "public_key" or .label == "public key") | .value) // "")] | @tsv' |
 		awk -F'\t' '$2 != "" { split($2, k, " "); print $1 "\t" k[1] " " k[2] }' |

@@ -2746,7 +2746,8 @@ _uncopy_path() {
 # or cancelled: false, and the caller's op call says what failed.
 OP_SIGNIN_TRIED=false
 _op_signin() {
-  op whoami >/dev/null 2>&1 && return 0
+  # a call that needs a valid session (op whoami isn't enough)
+  op vault list >/dev/null 2>&1 && return 0
   [[ $OP_SIGNIN_TRIED == true ]] && return 1
   OP_SIGNIN_TRIED=true
   { : </dev/tty; } 2>/dev/null || return 1
@@ -2754,7 +2755,7 @@ _op_signin() {
   local session
   session="$(op signin </dev/tty 2>/dev/tty)" || return 1
   eval "$session"
-  op whoami >/dev/null 2>&1
+  op vault list >/dev/null 2>&1
 }
 
 # Fill a repo file's op:// references with op inject and write the result

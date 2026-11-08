@@ -114,11 +114,14 @@ sshkeys() {
 	fi
 
 	# Sign in only if op isn't already; just the password for an added account.
-	if ! op whoami >/dev/null 2>&1; then
-		eval "$(op signin)" || {
+	# Signed in = a call that needs a valid session works (op whoami
+	# isn't enough). Otherwise sign in: just the password.
+	if ! op vault list >/dev/null 2>&1; then
+		local _session
+		if ! _session=$(op signin) || ! eval "$_session" || ! op vault list >/dev/null 2>&1; then
 			echo "sshkeys: 1Password sign-in failed or was cancelled; run sshkeys to try again" >&2
 			return 1
-		}
+		fi
 	fi
 
 	for item in Signing "$host"; do
