@@ -2739,6 +2739,24 @@ _uncopy_path() {
   fi
 }
 
+# The 1Password CLI signed in, or signed in now: op signin asks for your
+# password on the terminal (the session expires after 30 minutes unused).
+# Once per run. The session (OP_SESSION_*) is exported, so the rest of the
+# run, hooks included (the ssh functions), doesn't ask again. No terminal,
+# or cancelled: false, and the caller's op call says what failed.
+OP_SIGNIN_TRIED=false
+_op_signin() {
+  op whoami >/dev/null 2>&1 && return 0
+  [[ $OP_SIGNIN_TRIED == true ]] && return 1
+  OP_SIGNIN_TRIED=true
+  { : </dev/tty; } 2>/dev/null || return 1
+  log info "1Password: signed out; signing in (op signin asks for your password)"
+  local session
+  session="$(op signin </dev/tty 2>/dev/tty)" || return 1
+  eval "$session"
+  op whoami >/dev/null 2>&1
+}
+
 # Fill a repo file's op:// references with op inject and write the result
 # to dest, outside the repo, owner-only. The result is written next to dest
 # and renamed into place, so an old symlink is replaced, never written
@@ -2779,6 +2797,7 @@ _inject_path() {
     return 0
   fi
 
+  _op_signin || true
   mkdir -p "$(dirname "$dest_path")"
   tmp="$(mktemp "$(dirname "$dest_path")/.dotfiles-inject.XXXXXX")"
   log info "running: op inject -i ${src_path#"$DOTFILES"/} -o $shown"
