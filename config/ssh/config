@@ -5,8 +5,14 @@ Include ~/.ssh/1Password/config
 Match exec "test \"$(uname)\" = Darwin"
     IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
 
-Host *
+# Linux: 1Password's agent only exists with the desktop app running. Without
+# it (a machine with no desktop) ssh uses $SSH_AUTH_SOCK instead: the
+# systemd ssh-agent that config/shell/env points at, keys loaded from
+# 1Password with the op CLI.
+Match exec "test -S ~/.1password/agent.sock"
     IdentityAgent ~/.1password/agent.sock
+
+Host *
     # Each machine's public key is ~/.ssh/<hostname>.pub; %L is the short
     # hostname. Only that key is offered.
     IdentitiesOnly yes

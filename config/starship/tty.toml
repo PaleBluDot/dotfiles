@@ -1,0 +1,116 @@
+"$schema" = 'https://starship.rs/config-schema.json'
+
+# Minimal prompt for the Linux console (TTY, TERM=linux): no Nerd Font
+# icons, no powerline arrows, only the 8 basic colours the console has.
+# config/shell/env points STARSHIP_CONFIG here when TERM=linux.
+#
+#   ducky@host ~/Projects/dotfiles on main [!?] took 3s
+#   >
+
+format = """
+$username\
+$hostname\
+$directory\
+$git_branch\
+$git_state\
+$git_status\
+$python\
+$nodejs\
+$rust\
+$golang\
+$docker_context\
+$cmd_duration\
+$line_break\
+$jobs\
+$status\
+$character\
+"""
+
+add_newline = true
+
+[username]
+show_always = true
+style_user = "bold green"
+style_root = "bold red"
+format = "[$user]($style)"
+
+[hostname]
+ssh_only = false
+style = "bold green"
+format = "[@$hostname]($style) "
+
+[directory]
+style = "bold blue"
+truncation_length = 3
+truncation_symbol = ".../"
+read_only = " [ro]"
+format = "[$path]($style)[$read_only]($read_only_style) "
+
+[git_branch]
+symbol = ""
+style = "bold purple"
+format = "on [$branch]($style) "
+
+[git_state]
+style = "bold yellow"
+format = '[\($state( $progress_current/$progress_total)\)]($style) '
+
+[git_status]
+style = "bold red"
+format = '([\[$all_status$ahead_behind\]]($style) )'
+ahead = "^${count}"
+behind = "v${count}"
+diverged = "^${ahead_count}v${behind_count}"
+conflicted = "="
+untracked = "?"
+stashed = '\$'
+modified = "!"
+staged = "+"
+renamed = ">"
+deleted = "x"
+
+[python]
+symbol = "py "
+style = "yellow"
+format = '[$symbol$pyenv_prefix($version )(\($virtualenv\) )]($style)'
+
+[nodejs]
+symbol = "node "
+style = "green"
+format = "[$symbol($version )]($style)"
+
+[rust]
+symbol = "rs "
+style = "red"
+format = "[$symbol($version )]($style)"
+
+[golang]
+symbol = "go "
+style = "cyan"
+format = "[$symbol($version )]($style)"
+
+[docker_context]
+symbol = "docker "
+style = "blue"
+format = "[$symbol$context]($style) "
+
+[cmd_duration]
+min_time = 2000
+style = "yellow"
+format = "took [$duration]($style) "
+
+[jobs]
+symbol = "&"
+style = "bold blue"
+format = "[$symbol$number]($style) "
+
+[status]
+disabled = false
+symbol = "x"
+style = "bold red"
+format = "[$symbol$status]($style) "
+
+[character]
+success_symbol = "[>](bold green)"
+error_symbol = "[>](bold red)"
+vimcmd_symbol = "[<](bold green)"
