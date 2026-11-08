@@ -4821,43 +4821,26 @@ _doctor_self_links() {
   _path_check
 }
 
-# doctor: the ssh-agent on Linux without the 1Password app (no desktop).
-# Not on: hooks/ssh.sh turns it on (says so in a dry run). Keys not loaded
-# is a warning, not a failure: they're loaded by hand (sshkeys) after a
-# reboot, and a new shell asks for them.
+# doctor: the ssh-agent on Linux without the 1Password app (no desktop),
+# as the sshkeys function sees it (sshkeys --check: changes nothing, asks
+# nothing). Off is a failure; no keys loaded is a warning, since they're
+# loaded after a reboot by the first new shell, sshkeys or dotfiles link ssh.
 _doctor_ssh() {
   if ! _signs_through_agent; then
     log debug "ssh-agent: 1Password's (or nothing to check on $DOTFILES_OS)"
     return 0
   fi
-  local sock="${XDG_RUNTIME_DIR:-/run/user/$EUID}/ssh-agent.socket"
-  if ! systemctl --user is-enabled --quiet ssh-agent.socket 2>/dev/null ||
-    ! systemctl --user is-active --quiet ssh-agent.socket 2>/dev/null; then
-    _run_hook ssh || true
-    if [[ $DRY_RUN == true ]]; then
-      return 0
-    fi
-    if ! systemctl --user is-active --quiet ssh-agent.socket 2>/dev/null; then
-      _check_fail "ssh-agent: off, and turning it on failed (systemctl --user enable --now ssh-agent.socket)"
-      return 0
-    fi
+  local fn="$DOTFILES/config/shell/functions/sshkeys" out code=0
+  if [[ ! -f $fn ]]; then
+    log debug "ssh-agent: no sshkeys function to ask"
+    return 0
   fi
-
-  local keys signing fp=""
-  keys="$(SSH_AUTH_SOCK="$sock" ssh-add -l 2>/dev/null || true)"
-  signing="$(git config --get user.signingkey 2>/dev/null || true)"
-  if [[ $signing == key::* ]]; then
-    fp="$(ssh-keygen -lf - <<<"${signing#key::}" 2>/dev/null | awk '{print $2}')"
-  elif [[ -n $signing && -f ${signing/#\~/$HOME} ]]; then
-    fp="$(ssh-keygen -lf "${signing/#\~/$HOME}" 2>/dev/null | awk '{print $2}')"
-  fi
-  if [[ -z $keys || $keys == "The agent has no identities."* ]]; then
-    log warn "ssh-agent: on, but no keys loaded, so no ssh logins or signed commits yet; run: sshkeys"
-  elif [[ -n $fp ]] && ! grep -qF "$fp" <<<"$keys"; then
-    log warn "ssh-agent: $(grep -c . <<<"$keys") key(s) loaded, but not the git signing key; run: sshkeys"
-  else
-    _check_ok "ssh-agent: on ($(_tilde "$sock")), $(grep -c . <<<"$keys") key(s) loaded${fp:+, signing key included}"
-  fi
+  out="$(bash -c 'source "$1"; sshkeys --check' _ "$fn" 2>&1)" || code=$?
+  case $code in
+    0) _check_ok "ssh-agent: $out" ;;
+    1) _check_fail "ssh-agent: $out (or: dotfiles link ssh)" ;;
+    *) log warn "ssh-agent: $out (or: dotfiles link ssh)" ;;
+  esac
 }
 
 # ─── doctor (plan Section 7) ────────────────────────────────────────────

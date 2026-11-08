@@ -11,7 +11,8 @@
 #      hostname (this machine's IP), username and port, like the others.
 #   3. Template: a "Host <host>" block in config/ssh/config, under the
 #      section you pick, reading those fields with op:// references. Then
-#      it offers to run `dotfiles link ssh` to rebuild ~/.ssh/config.
+#      it offers to run `dotfiles link ssh` to rebuild ~/.ssh/config (not
+#      when dotfiles link ssh is the one running it: that rebuilds it).
 # The template change is left uncommitted in the repo for you to commit.
 #
 # Usage:
@@ -184,6 +185,8 @@ sshregister() {
 	cat "$tmp" >"$template" && rm -f "$tmp"
 	echo "✓ added Host $host to config/ssh/config (# $section); commit it when you're happy"
 
+	# Run by dotfiles (link ssh's hook): it rebuilds ~/.ssh/config itself.
+	[[ -n ${DOTFILES_COMMAND:-} ]] && return 0
 	if command -v dotfiles >/dev/null 2>&1 && _sshregister_ask "  Rebuild ~/.ssh/config now (dotfiles link ssh)? [Y/n] " yes; then
 		dotfiles link ssh
 	fi
