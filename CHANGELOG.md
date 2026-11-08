@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.28.0](https://github.com/PaleBluDot/dotfiles/compare/v2.27.0...v2.28.0) (2026-11-08)
+
+
+### Features
+
+* **function:** sshkeys, SSH keys from 1Password after reboot ([#125](https://github.com/PaleBluDot/dotfiles/issues/125)) ([495f9d3](https://github.com/PaleBluDot/dotfiles/commit/495f9d35e1104911e0904c7e2ffaf832bd7aab93)), closes [#124](https://github.com/PaleBluDot/dotfiles/issues/124)
+
 # [2.27.0](https://github.com/PaleBluDot/dotfiles/compare/v2.26.0...v2.27.0) (2026-11-08)
 
 
