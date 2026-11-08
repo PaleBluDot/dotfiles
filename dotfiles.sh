@@ -1332,8 +1332,10 @@ package_available_version() {
     pacman)
       if [[ $package == aur/* ]]; then
         output="$(yay -Si "${package#aur/}" 2>/dev/null)" || return 0
-      else
-        output="$(pacman -Si "$package" 2>/dev/null)" || return 0
+      elif ! output="$(pacman -Si "$package" 2>/dev/null)"; then
+        # not in the repos here: the AUR version, as _pm would install it
+        command -v yay >/dev/null 2>&1 || return 0
+        output="$(yay -Si "$package" 2>/dev/null)" || return 0
       fi
       awk -F': ' '/^Version/ { print $2; exit }' <<<"$output"
       ;;
@@ -1397,6 +1399,14 @@ run_cmd() {
 
 APT_UPDATED="${APT_UPDATED:-false}"
 
+# True when pacman can install <name> from this machine's repos: a package
+# or a group. A package that isn't is tried in the AUR (_pm,
+# package_available_version), so manifest.yml can name packages that are
+# in Omarchy's repo on Omarchy and in the AUR on plain Arch.
+_pacman_has() {
+  pacman -Si "$1" >/dev/null 2>&1 || pacman -Sg "$1" >/dev/null 2>&1
+}
+
 # Install or remove one package with this OS's package manager.
 # _pm install|remove <package>
 _pm() {
@@ -1407,6 +1417,17 @@ _pm() {
     # aur/<name> (manifest.yml): an AUR package, installed with yay. yay
     # runs as you and asks for sudo itself; pacman removes it like any other.
     install:pacman)
+      if [[ $package != aur/* ]] && ! _pacman_has "$package"; then
+        # Not in this machine's repos (plain Arch has no [omarchy] repo, for
+        # one): the AUR, with yay, when it's there.
+        if command -v yay >/dev/null 2>&1 && yay -Si "$package" >/dev/null 2>&1; then
+          log info "$package isn't in the pacman repos here; installing it from the AUR with yay"
+          package="aur/$package"
+        elif ! command -v yay >/dev/null 2>&1; then
+          log error "can't $action $package: it isn't in the pacman repos here, and yay (for the AUR) isn't installed"
+          return 1
+        fi
+      fi
       if [[ $package == aur/* ]]; then
         cmd=(yay -S --needed --noconfirm --answerdiff None --answerclean None "${package#aur/}")
       else
@@ -4614,28 +4635,50 @@ _op_ssh_sign_path() {
   fi
 }
 
+# Linux without the 1Password app (no desktop): git signs with ssh-keygen,
+# git's default, through the systemd user ssh-agent that hooks/ssh.sh turns
+# on and the sshkeys function fills from 1Password. True when that's how
+# this machine signs.
+_signs_through_agent() {
+  [[ $DOTFILES_OS == linux && -z $(_op_ssh_sign_path) ]] &&
+    command -v systemctl >/dev/null 2>&1 &&
+    systemctl --user cat ssh-agent.socket >/dev/null 2>&1
+}
+
+# How this machine signs, for doctor's line: set by _setup_git_signing.
+GIT_SIGNING_HOW=""
 _setup_git_signing() {
-  local helper want file="$DOTFILES/config/git/local.gitconfig"
+  local helper want how file="$DOTFILES/config/git/local.gitconfig"
   helper="$(_op_ssh_sign_path)"
-  if [[ -z $helper ]]; then
+  if [[ -n $helper ]]; then
+    how="op-ssh-sign for $DOTFILES_OS"
+    want="$(printf '%s\n' \
+      "# GENERATED FILE: do not edit. dotfiles writes this for this machine's OS." \
+      "# 1Password's ssh signing helper; its path differs per OS." \
+      '[gpg "ssh"]' \
+      "	program = $helper")"
+  elif _signs_through_agent; then
+    # No program line: git's default (ssh-keygen) signs through the agent.
+    how="ssh-keygen through the ssh-agent, no 1Password app here; sshkeys loads the key"
+    want="$(printf '%s\n' \
+      "# GENERATED FILE: do not edit. dotfiles writes this for this machine's OS." \
+      "# No 1Password app here: git signs with its default, ssh-keygen, through the" \
+      "# systemd ssh-agent (hooks/ssh.sh turns it on; sshkeys loads the key).")"
+  else
     log warn "git signing: 1Password's op-ssh-sign isn't installed here, so commits can't be signed until it is"
     return 1
   fi
-  want="$(printf '%s\n' \
-    "# GENERATED FILE: do not edit. dotfiles writes this for this machine's OS." \
-    "# 1Password's ssh signing helper; its path differs per OS." \
-    '[gpg "ssh"]' \
-    "	program = $helper")"
+  GIT_SIGNING_HOW="$how"
   if [[ -f $file && $(cat "$file") == "$want" ]]; then
     log debug "git signing: ${file#"$DOTFILES"/} is up to date"
     return 0
   fi
   if [[ $DRY_RUN == true ]]; then
-    log info "dry run, would write ${file#"$DOTFILES"/} (gpg.ssh.program = $helper)"
+    log info "dry run, would write ${file#"$DOTFILES"/} ($how)"
     return 0
   fi
   printf '%s\n' "$want" >"$file"
-  log success "git signing: wrote ${file#"$DOTFILES"/} (op-ssh-sign for $DOTFILES_OS)"
+  log success "git signing: wrote ${file#"$DOTFILES"/} ($how)"
 }
 
 # Make (or repair) both self links. Returns 1 if one isn't in place.
@@ -4773,9 +4816,48 @@ _doctor_self_links() {
     _check_fail "self link: not in place (see above)"
   fi
   if _setup_git_signing; then
-    _check_ok "git signing: $(_op_ssh_sign_path)"
+    _check_ok "git signing: $GIT_SIGNING_HOW"
   fi
   _path_check
+}
+
+# doctor: the ssh-agent on Linux without the 1Password app (no desktop).
+# Not on: hooks/ssh.sh turns it on (says so in a dry run). Keys not loaded
+# is a warning, not a failure: they're loaded by hand (sshkeys) after a
+# reboot, and a new shell asks for them.
+_doctor_ssh() {
+  if ! _signs_through_agent; then
+    log debug "ssh-agent: 1Password's (or nothing to check on $DOTFILES_OS)"
+    return 0
+  fi
+  local sock="${XDG_RUNTIME_DIR:-/run/user/$EUID}/ssh-agent.socket"
+  if ! systemctl --user is-enabled --quiet ssh-agent.socket 2>/dev/null ||
+    ! systemctl --user is-active --quiet ssh-agent.socket 2>/dev/null; then
+    _run_hook ssh || true
+    if [[ $DRY_RUN == true ]]; then
+      return 0
+    fi
+    if ! systemctl --user is-active --quiet ssh-agent.socket 2>/dev/null; then
+      _check_fail "ssh-agent: off, and turning it on failed (systemctl --user enable --now ssh-agent.socket)"
+      return 0
+    fi
+  fi
+
+  local keys signing fp=""
+  keys="$(SSH_AUTH_SOCK="$sock" ssh-add -l 2>/dev/null || true)"
+  signing="$(git config --get user.signingkey 2>/dev/null || true)"
+  if [[ $signing == key::* ]]; then
+    fp="$(ssh-keygen -lf - <<<"${signing#key::}" 2>/dev/null | awk '{print $2}')"
+  elif [[ -n $signing && -f ${signing/#\~/$HOME} ]]; then
+    fp="$(ssh-keygen -lf "${signing/#\~/$HOME}" 2>/dev/null | awk '{print $2}')"
+  fi
+  if [[ -z $keys || $keys == "The agent has no identities."* ]]; then
+    log warn "ssh-agent: on, but no keys loaded, so no ssh logins or signed commits yet; run: sshkeys"
+  elif [[ -n $fp ]] && ! grep -qF "$fp" <<<"$keys"; then
+    log warn "ssh-agent: $(grep -c . <<<"$keys") key(s) loaded, but not the git signing key; run: sshkeys"
+  else
+    _check_ok "ssh-agent: on ($(_tilde "$sock")), $(grep -c . <<<"$keys") key(s) loaded${fp:+, signing key included}"
+  fi
 }
 
 # ─── doctor (plan Section 7) ────────────────────────────────────────────
@@ -5222,6 +5304,7 @@ cmd_doctor() {
   _config_sync
   _doctor_machine
   _doctor_self_links
+  _doctor_ssh
   _doctor_tools
 
   if [[ $DOCTOR_FAILED -gt 0 ]]; then
