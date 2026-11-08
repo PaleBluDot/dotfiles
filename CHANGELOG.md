@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.30.0](https://github.com/PaleBluDot/dotfiles/compare/v2.29.0...v2.30.0) (2026-11-08)
+
+
+### Features
+
+* **script:** headless 1Password support and sshauthorize ([#128](https://github.com/PaleBluDot/dotfiles/issues/128)) ([5f9817a](https://github.com/PaleBluDot/dotfiles/commit/5f9817a9306aac3cbc8c8ec68b51d23584abc282)), closes [#127](https://github.com/PaleBluDot/dotfiles/issues/127)
+
 # [2.29.0](https://github.com/PaleBluDot/dotfiles/compare/v2.28.0...v2.29.0) (2026-11-08)
 
 
