@@ -10,7 +10,10 @@
 #       all: name           every platform not listed below
 #       <platform>: name    or [a, b] (installed together). Without all:,
 #                           only the listed platforms get the tool and its
-#                           links. aur/<name> under arch: from the AUR (yay)
+#                           links. aur/<name> under arch: from the AUR (yay);
+#                           a plain name pacman can't find in this machine's
+#                           repos is tried in the AUR too (e.g. a package
+#                           from Omarchy's repo, on plain Arch)
 #       <platform>: ~       used there, nothing to install (part of the OS):
 #                           only checks that its command is there
 #     command: name         the command that shows it's installed (default:
