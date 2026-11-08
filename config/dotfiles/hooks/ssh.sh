@@ -57,9 +57,10 @@ done
 order="${order% }"
 [[ -n $order ]] || exit 0
 
-for name in $order; do
+# opsignin too: they sign in to 1Password through it (one shared session)
+for name in opsignin $order; do
   # shellcheck source=/dev/null
-  source "$functions/$name"
+  [[ -f $functions/$name ]] && source "$functions/$name"
 done
 
 case "${DOTFILES_COMMAND:-}" in

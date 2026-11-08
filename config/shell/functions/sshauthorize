@@ -48,15 +48,10 @@ sshauthorize() {
 	for arg in op jq; do
 		command -v "$arg" >/dev/null 2>&1 || { echo "sshauthorize: $arg isn't installed" >&2; return 1; }
 	done
-	# Signed in = a call that needs a valid session works (op whoami
-	# isn't enough). Otherwise sign in: just the password.
-	if ! op vault list >/dev/null 2>&1; then
-		local _session
-		if ! _session=$(op signin) || ! eval "$_session" || ! op vault list >/dev/null 2>&1; then
-			echo "sshauthorize: 1Password sign-in failed or was cancelled" >&2
-			return 1
-		fi
-	fi
+	# Signed in through opsignin: the 1Password session shared by all
+	# shells until shutdown, or the password once (functions/opsignin).
+	type opsignin >/dev/null 2>&1 || . "${DOTFILES:-}/config/shell/functions/opsignin" 2>/dev/null
+	opsignin || return 1
 
 	# All SSH keys in the vault: "<name>\t<type> <key>", sorted by name.
 	local keys

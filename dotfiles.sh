@@ -2739,23 +2739,24 @@ _uncopy_path() {
   fi
 }
 
-# The 1Password CLI signed in, or signed in now: op signin asks for your
-# password on the terminal (the session expires after 30 minutes unused).
-# Once per run. The session (OP_SESSION_*) is exported, so the rest of the
-# run, hooks included (the ssh functions), doesn't ask again. No terminal,
-# or cancelled: false, and the caller's op call says what failed.
+# The 1Password CLI signed in, or signed in now, through the opsignin
+# function (config/shell/functions/opsignin): the session every shell shares
+# until shutdown when there is one, otherwise op signin asks for your
+# password, once per run, and the session is shared from then on. Hooks
+# (the ssh functions) get it too. No terminal, or cancelled: false, and the
+# caller's op call says what failed.
 OP_SIGNIN_TRIED=false
 _op_signin() {
-  # a call that needs a valid session (op whoami isn't enough)
-  op vault list >/dev/null 2>&1 && return 0
+  local fn="$DOTFILES/config/shell/functions/opsignin"
+  [[ -f $fn ]] || return 1
+  # shellcheck source=/dev/null
+  source "$fn"
+  opsignin --check && return 0
   [[ $OP_SIGNIN_TRIED == true ]] && return 1
   OP_SIGNIN_TRIED=true
   { : </dev/tty; } 2>/dev/null || return 1
   log info "1Password: signed out; signing in (op signin asks for your password)"
-  local session
-  session="$(op signin </dev/tty 2>/dev/tty)" || return 1
-  eval "$session"
-  op vault list >/dev/null 2>&1
+  opsignin </dev/tty 2>/dev/tty
 }
 
 # Fill a repo file's op:// references with op inject and write the result

@@ -114,15 +114,10 @@ sshkeys() {
 	fi
 
 	# Sign in only if op isn't already; just the password for an added account.
-	# Signed in = a call that needs a valid session works (op whoami
-	# isn't enough). Otherwise sign in: just the password.
-	if ! op vault list >/dev/null 2>&1; then
-		local _session
-		if ! _session=$(op signin) || ! eval "$_session" || ! op vault list >/dev/null 2>&1; then
-			echo "sshkeys: 1Password sign-in failed or was cancelled; run sshkeys to try again" >&2
-			return 1
-		fi
-	fi
+	# Signed in through opsignin: the 1Password session shared by all
+	# shells until shutdown, or the password once (functions/opsignin).
+	type opsignin >/dev/null 2>&1 || . "${DOTFILES:-}/config/shell/functions/opsignin" 2>/dev/null
+	opsignin || return 1
 
 	for item in Signing "$host"; do
 		[[ $item == Signing && $need_signing == false ]] && continue

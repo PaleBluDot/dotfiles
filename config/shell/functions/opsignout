@@ -1,0 +1,18 @@
+# shellcheck shell=bash
+# opsignout — end the shared 1Password CLI session that opsignin keeps until
+# shutdown: op signout, stop its keep-alive loop, forget the saved session
+# ($XDG_RUNTIME_DIR/op-session), and drop it from this shell. Other open
+# shells keep their copy until it expires; new ones start signed out.
+#
+# Usage:
+#   opsignout
+opsignout() {
+	local file="${XDG_RUNTIME_DIR:-}/op-session" pidfile="${XDG_RUNTIME_DIR:-}/op-session.keepalive" name
+	command -v op >/dev/null 2>&1 && op signout --all >/dev/null 2>&1
+	[[ -r $pidfile ]] && kill "$(<"$pidfile")" 2>/dev/null
+	rm -f "$file" "$pidfile"
+	for name in $(env | sed -n 's/^\(OP_SESSION_[A-Za-z0-9_]*\)=.*/\1/p'); do
+		unset "$name"
+	done
+	echo "opsignout: signed out of 1Password; the shared session is gone"
+}

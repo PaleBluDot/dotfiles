@@ -1,0 +1,96 @@
+# shellcheck shell=bash
+# opsignin — sign in to the 1Password CLI once, for every shell, until shutdown.
+#
+# A plain op signin lasts 30 minutes unused and only in the shell that ran
+# it. opsignin keeps one session for all of them instead:
+#   - uses the shared session when it still works (no password);
+#   - otherwise asks for your 1Password password (op signin) and saves the
+#     session to $XDG_RUNTIME_DIR/op-session: owner-only, in memory (tmpfs),
+#     gone at shutdown. New shells load it (config/shell/env);
+#   - keeps it alive: a background loop makes one 1Password call every 20
+#     minutes (OPSIGNIN_INTERVAL seconds, default 1200), so the 30-minute
+#     idle limit never comes (if 1Password ends it anyway, the next opsignin
+#     asks again).
+# The trade-off: until shutdown (or opsignout), anything running as you can
+# use your vaults without the password.
+#
+# sshkeys, sshregister, sshauthorize and dotfiles.sh sign in through this,
+# so after a reboot the first one to need 1Password asks, once.
+#
+# Usage:
+#   opsignin           signed in after this (asks only when needed)
+#   opsignin --check   signed in? Loads the shared session; never asks
+#   opsignout          end it (functions/opsignout)
+opsignin() {
+	local file="${XDG_RUNTIME_DIR:-}/op-session" session
+	if ! command -v op >/dev/null 2>&1; then
+		echo "opsignin: op (1Password CLI) isn't installed" >&2
+		return 1
+	fi
+
+	# Signed in = a call that needs a valid session works (op whoami
+	# reports a token that has already expired).
+	if ! op vault list >/dev/null 2>&1 && [[ -n ${XDG_RUNTIME_DIR:-} && -r $file ]]; then
+		_opsignin_load "$file"
+	fi
+	if op vault list >/dev/null 2>&1; then
+		_opsignin_keepalive
+		return 0
+	fi
+	[[ ${1:-} == --check ]] && return 1
+
+	if ! session=$(op signin) || [[ -z $session ]]; then
+		echo "opsignin: 1Password sign-in failed or was cancelled" >&2
+		return 1
+	fi
+	_opsignin_load /dev/stdin <<<"$session"
+	if ! op vault list >/dev/null 2>&1; then
+		echo "opsignin: signed in, but 1Password still says signed out" >&2
+		return 1
+	fi
+	if [[ -n ${XDG_RUNTIME_DIR:-} && -d $XDG_RUNTIME_DIR ]]; then
+		(umask 077 && printf '%s\n' "$session" >"$file")
+	fi
+	_opsignin_keepalive
+}
+
+# _opsignin_load <file> — export the OP_SESSION_<account> lines in it, and
+# nothing else (it's never run as a script).
+_opsignin_load() {
+	local line name value
+	while IFS= read -r line || [[ -n $line ]]; do
+		[[ $line =~ ^export\ (OP_SESSION_[A-Za-z0-9_]+)=\"?([A-Za-z0-9_-]+)\"?$ ]] || continue
+		if [[ -n ${BASH_VERSION:-} ]]; then
+			name=${BASH_REMATCH[1]} value=${BASH_REMATCH[2]}
+		else
+			# shellcheck disable=SC2154
+			name=${match[1]} value=${match[2]}
+		fi
+		export "$name=$value"
+	done <"$1"
+}
+
+# _opsignin_keepalive — one background loop per boot: every 20 minutes a
+# 1Password call with the shared session; stops when the file is gone
+# (opsignout) or 1Password refuses it (then forgets the file).
+_opsignin_keepalive() {
+	local file="${XDG_RUNTIME_DIR:-}/op-session" pidfile="${XDG_RUNTIME_DIR:-}/op-session.keepalive" pid=""
+	[[ -n ${XDG_RUNTIME_DIR:-} && -r $file ]] || return 0
+	[[ -r $pidfile ]] && pid=$(<"$pidfile")
+	[[ -n $pid ]] && kill -0 "$pid" 2>/dev/null && return 0
+	# In a subshell: no job-control message, and it outlives this shell.
+	(
+		nohup bash -c '
+			file=$1
+			while sleep "$2"; do
+				[[ -r $file ]] || exit 0
+				while IFS= read -r line; do
+					[[ $line =~ ^export\ (OP_SESSION_[A-Za-z0-9_]+)=\"?([A-Za-z0-9_-]+)\"?$ ]] &&
+						export "${BASH_REMATCH[1]}=${BASH_REMATCH[2]}"
+				done <"$file"
+				op vault list >/dev/null 2>&1 || { rm -f "$file"; exit 0; }
+			done
+		' _ "$file" "${OPSIGNIN_INTERVAL:-1200}" >/dev/null 2>&1 &
+		echo $! >"$pidfile"
+	)
+}
