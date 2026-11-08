@@ -4,6 +4,13 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.27.0](https://github.com/PaleBluDot/dotfiles/compare/v2.26.0...v2.27.0) (2026-11-08)
+
+
+### Features
+
+* **config:** plain-ASCII starship prompt on the TTY ([#124](https://github.com/PaleBluDot/dotfiles/issues/124)) ([84a2ead](https://github.com/PaleBluDot/dotfiles/commit/84a2ead8bef395c654e35515094690d4f5486504))
+
 # [2.26.0](https://github.com/PaleBluDot/dotfiles/compare/v2.25.1...v2.26.0) (2026-11-04)
 
 
