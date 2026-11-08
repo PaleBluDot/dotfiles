@@ -61,6 +61,13 @@ else
   export STARSHIP_CONFIG="$_starship_src"
 fi
 unset _starship_src _starship_copy
+# Linux console (TTY): no Nerd Font there, so a plain-ASCII prompt instead.
+# TERM is "linux" on the console itself; inside tmux it isn't, so ask tmux
+# what terminal its client is on. Anywhere else, starship.toml (above).
+if [[ $TERM == linux ]] ||
+  [[ -n $TMUX && $(tmux display-message -p '#{client_termname}' 2>/dev/null) == linux ]]; then
+  export STARSHIP_CONFIG="$HOME/.config/starship/tty.toml"
+fi
 
 # bat: the current theme's colours once the theme hook has installed them
 # as bat's "omarchy" theme; otherwise --theme in bat's config (knuckles).

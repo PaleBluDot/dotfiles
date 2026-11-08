@@ -25,6 +25,7 @@ doc/
 # Machine-local (installed or written per machine)
 config/zsh/oh-my-zsh/
 config/git/local.gitconfig
+config/nvim/lazy-lock.json
 
 # App data adopted by mistake: caches, sessions, tokens. Never commit.
 config/Claude/

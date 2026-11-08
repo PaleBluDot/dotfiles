@@ -147,6 +147,7 @@ alias clean-node="rm -rf ./node_modules && rm -rf package-lock.json"
 # @@@ PACKAGES
 # !------------------------------------
 alias rmdpkg="sudo apt-get --purge remove"
+alias pi="apt-mark showmanual"
 alias brew-installs="brew list > ~/.config/brew.txt"
 alias mup='MISE_MINIMUM_RELEASE_AGE=0 mise up'
 
