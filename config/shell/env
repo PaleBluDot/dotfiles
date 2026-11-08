@@ -69,6 +69,22 @@ if [[ $TERM == linux ]] ||
   export STARSHIP_CONFIG="$HOME/.config/starship/tty.toml"
 fi
 
+# 1Password CLI: the session opsignin shares with every shell until shutdown
+# ($XDG_RUNTIME_DIR/op-session, owner-only, in memory). Only its
+# OP_SESSION_<account> lines are read; it's never run as a script.
+if [[ -n ${XDG_RUNTIME_DIR:-} && -r $XDG_RUNTIME_DIR/op-session ]]; then
+  while IFS= read -r _op_line || [[ -n $_op_line ]]; do
+    if [[ $_op_line =~ ^export\ (OP_SESSION_[A-Za-z0-9_]+)=\"?([A-Za-z0-9_-]+)\"?$ ]]; then
+      if [[ -n ${BASH_VERSION:-} ]]; then
+        export "${BASH_REMATCH[1]}=${BASH_REMATCH[2]}"
+      else
+        export "${match[1]}=${match[2]}"
+      fi
+    fi
+  done <"$XDG_RUNTIME_DIR/op-session"
+  unset _op_line
+fi
+
 # SSH agent on Linux without the 1Password desktop app (no desktop): the
 # systemd user ssh-agent (systemctl --user enable --now ssh-agent.socket),
 # keys loaded into it from 1Password with the op CLI. ssh/config uses

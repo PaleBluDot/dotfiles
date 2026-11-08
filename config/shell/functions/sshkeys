@@ -5,7 +5,9 @@
 # git signing use the systemd user ssh-agent instead (see config/shell/env).
 # The agent keeps keys in memory only, so they're gone after a reboot; this
 # puts them back. Asks only for your 1Password password (the account is
-# already added to op), and nothing at all if op is still signed in.
+# already added to op), and nothing at all if op is still signed in or the
+# keys are already loaded. Turns the agent on first when it's off
+# (systemctl --user enable --now ssh-agent.socket).
 #
 # Keys loaded, from the 1Password vault "Personal":
 #   Signing         signs git commits (user.signingkey)
@@ -14,57 +16,112 @@
 #                   which ssh/config offers (IdentityFile ~/.ssh/%L.pub)
 #
 # Usage:
-#   sshkeys          load the keys now
+#   sshkeys          turn the agent on if needed, load the keys that aren't
+#                    loaded yet (dotfiles link ssh runs this)
 #   sshkeys --auto   for shell startup (zshrc, bashrc): only on a terminal,
 #                    only when the agent is empty, and asks once per boot
 #                    (cancel it and new shells won't ask again; run
 #                    sshkeys by hand)
+#   sshkeys --check  change nothing, ask nothing: one line saying how the
+#                    agent is (dotfiles doctor uses it). Exit 0 = fine,
+#                    1 = agent off, 2 = no keys, 3 = no git signing key
 #
 # Does nothing when 1Password's own agent is running (desktop app).
 sshkeys() {
-	local auto=false host vault=Personal item failed=0 marker
-	[[ ${1:-} == --auto ]] && auto=true
+	local mode=load host vault=Personal item failed=0 marker rc
+	case ${1:-} in
+	--auto) mode=auto ;;
+	--check) mode=check ;;
+	esac
 	host=$(uname -n)
 	host=${host%%.*}
 	marker="${XDG_RUNTIME_DIR:-/tmp}/sshkeys-asked"
 
-	if [[ -S $HOME/.1password/agent.sock ]]; then
-		[[ $auto == true ]] || echo "sshkeys: 1Password's own agent is running; nothing to load"
+	if [[ -S $HOME/.1password/agent.sock || -S "$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock" ]]; then
+		[[ $mode == auto ]] || echo "1Password's own agent is running; nothing to load"
 		return 0
 	fi
 
-	if [[ $auto == true ]]; then
-		# a terminal, op installed, not asked yet this boot
+	# ssh-add -l: 0 = has keys, 1 = empty, 2 = no agent
+	ssh-add -l >/dev/null 2>&1
+	rc=$?
+	if [[ $rc -eq 2 ]]; then
+		case $mode in
+		check)
+			echo "off (no agent at ${SSH_AUTH_SOCK:-SSH_AUTH_SOCK not set}); run: sshkeys"
+			return 1
+			;;
+		auto) return 0 ;;
+		esac
+		if [[ $(uname -s) == Linux ]] && systemctl --user cat ssh-agent.socket >/dev/null 2>&1 &&
+			systemctl --user enable --now ssh-agent.socket >/dev/null 2>&1; then
+			[[ -n ${SSH_AUTH_SOCK:-} ]] || export SSH_AUTH_SOCK="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ssh-agent.socket"
+			echo "sshkeys: turned on the ssh-agent (systemctl --user enable --now ssh-agent.socket)"
+			ssh-add -l >/dev/null 2>&1
+			rc=$?
+		fi
+		if [[ $rc -eq 2 ]]; then
+			echo "sshkeys: no ssh-agent at ${SSH_AUTH_SOCK:-(SSH_AUTH_SOCK not set)}, and it couldn't be turned on" >&2
+			return 1
+		fi
+	fi
+
+	# Which keys the agent already has: the git signing key (user.signingkey)
+	# and this machine's key (~/.ssh/<host>.pub), by fingerprint.
+	local loaded signing fp_signing="" fp_host="" need_signing=true need_host=true
+	loaded=$(ssh-add -l 2>/dev/null)
+	signing=$(git config --get user.signingkey 2>/dev/null)
+	if [[ $signing == key::* ]]; then
+		fp_signing=$(ssh-keygen -lf - <<<"${signing#key::}" 2>/dev/null | awk '{print $2}')
+	elif [[ -n $signing && -f ${signing/#\~/$HOME} ]]; then
+		fp_signing=$(ssh-keygen -lf "${signing/#\~/$HOME}" 2>/dev/null | awk '{print $2}')
+	fi
+	[[ -f $HOME/.ssh/$host.pub ]] && fp_host=$(ssh-keygen -lf "$HOME/.ssh/$host.pub" 2>/dev/null | awk '{print $2}')
+	[[ -n $fp_signing && $loaded == *"$fp_signing"* ]] && need_signing=false
+	[[ -n $fp_host && $loaded == *"$fp_host"* ]] && need_host=false
+
+	if [[ $mode == check ]]; then
+		local count=0
+		[[ $rc -eq 0 ]] && count=$(grep -c . <<<"$loaded")
+		if [[ $rc -eq 1 ]]; then
+			echo "on, but no keys loaded, so no ssh logins or signed commits yet; run: sshkeys"
+			return 2
+		elif [[ -n $fp_signing && $need_signing == true ]]; then
+			echo "$count key(s) loaded, but not the git signing key; run: sshkeys"
+			return 3
+		fi
+		echo "on, $count key(s) loaded${fp_signing:+, signing key included}$([[ $need_host == true ]] && echo ", not this machine's ($host)")"
+		return 0
+	fi
+
+	if [[ $mode == auto ]]; then
+		# a terminal, op installed, not asked yet this boot, agent empty
 		[[ $- == *i* && -t 0 && -t 1 ]] || return 0
 		command -v op >/dev/null 2>&1 || return 0
 		[[ -e $marker ]] && return 0
-		# ssh-add -l: 0 = has keys, 1 = empty, 2 = no agent
-		ssh-add -l >/dev/null 2>&1
-		[[ $? -eq 1 ]] || return 0
+		[[ $rc -eq 1 ]] || return 0
 		: >"$marker"
 		echo "sshkeys: the ssh-agent is empty; loading your keys from 1Password"
 	else
+		if [[ $need_signing == false && $need_host == false ]]; then
+			echo "sshkeys: your keys are already loaded (Signing, $host)"
+			return 0
+		fi
 		if ! command -v op >/dev/null 2>&1; then
 			echo "sshkeys: op (1Password CLI) isn't installed" >&2
-			return 1
-		fi
-		ssh-add -l >/dev/null 2>&1
-		if [[ $? -eq 2 ]]; then
-			echo "sshkeys: no ssh-agent at ${SSH_AUTH_SOCK:-(SSH_AUTH_SOCK not set)}" >&2
-			echo "         systemctl --user enable --now ssh-agent.socket, then open a new shell" >&2
 			return 1
 		fi
 	fi
 
 	# Sign in only if op isn't already; just the password for an added account.
-	if ! op whoami >/dev/null 2>&1; then
-		eval "$(op signin)" || {
-			echo "sshkeys: 1Password sign-in failed or was cancelled; run sshkeys to try again" >&2
-			return 1
-		}
-	fi
+	# Signed in through opsignin: the 1Password session shared by all
+	# shells until shutdown, or the password once (functions/opsignin).
+	type opsignin >/dev/null 2>&1 || . "${DOTFILES:-}/config/shell/functions/opsignin" 2>/dev/null
+	opsignin || return 1
 
 	for item in Signing "$host"; do
+		[[ $item == Signing && $need_signing == false ]] && continue
+		[[ $item == "$host" && $need_host == false ]] && continue
 		# Straight from op into the agent: the private key never touches disk.
 		if op read "op://$vault/$item/private key?ssh-format=openssh" | ssh-add -q - 2>/dev/null; then
 			echo "   loaded $item"

@@ -53,6 +53,10 @@ Host hackberry
     HostName {{ op://lab/hackberry/hostname }}
     User {{ op://lab/hackberry/username }}
 
+Host surfarch
+    HostName {{ op://lab/surfarch/hostname }}
+    User {{ op://lab/surfarch/username }}
+
 
 # VMs
 Host svr-ubuntu
