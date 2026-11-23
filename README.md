@@ -113,6 +113,14 @@ removed by `unlink` (only `unlink --force`) or the interactive setup;
 the old `config.yaml` writes it from that file's `enabled:` / `locked:`
 values.
 
+`settings.shell` is the machine's login shell: zsh, bash or fish. The
+interactive setup asks once, starting on the current login shell, saves it
+there, adds it to `required:` and switches to it with `chsh` (asks for your
+password). `dotfiles --force` asks again. `dotfiles link` with no tool named
+does the same for a `shell:` written by hand. `/etc/shells` is never
+edited: the package adds the shell there, and a missing entry shows up
+under Next steps. The fish config reads the same `~/.zshenv` as zsh and bash.
+
 It follows what's installed, every run: a tool from `manifest.yml`
 installed here goes into `tools:`, and one removed outside dotfiles comes
 off. A tool you add by hand stays until `link` installs it, and moving one
