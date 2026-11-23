@@ -1,12 +1,14 @@
 name: Dry Release
 
-# Only pull requests into main, since merging there is what releases.
-# Checks the title (the squash merge uses it as the commit semantic-release
-# reads) and shows the version the branch would release. edited: a title
+# Pull requests into dev (each feature or fix, squash-merged: its title
+# becomes the commit semantic-release reads) and into main (dev, merged
+# with a merge commit: releases every feat and fix it brings). Checks the
+# title and shows the version the branch would release. edited: a title
 # change runs it again.
 on:
   pull_request:
     branches:
+      - dev
       - main
     types: [opened, synchronize, reopened, edited]
 
@@ -24,7 +26,7 @@ jobs:
           TITLE: ${{ github.event.pull_request.title }}
         run: |
           if [[ ! $TITLE =~ ^(feat|fix|perf|refactor|docs|style|test|build|ci|chore|revert)(\([a-z0-9-]+\))?!?:\ .+ ]]; then
-            echo "::error::PR title '$TITLE' isn't a conventional commit (type(scope): subject); the squash merge would release nothing"
+            echo "::error::PR title '$TITLE' isn't a conventional commit (type(scope): subject); semantic-release would skip it"
             exit 1
           fi
 

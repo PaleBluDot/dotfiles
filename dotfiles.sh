@@ -961,6 +961,7 @@ _config_template() {
 
 settings:
 ${1:-  # theme: starburst}
+  # shell: zsh          # this machine's login shell: zsh, bash or fish (asked on the first run)
   # log_file: ~/.local/state/dotfiles/dotfiles.log
   # backup_suffix: .bak
 
@@ -1049,6 +1050,110 @@ _config_set() {
   fi
   CFG_REQUIRED="$required"
   CFG_USED="$used"
+}
+
+# Set one settings: entry in config.yml ("  key: value"). Its line, or its
+# commented-out "  # key: …" line, is replaced; otherwise it goes first
+# under settings:. Everything else in the file stays.
+#   _config_setting_set <key> <value>
+_config_setting_set() {
+  local key="$1" value="$2" file="$DOTFILES_CONFIG" tmp
+  if [[ $(_cfg_setting "$key") == "$value" ]]; then
+    return 0
+  fi
+  if [[ $DRY_RUN == true ]]; then
+    log info "dry run, would set $key: $value in config.yml"
+  else
+    mkdir -p "$CONFIG_DIR"
+    if [[ ! -f $file ]]; then
+      _config_template >"$file"
+    fi
+    tmp="$file.tmp.$$"
+    # Two passes over the file: the first finds out whether settings: has
+    # the key already, the second writes. A comment after the old value
+    # ("  # shell: zsh   # …") stays after the new one.
+    KEY="$key" VALUE="$value" awk '
+      BEGIN { line = "  " ENVIRON["KEY"] ": " ENVIRON["VALUE"]; pat = "^  (# ?)?" ENVIRON["KEY"] ":" }
+      FNR == NR {
+        if (/^settings:/) s = 1; else if (/^[^ \t#]/) s = 0; else if (s && $0 ~ pat) has = 1
+        next
+      }
+      /^settings:/ { print; s = 1; if (!has) { print line; done = 1 }; next }
+      /^[^ \t#]/ { s = 0 }
+      s && !done && $0 ~ pat {
+        rest = $0; sub(/^  (# ?)?[^:]*:/, "", rest); note = ""
+        if (match(rest, /[ \t]+#.*/)) note = substr(rest, RSTART)
+        print line note; done = 1; next
+      }
+      { print }
+      END { if (!done) { print ""; print "settings:"; print line } }
+    ' "$file" "$file" >"$tmp"
+    if ! yq eval '.' "$tmp" >/dev/null 2>&1; then
+      rm -f "$tmp"
+      log error "couldn't set $key in $(_tilde "$file") (it isn't valid YAML afterwards); left it as it was"
+      return 1
+    fi
+    mv "$tmp" "$file"
+    log info "$key: $value in config.yml"
+  fi
+  printf -v "CFG_SET_$key" '=%s' "$value"
+}
+
+# ─── settings.shell: this machine's login shell ─────────────────────────
+SHELLS="zsh bash fish"
+
+# The login shell's name (zsh, bash, …) from the user database; $SHELL
+# when that can't be read.
+_login_shell() {
+  local user path=""
+  user="$(id -un 2>/dev/null || echo "${USER:-}")"
+  if command -v getent >/dev/null 2>&1; then
+    path="$(getent passwd "$user" 2>/dev/null | cut -d: -f7 || true)"
+  elif command -v dscl >/dev/null 2>&1; then
+    path="$(dscl . -read "/Users/$user" UserShell 2>/dev/null | awk '{ print $2 }' || true)"
+  fi
+  path="${path:-${SHELL:-}}"
+  echo "${path##*/}"
+}
+
+# Make settings.shell the login shell with chsh (it asks for the password).
+# /etc/shells is left alone: the package adds the shell there, and when it
+# didn't, that's a next step. Windows has no login shell to change.
+# Returns 1 when the shell wasn't changed (the next step says why).
+_shell_apply() {
+  local shell path
+  shell="$(_cfg_setting shell)"
+  if [[ -z $shell || $PLATFORM == windows ]]; then
+    return 0
+  fi
+  if [[ " $SHELLS " != *" $shell "* ]]; then
+    log warn "settings.shell: $shell isn't one of: $SHELLS; login shell left as it is"
+    return 1
+  fi
+  if [[ $(_login_shell) == "$shell" ]]; then
+    log debug "shell: $shell is already the login shell"
+    return 0
+  fi
+  path="$(command -v "$shell" 2>/dev/null || true)"
+  if [[ $DRY_RUN == true ]]; then
+    log info "dry run, would run: chsh -s ${path:-<path to $shell>}"
+    return 0
+  fi
+  if [[ -z $path ]]; then
+    NEXT_STEPS+="shell: $shell isn't installed; run: dotfiles link $shell"$'\n'
+    return 1
+  fi
+  if ! grep -qx "$path" /etc/shells 2>/dev/null; then
+    NEXT_STEPS+="shell: $path isn't in /etc/shells; add it (echo $path | sudo tee -a /etc/shells), then run: chsh -s $path"$'\n'
+    return 1
+  fi
+  ui "Login shell: $shell (chsh asks for your password)"
+  if ! chsh -s "$path" </dev/tty; then
+    NEXT_STEPS+="shell: chsh didn't change the login shell; run: chsh -s $path"$'\n'
+    return 1
+  fi
+  log success "shell: $shell is the login shell now"
+  NEXT_STEPS+="shell: log out and back in to start $shell"$'\n'
 }
 
 # ─── first run after #51: config.yaml -> config.yml ─────────────────────
@@ -1676,6 +1781,9 @@ A file with op:// references (e.g. ~/.ssh/config) is filled in from
 1Password, only again when its source in the repo changed; --force fills
 it in again anyway (for values changed in 1Password).
 
+With no tool named, shell: in config.yml (zsh, bash or fish) is linked
+and required, and made the login shell with chsh when it isn't yet.
+
 Things to do by hand (apps to download) are listed under "Next steps" at
 the end.
 
@@ -1721,13 +1829,17 @@ EOF
       cat <<'EOF'
 dotfiles [-d] [-v] [--force]
 
-Interactive setup, three steps:
+Interactive setup, four steps:
   1. every tool used on this platform, the ones in config.yml switched on.
      Switched on = link (install + link), switched off = unlink (unlink +
      remove the package). Required tools can't be switched off here.
   2. which of the picked tools are required on this machine.
   3. the theme (config/omarchy/themes; theme-set switches to it after the
      tools are set up; keeping the current one changes nothing).
+  4. the login shell: zsh, bash or fish, starting on the current one. Asked
+     once: saved as shell: in config.yml, linked, required here, and set
+     with chsh (asks for your password). --force asks again. Not on
+     Windows.
 
 With gum (installed first, priority: high): checkbox lists, with gum's
 keys shown under each list (x toggles, Enter = done); Esc = cancel
@@ -1772,25 +1884,17 @@ EOF
       cat <<'EOF'
 dotfiles update [-d] [-v] [--force]
 
-Get the latest repo changes and bring this machine in line with them:
-  1. git fetch
-  2. git pull --rebase --autostash (your local changes are set aside and
-     put back; a conflict stops with how to continue or undo)
-  3. for every tool in config.yml: install it if it's new (never
-     upgrades), make sure every link is there, run its hook
+Brings this machine up to date with the latest changes in the dotfiles
+repo. When the update brings a new release, it ends with the
+version change and what's new in it.
 
-Made to run from .zshrc/.bashrc on every new shell: it only asks for sudo
-when a system file changes, and only asks 1Password when a filled-in file's
-source changed. With nothing to do it ends with:
-  [INFO] update: nothing to change
+  -d       show what's coming in and change nothing
+  -v       show every step, including each hook as it runs
+  --force  run the hooks with --force
 
-  -d  fetch, pull nothing, change nothing; show what would change
-  -v  also show the package manager's output
-  --force  no questions, no backups (like link), and fill in 1Password
-           files (~/.ssh/config) again
-
-Example:
-  dotfiles update -dv
+Examples:
+  dotfiles update
+  dotfiles update -d
 EOF
       ;;
     status)
@@ -1879,7 +1983,7 @@ Commands:
   remove <tool...>      undo add, restore the old config, and remove the repo copy
   link [tool...]        install tools and link their configs (no tool = config.yml)
   unlink [tool...]      remove tools and their links (no tool = pick from a list)
-  update                pull the repo, install new tools, check links
+  update                pull the repo, run the hooks, show what changed
   wipe                  undo everything dotfiles set up here (for re-testing)
   status [tool]         what's installed and linked
   doctor [tool]         check (and fix) what dotfiles needs
@@ -1935,6 +2039,28 @@ _version() {
 # One line with the version, for help, status and doctor.
 _title() {
   printf 'dotfiles %s\n\n' "$(_version)"
+}
+
+# ─── what changed (the end of update) ───────────────────────────────────
+
+# The release a commit is at: the latest v* tag it contains, or nothing.
+_release_tag() {
+  git -C "$DOTFILES" describe --tags --abbrev=0 --match 'v*' "$1" 2>/dev/null || true
+}
+
+# What changed from one commit to another, for people: the feat, fix and
+# perf commit titles (✨ feature, 🐞 fix, ⚡ faster), without the type,
+# scope or PR number. At most 10 lines, then how many more.
+_changelog() {
+  git -C "$DOTFILES" log --no-merges --format=%s "$1..$2" 2>/dev/null | awk '
+    /^(feat|fix|perf)(\([^)]*\))?!?: / {
+      type = $0; sub(/[(!:].*/, "", type)
+      text = $0; sub(/^[^:]*: /, "", text); sub(/ \(#[0-9]+\)$/, "", text)
+      icon = (type == "feat") ? "✨" : (type == "fix") ? "🐞" : "⚡"
+      n++
+      if (n <= 10) printf "  %s %s\n", icon, text
+    }
+    END { if (n > 10) printf "  … and %d more\n", n - 10 }'
 }
 
 # Stubs: each one is replaced in its build step (plan Section 16).
@@ -2550,7 +2676,7 @@ _pick_tools() {
       TOOLS+=("$tool")
     done < <(_order_tools $(_listed_tools))
     if [[ ${#TOOLS[@]} -eq 0 && $cmd == update ]]; then
-      log info "update: no tools in config.yml yet; nothing to install or link"
+      log info "update: no tools in config.yml yet; no hooks to run"
     elif [[ ${#TOOLS[@]} -eq 0 ]]; then
       log info "$cmd: no tools in config.yml yet; name one: dotfiles.sh $cmd <tool> (or run dotfiles to pick)"
     fi
@@ -3303,6 +3429,13 @@ cmd_link() {
     log error "link --required needs the tools to add, e.g. dotfiles link --required git"
     exit 2
   fi
+  # settings.shell (set by hand, or a config.yml from another machine):
+  # required here, so a full link installs it; chsh after the tools.
+  local shell
+  shell="$(_cfg_setting shell)"
+  if [[ $# -eq 0 && -n $shell ]] && _tool_is_used_here "$shell" && ! _tool_is_required "$shell"; then
+    _config_set "$shell" required
+  fi
   _pick_tools link "$@"
   _require_sudo link ${TOOLS[@]+"${TOOLS[@]}"}
   local tool good="" bad="" as=tools
@@ -3331,6 +3464,9 @@ cmd_link() {
     fi
   done
   _render_theme
+  if [[ $# -eq 0 ]]; then
+    _shell_apply || true
+  fi
   _summary linked "$good" "$bad"
   _next_steps
   if [[ -n $bad ]]; then
@@ -4245,6 +4381,58 @@ _screen_tools() {
     fi
   fi
 
+  # Step 4: the login shell, asked once (settings.shell; --force asks
+  # again). Starts on the one in config.yml, else the current login shell,
+  # else zsh. The pick is linked and required here; chsh runs after the
+  # tools.
+  local -a shells=()
+  local shell_now="" shell_start="" shell_pick=""
+  if [[ $PLATFORM != windows && ( -z $(_cfg_setting shell) || $FORCE == true ) ]]; then
+    for name in $SHELLS; do
+      if _tool_is_used_here "$name"; then
+        shells+=("$name")
+      fi
+    done
+  fi
+  if [[ ${#shells[@]} -gt 0 ]]; then
+    shell_now="$(_login_shell)"
+    shell_start="$(_cfg_setting shell)"
+    if [[ -z $shell_start && " ${shells[*]} " == *" $shell_now "* ]]; then
+      shell_start="$shell_now"
+    fi
+    shell_start="${shell_start:-zsh}"
+    ui ""
+    if _use_gum; then
+      if ! shell_pick="$(_gum_pick_one "Login shell${shell_now:+ (now: $shell_now)} (keys below)" "$shell_start" "${shells[@]}")"; then
+        ui "Cancelled; nothing changed."
+        return 0
+      fi
+    else
+      ui "Login shell${shell_now:+ (now: $shell_now)}:"
+      for ((n = 0; n < ${#shells[@]}; n++)); do
+        ui "$(printf '  %2d) %s' "$((n + 1))" "${shells[n]}")"
+      done
+      while true; do
+        _ask "Shell number, Enter = $shell_start: "
+        if [[ -z $ANSWER ]]; then
+          shell_pick="$shell_start"
+          break
+        fi
+        if [[ $ANSWER =~ ^[0-9]+$ && $ANSWER -ge 1 && $ANSWER -le ${#shells[@]} ]]; then
+          shell_pick="${shells[ANSWER - 1]}"
+          break
+        fi
+        ui "  a number from 1 to ${#shells[@]}"
+      done
+    fi
+    for ((i = 0; i < ${#names[@]}; i++)); do
+      if [[ ${names[i]} == "$shell_pick" ]]; then
+        selected[i]=true
+        required[i]=true
+      fi
+    done
+  fi
+
   # Run order: priority: high, then required, then the rest.
   local -a order=()
   local pass
@@ -4311,6 +4499,20 @@ _screen_tools() {
     else
       ui "  theme: switching to $theme_pick failed (see the messages above)"
       INTERACTIVE_FAILED=true
+    fi
+  fi
+
+  # The login shell: saved in config.yml, then chsh when it isn't the
+  # login shell yet (a failed chsh is a next step).
+  if [[ -n $shell_pick ]]; then
+    if ! _config_setting_set shell "$shell_pick"; then
+      INTERACTIVE_FAILED=true
+    elif [[ $shell_pick == "$shell_now" ]]; then
+      ui "  shell: $shell_pick (already the login shell)"
+    elif [[ $DRY_RUN == true ]]; then
+      ui "  Test: login shell $shell_pick (chsh)"
+    elif _shell_apply; then
+      ui "  shell: $shell_pick is the login shell (log out and back in)"
     fi
   fi
 }
@@ -4536,6 +4738,7 @@ cmd_wipe() {
 # Fetch, show what's coming in, then pull --rebase --autostash. A dry run
 # fetches (changes no files) and stops before pulling.
 PULLED=false   # update: the pull brought new commits
+UPDATE_FROM="" # update: the commit before the pull (for the summary)
 _update_pull() {
   local upstream output incoming count
   if ! upstream="$(git -C "$DOTFILES" rev-parse --abbrev-ref '@{u}' 2>/dev/null)"; then
@@ -4558,6 +4761,7 @@ _update_pull() {
     log success "repo: up to date with $upstream"
     return 0
   fi
+  UPDATE_FROM="$(git -C "$DOTFILES" rev-parse HEAD 2>/dev/null)" || UPDATE_FROM=""
   out "Incoming from $upstream:"
   while IFS= read -r output; do
     out "  $output"
@@ -4577,58 +4781,62 @@ _update_pull() {
   fi
 }
 
+# Pull the repo's latest changes, run the hooks of the tools in config.yml
+# (DOTFILES_COMMAND=update: hooks that install from GitHub releases look
+# for a newer one), then show what changed when the pull reached a new
+# release. No installing and no relinking: that's dotfiles link. Linked
+# configs follow the pull on their own (they point into the repo).
 cmd_update() {
-  _require_config
   if ! command -v git >/dev/null 2>&1; then
     log error "git isn't installed; run: dotfiles.sh doctor"
     exit 1
   fi
-  if ! git -C "$DOTFILES" rev-parse --git-dir >/dev/null 2>&1; then
-    log error "$DOTFILES isn't a git repo; nothing to pull"
+  if [[ -z $DOTFILES ]] || ! git -C "$DOTFILES" rev-parse --git-dir >/dev/null 2>&1; then
+    log error "${DOTFILES:-the dotfiles repo} isn't a git repo; nothing to pull"
     exit 1
   fi
   if ! _update_pull; then
     exit 1
   fi
   # The pull may have changed manifest.yml or the hooks: read them again.
+  _require_config
   if [[ $PULLED == true && $DRY_RUN != true ]]; then
     _cfg_reload
   fi
-  # Install what's missing (no upgrades) and relink every tool in config.yml.
-  local tool good="" bad=""
+  local tool bad=""
   _pick_tools update
-  if [[ ${#TOOLS[@]} -eq 0 ]]; then
-    return 0
-  fi
-  # After the pull: the new commits decide whether a system file changes.
-  _require_sudo link "${TOOLS[@]}"
-  local changed=$PULLED
-  for tool in "${TOOLS[@]}"; do
-    CHANGED=false
-    _tool_hold
-    if ! _link_tool "$tool" keep; then
-      _tool_release
+  for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
+    if ! _run_hook "$tool"; then
       bad="${bad:+$bad, }$tool"
-    else
-      _tool_done "$tool"
-      if [[ $CHANGED == true ]]; then
-        changed=true
-        good="${good:+$good, }$(_tool_with_version "$tool")"
-      fi
     fi
   done
+  if [[ -n $bad ]]; then
+    log error "update: hooks failed: $bad"
+  fi
+  # Without Omarchy: re-render the theme when a pulled template changed.
   _render_theme
-  if [[ $THEME_CHANGED == true ]]; then
-    changed=true
-  fi
-  _summary "installed or linked" "$good" "$bad"
   _next_steps
-  if [[ $changed != true && -z $bad ]]; then
-    log info "update: nothing to change"
-  fi
+  _update_summary
   if [[ -n $bad ]]; then
     exit 1
   fi
+}
+
+# After a pull to a new release: "dotfiles vOLD → vNEW" and what changed,
+# like oh-my-zsh after its update.
+_update_summary() {
+  local old new
+  if [[ $PULLED != true || $DRY_RUN == true || -z ${UPDATE_FROM:-} ]]; then
+    return 0
+  fi
+  old="$(_release_tag "$UPDATE_FROM")"
+  new="$(_release_tag HEAD)"
+  if [[ -z $new || $new == "$old" ]]; then
+    return 0
+  fi
+  ui ""
+  ui "dotfiles ${old:-?} → $new"
+  _changelog "$UPDATE_FROM" HEAD
 }
 
 # ─── first run (plan Section 2) ─────────────────────────────────────────
@@ -5458,12 +5666,12 @@ main() {
     load_settings
   fi
   case "$cmd" in
-    help | list) ;;
+    help | list | update) ;;
     *) pkg_cache_load ;;
   esac
   # config.yml follows what's installed (doctor does it after its checks).
   case "$cmd" in
-    help | doctor | add | remove | list) ;;
+    help | doctor | add | remove | list | update) ;;
     *) _config_sync ;;
   esac
   warn_unused_flags "$cmd"

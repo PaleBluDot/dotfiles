@@ -152,6 +152,13 @@ tools:
     links:
       fd/ignore: $HOME/.config/fd/ignore
 
+  fish:
+    package:
+      linux: fish
+      mac: fish
+    links:
+      fish/config.fish: $HOME/.config/fish/config.fish
+
   fontconfig:
     package:
       linux: fontconfig

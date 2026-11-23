@@ -178,8 +178,7 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: root.badgeCount > 0 && !root.vertical ? "\uf09b " + root.badgeCount : "\uf09b"
-    slotSize: Style.bar.iconSlot * (root.badgeCount > 0 && !root.vertical ? (root.badgeCount > 9 ? 2.4 : 1.9) : 1)
+    text: "\uf09b"
     tooltipText: ""
     opacity: root.authenticated ? 1.0 : 0.6
     onPressed: function(buttonCode) {

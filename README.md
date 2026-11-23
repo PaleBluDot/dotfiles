@@ -33,7 +33,7 @@ or the config symlinks can't be made.
 dotfiles                  interactive setup (checkbox lists with gum)
 dotfiles link [tool…]     install tools and link their configs (no tool = all in config.yml)
 dotfiles unlink [tool…]   remove tools and their links (no tool = pick from a list)
-dotfiles update           pull the repo, install what's missing, relink
+dotfiles update           pull the repo, run the hooks, show what changed
 dotfiles wipe             undo everything dotfiles set up here (to test again)
 dotfiles status [tool]
 dotfiles doctor [tool]    check (and fix) what dotfiles needs (one tool: only its checks)
@@ -113,6 +113,14 @@ removed by `unlink` (only `unlink --force`) or the interactive setup;
 the old `config.yaml` writes it from that file's `enabled:` / `locked:`
 values.
 
+`settings.shell` is the machine's login shell: zsh, bash or fish. The
+interactive setup asks once, starting on the current login shell, saves it
+there, adds it to `required:` and switches to it with `chsh` (asks for your
+password). `dotfiles --force` asks again. `dotfiles link` with no tool named
+does the same for a `shell:` written by hand. `/etc/shells` is never
+edited: the package adds the shell there, and a missing entry shows up
+under Next steps. The fish config reads the same `~/.zshenv` as zsh and bash.
+
 It follows what's installed, every run: a tool from `manifest.yml`
 installed here goes into `tools:`, and one removed outside dotfiles comes
 off. A tool you add by hand stays until `link` installs it, and moving one
@@ -122,6 +130,15 @@ using an installed tool, `dotfiles unlink` it.
 
 Run order: `priority: high` tools first, then the required ones, then the
 rest.
+
+When `dotfiles update` pulls a new release, it ends with what changed, like
+oh-my-zsh after its update:
+
+```text
+dotfiles v2.30.0 → v2.31.0
+  ✨ a new feature
+  🐞 a fix
+```
 
 No secrets are committed. Files that need them hold `op://` references and
 are filled in by the 1Password CLI (`op inject`) when linked. espanso's
