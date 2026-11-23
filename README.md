@@ -33,7 +33,7 @@ or the config symlinks can't be made.
 dotfiles                  interactive setup (checkbox lists with gum)
 dotfiles link [tool…]     install tools and link their configs (no tool = all in config.yml)
 dotfiles unlink [tool…]   remove tools and their links (no tool = pick from a list)
-dotfiles update           pull the repo, install what's missing, relink
+dotfiles update           pull the repo, run the hooks, show what changed
 dotfiles wipe             undo everything dotfiles set up here (to test again)
 dotfiles status [tool]
 dotfiles doctor [tool]    check (and fix) what dotfiles needs (one tool: only its checks)
@@ -122,6 +122,15 @@ using an installed tool, `dotfiles unlink` it.
 
 Run order: `priority: high` tools first, then the required ones, then the
 rest.
+
+When `dotfiles update` pulls a new release, it ends with what changed, like
+oh-my-zsh after its update:
+
+```text
+dotfiles v2.30.0 → v2.31.0
+  ✨ a new feature
+  🐞 a fix
+```
 
 No secrets are committed. Files that need them hold `op://` references and
 are filled in by the 1Password CLI (`op inject`) when linked. espanso's

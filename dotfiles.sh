@@ -1772,25 +1772,17 @@ EOF
       cat <<'EOF'
 dotfiles update [-d] [-v] [--force]
 
-Get the latest repo changes and bring this machine in line with them:
-  1. git fetch
-  2. git pull --rebase --autostash (your local changes are set aside and
-     put back; a conflict stops with how to continue or undo)
-  3. for every tool in config.yml: install it if it's new (never
-     upgrades), make sure every link is there, run its hook
+Brings this machine up to date with the latest changes in the dotfiles
+repo. When the update brings a new release, it ends with the
+version change and what's new in it.
 
-Made to run from .zshrc/.bashrc on every new shell: it only asks for sudo
-when a system file changes, and only asks 1Password when a filled-in file's
-source changed. With nothing to do it ends with:
-  [INFO] update: nothing to change
+  -d       show what's coming in and change nothing
+  -v       show every step, including each hook as it runs
+  --force  run the hooks with --force
 
-  -d  fetch, pull nothing, change nothing; show what would change
-  -v  also show the package manager's output
-  --force  no questions, no backups (like link), and fill in 1Password
-           files (~/.ssh/config) again
-
-Example:
-  dotfiles update -dv
+Examples:
+  dotfiles update
+  dotfiles update -d
 EOF
       ;;
     status)
@@ -1879,7 +1871,7 @@ Commands:
   remove <tool...>      undo add, restore the old config, and remove the repo copy
   link [tool...]        install tools and link their configs (no tool = config.yml)
   unlink [tool...]      remove tools and their links (no tool = pick from a list)
-  update                pull the repo, install new tools, check links
+  update                pull the repo, run the hooks, show what changed
   wipe                  undo everything dotfiles set up here (for re-testing)
   status [tool]         what's installed and linked
   doctor [tool]         check (and fix) what dotfiles needs
@@ -1935,6 +1927,28 @@ _version() {
 # One line with the version, for help, status and doctor.
 _title() {
   printf 'dotfiles %s\n\n' "$(_version)"
+}
+
+# ─── what changed (the end of update) ───────────────────────────────────
+
+# The release a commit is at: the latest v* tag it contains, or nothing.
+_release_tag() {
+  git -C "$DOTFILES" describe --tags --abbrev=0 --match 'v*' "$1" 2>/dev/null || true
+}
+
+# What changed from one commit to another, for people: the feat, fix and
+# perf commit titles (✨ feature, 🐞 fix, ⚡ faster), without the type,
+# scope or PR number. At most 10 lines, then how many more.
+_changelog() {
+  git -C "$DOTFILES" log --no-merges --format=%s "$1..$2" 2>/dev/null | awk '
+    /^(feat|fix|perf)(\([^)]*\))?!?: / {
+      type = $0; sub(/[(!:].*/, "", type)
+      text = $0; sub(/^[^:]*: /, "", text); sub(/ \(#[0-9]+\)$/, "", text)
+      icon = (type == "feat") ? "✨" : (type == "fix") ? "🐞" : "⚡"
+      n++
+      if (n <= 10) printf "  %s %s\n", icon, text
+    }
+    END { if (n > 10) printf "  … and %d more\n", n - 10 }'
 }
 
 # Stubs: each one is replaced in its build step (plan Section 16).
@@ -2550,7 +2564,7 @@ _pick_tools() {
       TOOLS+=("$tool")
     done < <(_order_tools $(_listed_tools))
     if [[ ${#TOOLS[@]} -eq 0 && $cmd == update ]]; then
-      log info "update: no tools in config.yml yet; nothing to install or link"
+      log info "update: no tools in config.yml yet; no hooks to run"
     elif [[ ${#TOOLS[@]} -eq 0 ]]; then
       log info "$cmd: no tools in config.yml yet; name one: dotfiles.sh $cmd <tool> (or run dotfiles to pick)"
     fi
@@ -4536,6 +4550,7 @@ cmd_wipe() {
 # Fetch, show what's coming in, then pull --rebase --autostash. A dry run
 # fetches (changes no files) and stops before pulling.
 PULLED=false   # update: the pull brought new commits
+UPDATE_FROM="" # update: the commit before the pull (for the summary)
 _update_pull() {
   local upstream output incoming count
   if ! upstream="$(git -C "$DOTFILES" rev-parse --abbrev-ref '@{u}' 2>/dev/null)"; then
@@ -4558,6 +4573,7 @@ _update_pull() {
     log success "repo: up to date with $upstream"
     return 0
   fi
+  UPDATE_FROM="$(git -C "$DOTFILES" rev-parse HEAD 2>/dev/null)" || UPDATE_FROM=""
   out "Incoming from $upstream:"
   while IFS= read -r output; do
     out "  $output"
@@ -4577,58 +4593,62 @@ _update_pull() {
   fi
 }
 
+# Pull the repo's latest changes, run the hooks of the tools in config.yml
+# (DOTFILES_COMMAND=update: hooks that install from GitHub releases look
+# for a newer one), then show what changed when the pull reached a new
+# release. No installing and no relinking: that's dotfiles link. Linked
+# configs follow the pull on their own (they point into the repo).
 cmd_update() {
-  _require_config
   if ! command -v git >/dev/null 2>&1; then
     log error "git isn't installed; run: dotfiles.sh doctor"
     exit 1
   fi
-  if ! git -C "$DOTFILES" rev-parse --git-dir >/dev/null 2>&1; then
-    log error "$DOTFILES isn't a git repo; nothing to pull"
+  if [[ -z $DOTFILES ]] || ! git -C "$DOTFILES" rev-parse --git-dir >/dev/null 2>&1; then
+    log error "${DOTFILES:-the dotfiles repo} isn't a git repo; nothing to pull"
     exit 1
   fi
   if ! _update_pull; then
     exit 1
   fi
   # The pull may have changed manifest.yml or the hooks: read them again.
+  _require_config
   if [[ $PULLED == true && $DRY_RUN != true ]]; then
     _cfg_reload
   fi
-  # Install what's missing (no upgrades) and relink every tool in config.yml.
-  local tool good="" bad=""
+  local tool bad=""
   _pick_tools update
-  if [[ ${#TOOLS[@]} -eq 0 ]]; then
-    return 0
-  fi
-  # After the pull: the new commits decide whether a system file changes.
-  _require_sudo link "${TOOLS[@]}"
-  local changed=$PULLED
-  for tool in "${TOOLS[@]}"; do
-    CHANGED=false
-    _tool_hold
-    if ! _link_tool "$tool" keep; then
-      _tool_release
+  for tool in ${TOOLS[@]+"${TOOLS[@]}"}; do
+    if ! _run_hook "$tool"; then
       bad="${bad:+$bad, }$tool"
-    else
-      _tool_done "$tool"
-      if [[ $CHANGED == true ]]; then
-        changed=true
-        good="${good:+$good, }$(_tool_with_version "$tool")"
-      fi
     fi
   done
+  if [[ -n $bad ]]; then
+    log error "update: hooks failed: $bad"
+  fi
+  # Without Omarchy: re-render the theme when a pulled template changed.
   _render_theme
-  if [[ $THEME_CHANGED == true ]]; then
-    changed=true
-  fi
-  _summary "installed or linked" "$good" "$bad"
   _next_steps
-  if [[ $changed != true && -z $bad ]]; then
-    log info "update: nothing to change"
-  fi
+  _update_summary
   if [[ -n $bad ]]; then
     exit 1
   fi
+}
+
+# After a pull to a new release: "dotfiles vOLD → vNEW" and what changed,
+# like oh-my-zsh after its update.
+_update_summary() {
+  local old new
+  if [[ $PULLED != true || $DRY_RUN == true || -z ${UPDATE_FROM:-} ]]; then
+    return 0
+  fi
+  old="$(_release_tag "$UPDATE_FROM")"
+  new="$(_release_tag HEAD)"
+  if [[ -z $new || $new == "$old" ]]; then
+    return 0
+  fi
+  ui ""
+  ui "dotfiles ${old:-?} → $new"
+  _changelog "$UPDATE_FROM" HEAD
 }
 
 # ─── first run (plan Section 2) ─────────────────────────────────────────
@@ -5458,12 +5478,12 @@ main() {
     load_settings
   fi
   case "$cmd" in
-    help | list) ;;
+    help | list | update) ;;
     *) pkg_cache_load ;;
   esac
   # config.yml follows what's installed (doctor does it after its checks).
   case "$cmd" in
-    help | doctor | add | remove | list) ;;
+    help | doctor | add | remove | list | update) ;;
     *) _config_sync ;;
   esac
   warn_unused_flags "$cmd"
