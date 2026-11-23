@@ -19,6 +19,10 @@ vim.g.lazyvim_picker = "telescope"
 -- Can be one of: vtsls, tsc
 vim.g.lazyvim_ts_lsp = "tsc"
 
+-- Show text exactly as written: never hide markup such as markdown
+-- backticks and code fences. LazyVim sets this to 2.
+vim.opt.conceallevel = 0
+
 -- Optionally setup the terminal to use
 -- This sets `vim.o.shell` and does some additional configuration for:
 -- * pwsh
