@@ -77,3 +77,11 @@ config/nvim/**/.repro
 config/nvim/**/foo.*
 config/nvim/**/*.log
 config/nvim/**/data
+
+# Omarchy: owe wallpaper engine theme-set hook (installed by owe, per machine)
+config/omarchy/hooks/theme-set.d/10-owe-sync
+
+# Omarchy dictation (voxtype): per machine, not tracked
+config/omarchy/defaults/dictation
+config/omarchy/defaults/dictation.lock
+config/omarchy/plugins/io.voxtype.settings/
