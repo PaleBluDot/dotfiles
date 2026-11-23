@@ -27,11 +27,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # The deploy key (secret RELEASE_DEPLOY_KEY, write access) is on main's
+      # bypass list, so semantic-release can push the release commit and tag
+      # to main, which admins can only reach through a pull request. Kept for
+      # the release step's git push (persist-credentials).
       - name: 🛒 Checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          persist-credentials: false
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
+          persist-credentials: true
 
       - name: ⚙️ Setup Node
         uses: actions/setup-node@v7
@@ -46,8 +51,10 @@ jobs:
       - name: 🏗 Build
         run: npm run build --if-present
 
+      # Pushes over SSH with the deploy key from the checkout. GH_TOKEN is
+      # only for the GitHub API (the release, comments on issues and PRs).
       - name: 🚀 Release
-        run: npm run release
+        run: npm run release -- --repository-url git@github.com:PaleBluDot/dotfiles.git
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}

@@ -7,6 +7,7 @@
 	"license": "MIT",
 	"private": true,
 	"scripts": {
+		"prepare": "husky install",
 		"commit": "git cz",
 		"release": "npx semantic-release",
 		"dry-release": "npx semantic-release -d"
