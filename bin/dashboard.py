@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
 System Dashboard
 A dark-themed desktop GUI showing CPU, RAM, Disk, Network, and Power Profile.
