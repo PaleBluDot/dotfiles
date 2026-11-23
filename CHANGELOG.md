@@ -4,6 +4,17 @@ These are automatically created by [semantic-release](https://github.com/semanti
 
 
 
+# [2.31.0](https://github.com/PaleBluDot/dotfiles/compare/v2.30.0...v2.31.0) (2026-11-23)
+
+
+### Features
+
+* **bin:** update python scripts ([#141](https://github.com/PaleBluDot/dotfiles/issues/141)) ([3a835cf](https://github.com/PaleBluDot/dotfiles/commit/3a835cfc6f023188c5c6e8ef94084b6ba5f87eb1)), closes [#135](https://github.com/PaleBluDot/dotfiles/issues/135)
+* **config:** chromium and hypr tweaks ([#143](https://github.com/PaleBluDot/dotfiles/issues/143)) ([888ae4d](https://github.com/PaleBluDot/dotfiles/commit/888ae4d17bdce8ab18a9b9b12e7dc2791763b94f)), closes [#137](https://github.com/PaleBluDot/dotfiles/issues/137)
+* **config:** update omarchy bar ([#142](https://github.com/PaleBluDot/dotfiles/issues/142)) ([897a9d7](https://github.com/PaleBluDot/dotfiles/commit/897a9d79236e3d18897242e1b38d878ae977916e)), closes [#136](https://github.com/PaleBluDot/dotfiles/issues/136)
+* **script:** choose login shell ([#140](https://github.com/PaleBluDot/dotfiles/issues/140)) ([c160d69](https://github.com/PaleBluDot/dotfiles/commit/c160d699aeee82cdf8af4fe4e5ae84e0da283f3e)), closes [#131](https://github.com/PaleBluDot/dotfiles/issues/131)
+* **script:** update shows changes ([#134](https://github.com/PaleBluDot/dotfiles/issues/134)) ([476c186](https://github.com/PaleBluDot/dotfiles/commit/476c1867dce54da89b9d30befe125b49d159931a)), closes [#130](https://github.com/PaleBluDot/dotfiles/issues/130)
+
 # [2.30.0](https://github.com/PaleBluDot/dotfiles/compare/v2.29.0...v2.30.0) (2026-11-08)
 
 
