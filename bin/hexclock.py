@@ -1,6 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 
 import socket
+import threading
+import webbrowser
 from flask import Flask, render_template_string
 from datetime import datetime
 
@@ -152,4 +154,7 @@ def time_hex():
 
 if __name__ == "__main__":
     local_ip = socket.gethostbyname(socket.gethostname())
+    # app.run() blocks until Ctrl+C, so open the browser from a timer that
+    # fires a second later, once the server is listening.
+    threading.Timer(1, webbrowser.open, args=[f"http://{local_ip}:5000"]).start()
     app.run(host=local_ip, port=5000)
