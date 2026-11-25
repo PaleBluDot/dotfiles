@@ -157,9 +157,9 @@ alias mup='MISE_MINIMUM_RELEASE_AGE=0 mise up'
 # !------------------------------------
 alias h="herdr"
 alias d="docker"
-alias linuxbox='docker start -ai linux-command-line'
 alias g="git"
 alias r="rails"
+alias linuxbox='docker start -ai linux-command-line'
 
 
 # !------------------------------------
