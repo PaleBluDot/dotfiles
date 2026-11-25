@@ -159,6 +159,7 @@ alias h="herdr"
 alias d="docker"
 alias g="git"
 alias r="rails"
+alias linuxbox='docker start -ai linux-command-line'
 
 
 # !------------------------------------
